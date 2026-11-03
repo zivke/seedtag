@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)"
+    ],
+    "deny": [
+      "Bash(git push:*)",
+      "Bash(sudo rm:*)",
+      "Bash(cat ~/.android-keys/*)",
+      "Bash(cat *.p12*)",
+      "Bash(cat *.jks*)",
+      "Bash(cat *.keystore*)",
+      "Bash(cat .env*)",
+      "Read(./.env)",
+      "Read(~/.android-keys/**)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "${CLAUDE_PROJECT_DIR:-/workspaces/seedtag}/.claude/statusline.sh"
+  }
+}

@@ -1,0 +1,79 @@
+{
+  "name": "seedtag",
+  // Dockerfile rather than a bare image: the Android SDK is installed with
+  // sdkmanager, which no feature does. Features still apply on top.
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "."
+  },
+
+  "features": {
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    }
+  },
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "JetBrains.kotlin-server",
+        "vscjava.vscode-gradle",
+        "redhat.vscode-xml",
+        "ms-python.python",
+        "github.vscode-pull-request-github",
+        "eamodio.gitlens",
+        "anthropic.claude-code"
+      ],
+      "settings": {
+        // Lets the folderOpen task in .vscode/tasks.json run without the
+        // "allow automatic tasks?" prompt on every window
+        "task.allowAutomaticTasks": "on"
+      }
+    }
+  },
+
+  "mounts": [
+    // Per-project — sign in once per devcontainer
+    "source=claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume",
+    // Deliberately NOT ${devcontainerId}: the signing keys and the adb identity
+    // are yours, not this project's, and are shared by every Android project.
+    // See .devcontainer/README.md before the first release build.
+    "source=android-keys,target=/home/vscode/.android-keys,type=volume",
+    // adb's own key pair, so the device stays authorised across rebuilds
+    "source=android-adb,target=/home/vscode/.android,type=volume",
+    // Gradle distribution + dependency cache. Shared too: it only holds public
+    // artifacts, and re-downloading AGP/Compose on every rebuild is slow.
+    "source=gradle-cache,target=/home/vscode/.gradle,type=volume"
+  ],
+
+  // adb over USB instead of over the network: uncomment, rebuild, and stop any
+  // adb server on the host first (`adb kill-server`) so it releases the device.
+  // "runArgs": ["--privileged", "-v", "/dev/bus/usb:/dev/bus/usb"],
+
+  "containerEnv": {
+    "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
+    // The signing key (KEYSTORE, KEY_PASS) is set in .env, not here: a value
+    // here would override .env.
+    // Address of the device for `make connect`, e.g. 192.168.1.50
+    "DEVICE_IP": "${localEnv:SEEDTAG_DEVICE_IP}",
+    // Auto-update channel for the native install: latest (default) or stable.
+    // Note there is deliberately no DISABLE_AUTOUPDATER here — leaving it unset
+    // is what keeps the background updater running.
+    "CLAUDE_CHANNEL": "${localEnv:CLAUDE_CHANNEL}"
+  },
+
+  "remoteEnv": {
+    // ~/.local/bin: native Claude Code installer. The SDK tools (adb,
+    // sdkmanager, apksigner) are already on PATH from the Dockerfile.
+    "PATH": "/home/vscode/.local/bin:${containerEnv:PATH}"
+  },
+
+  "remoteUser": "vscode",
+
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+
+  // Runs on every container start, not just creation: pulls any release that
+  // landed while the container was stopped, so a long-lived container doesn't
+  // drift. Never fails the start.
+  "postStartCommand": "bash -c 'claude update >/tmp/claude-update.log 2>&1 || true'"
+}

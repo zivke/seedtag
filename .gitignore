@@ -1,0 +1,33 @@
+# Build output
+build/
+.gradle/
+.kotlin/
+*.apk
+*.aab
+
+# Signing keys: never commit these
+*.p12
+*.jks
+*.keystore
+# Key password for the release build
+.env
+
+# SDK path, written by post-create / Android Studio
+local.properties
+
+# IDEs and language servers
+.idea/
+*.iml
+bin/
+
+# Python
+__pycache__/
+
+# Claude Code: .claude/settings.json is shared and tracked; local overrides are not
+.claude/settings.local.json
+
+# Editor / OS cruft
+.DS_Store
+Thumbs.db
+*.swp
+*~

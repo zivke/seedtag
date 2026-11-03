@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "JetBrains.kotlin-server",
+    "vscjava.vscode-gradle",
+    "redhat.vscode-xml",
+    "ms-python.python",
+    "github.vscode-pull-request-github",
+    "eamodio.gitlens",
+    "anthropic.claude-code"
+  ]
+}

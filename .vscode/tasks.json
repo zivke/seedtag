@@ -1,0 +1,48 @@
+{
+  // `task.allowAutomaticTasks` is set to "on" in .devcontainer/devcontainer.json
+  // so the folderOpen task below runs without a prompt. Drop its "runOptions"
+  // to make it manual.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "claude: resume session",
+      "detail": "Resume the last Claude Code session for this folder, or start a new one",
+      "type": "shell",
+      "command": "claude --continue || claude",
+      "runOptions": { "runOn": "folderOpen" },
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "debug build",
+      "detail": "make debug (debug key, no .env needed)",
+      "type": "shell",
+      "command": "make debug",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "release build",
+      "detail": "make build (signed with the key in .env)",
+      "type": "shell",
+      "command": "make build",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "test",
+      "detail": "make test (JVM core + seedtag.py, no device needed)",
+      "type": "shell",
+      "command": "make test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "install + run (debug)",
+      "detail": "make run-debug (device must be connected: make connect)",
+      "type": "shell",
+      "command": "make run-debug",
+      "problemMatcher": []
+    }
+  ]
+}
