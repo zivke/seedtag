@@ -18,11 +18,13 @@ sealed interface TagRequest {
     /** Write [text]; refuses to overwrite a non-empty tag unless [allowOverwrite]. */
     data class Write(val text: String, val allowOverwrite: Boolean = false) : TagRequest
     data object Read : TagRequest
-    data object Lock : TagRequest
+    /** Make the tag read-only, but only if it holds exactly [expected]. */
+    data class Lock(val expected: String) : TagRequest
 }
 
 sealed interface TagResult {
-    data class Written(val capacity: Int, val used: Int) : TagResult
+    /** [text] was written and read back. */
+    data class Written(val text: String) : TagResult
     data class Read(val text: String) : TagResult
     data object Locked : TagResult
     /** Tag already holds data; [existing] is its text if it was a Text record. */
@@ -37,7 +39,7 @@ object TagIo {
         when (request) {
             is TagRequest.Write -> write(tag, request)
             TagRequest.Read -> read(tag)
-            TagRequest.Lock -> lock(tag)
+            is TagRequest.Lock -> lock(tag, request.expected)
         }
     } catch (e: TagLostException) {
         TagResult.Failed("Tag moved away too early. Hold it still against the phone and try again.")
@@ -76,7 +78,7 @@ object TagIo {
             // Read back over the same connection; getNdefMessage() re-reads the tag.
             val back = firstText(it.ndefMessage)
             if (back != req.text) return TagResult.Failed("Read-back mismatch after writing. The tag may be faulty – don't use it.")
-            return TagResult.Written(capacity = it.maxSize, used = message.byteArrayLength)
+            return TagResult.Written(req.text)
         }
     }
 
@@ -86,7 +88,7 @@ object TagIo {
             it.connect()
             val back = firstText(it.ndefMessage)
             if (back != expected) return TagResult.Failed("Read-back mismatch after writing. The tag may be faulty – don't use it.")
-            return TagResult.Written(capacity = it.maxSize, used = NdefMessage(NdefRecord.createTextRecord("en", expected)).byteArrayLength)
+            return TagResult.Written(expected)
         }
     }
 
@@ -100,10 +102,14 @@ object TagIo {
         }
     }
 
-    private fun lock(tag: Tag): TagResult {
+    private fun lock(tag: Tag, expected: String): TagResult {
         val ndef = Ndef.get(tag) ?: return TagResult.Failed("This tag has no NDEF data.")
         ndef.use {
             it.connect()
+            // Locking is permanent: only the tag that was just written or verified.
+            if (firstText(it.ndefMessage) != expected) {
+                return TagResult.Failed("This isn't the tag you last wrote or verified. Nothing was changed.")
+            }
             if (!it.isWritable) return TagResult.Locked
             if (!it.canMakeReadOnly()) return TagResult.Failed("This tag can't be made read-only.")
             return if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Locking failed. The tag is unchanged.")

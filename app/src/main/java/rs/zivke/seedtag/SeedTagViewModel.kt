@@ -58,6 +58,8 @@ class SeedTagViewModel : ViewModel() {
     var backupFingerprint by mutableStateOf<String?>(null)
         private set
     private var pendingText: String? = null
+    /** Tag text (Base64 blob, no secret) last written or decrypted: the only tag Lock will touch. */
+    private var lockTarget: String? = null
 
     // ---- verify / restore -----------------------------------------------------
     var readPassword by mutableStateOf("")
@@ -171,11 +173,15 @@ class SeedTagViewModel : ViewModel() {
         arm(TagRequest.Read, purpose, "Hold the tag to the back of the phone to read")
     }
 
-    fun requestLock() { dialog = Dialog.ConfirmLock }
+    fun requestLock() {
+        if (lockTarget == null) return showError("Write or verify the tag first.")
+        dialog = Dialog.ConfirmLock
+    }
 
     fun confirmLock() {
         dialog = null
-        arm(TagRequest.Lock, Purpose.Lock, "Hold the tag to make it permanently read-only")
+        val target = lockTarget ?: return
+        arm(TagRequest.Lock(target), Purpose.Lock, "Hold the same tag to make it permanently read-only")
     }
 
     fun cancelScan() { pending.set(null); scanPrompt = null }
@@ -183,7 +189,7 @@ class SeedTagViewModel : ViewModel() {
     fun hideRestored() { restoredWords = null }
 
     fun startOver() {
-        wipeBackup(); step = BackupStep.Words; backupFingerprint = null
+        wipeBackup(); step = BackupStep.Words; backupFingerprint = null; lockTarget = null
     }
 
     // ================================================================= NFC ===
@@ -215,6 +221,7 @@ class SeedTagViewModel : ViewModel() {
             is TagResult.Written -> {
                 scanPrompt = null
                 wipeBackup()
+                lockTarget = r.text
                 step = BackupStep.Done
             }
             is TagResult.Locked -> {
@@ -240,6 +247,7 @@ class SeedTagViewModel : ViewModel() {
                     } finally { entropy.fill(0) }
                 }
                 verifyResult = VerifyResult(words.size, fp)
+                lockTarget = text
                 if (reveal) restoredWords = words
                 readPassword = ""
             } catch (e: SeedTagException) {
