@@ -11,6 +11,8 @@ All notable user-visible changes to SeedTag. The format follows
   word list above it scrolls, and it follows the word being typed.
 - The app runs full screen: the status and navigation bars are hidden and
   can be brought back briefly with a swipe from the edge.
+- **Make tag read-only** is now a red button, so it stands out as the one
+  permanent action.
 
 ### Added
 - **Hide entered words**, on by default: words already entered are shown as

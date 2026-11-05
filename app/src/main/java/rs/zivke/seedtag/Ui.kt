@@ -317,9 +317,22 @@ private fun DoneStep(vm: SeedTagViewModel) {
             style = MaterialTheme.typography.bodyMedium,
         )
         Button(onClick = { vm.tab = Screen.Verify }, modifier = Modifier.fillMaxWidth()) { Text("Verify now") }
-        OutlinedButton(onClick = vm::requestLock, modifier = Modifier.fillMaxWidth()) { Text("Make tag read-only…") }
+        LockButton(vm)
         TextButton(onClick = vm::startOver, modifier = Modifier.fillMaxWidth()) { Text("Back up another seed") }
     }
+}
+
+/** Permanent and irreversible, so it looks it: red, unlike every other button. */
+@Composable
+private fun LockButton(vm: SeedTagViewModel) {
+    Button(
+        onClick = vm::requestLock,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.error,
+            contentColor = MaterialTheme.colorScheme.onError,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) { Text("Make tag read-only", fontWeight = FontWeight.SemiBold) }
 }
 
 // ===================================================== verify / restore ===
@@ -353,7 +366,7 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
                 }
             }
             if (!reveal) {
-                OutlinedButton(onClick = vm::requestLock, modifier = Modifier.fillMaxWidth()) { Text("Make tag read-only…") }
+                LockButton(vm)
             }
         }
         val words = vm.restoredWords
