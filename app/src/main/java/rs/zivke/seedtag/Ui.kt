@@ -47,6 +47,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -148,21 +149,35 @@ private fun BackupScreen(vm: SeedTagViewModel) {
 
 @Composable
 private fun WordsStep(vm: SeedTagViewModel) {
-    ScreenColumn {
-        Text("1 · Enter your recovery words", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Type with the keypad below and tap the matching word. The system keyboard and clipboard are never used.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        WordGrid(vm.words, current = vm.prefix)
+    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Only the words scroll; suggestions, keypad and buttons stay fixed at the bottom.
+        val scroll = rememberScrollState()
+        // Keep the word being typed in view as the grid grows.
+        LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("1 · Enter your recovery words", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Type with the keypad below and tap the matching word. The system keyboard and clipboard are never used.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            WordGrid(vm.words, current = vm.prefix)
 
-        when (val s = vm.mnemonicStatus) {
-            is MnemonicStatus.Incomplete -> Text("${s.count} words", style = MaterialTheme.typography.bodyMedium)
-            is MnemonicStatus.Invalid -> Text("✗ ${s.reason}", color = MaterialTheme.colorScheme.error)
-            is MnemonicStatus.Valid -> Text("✓ Valid ${s.count}-word mnemonic", color = MaterialTheme.colorScheme.primary)
+            when (val s = vm.mnemonicStatus) {
+                is MnemonicStatus.Incomplete -> Text("${s.count} words", style = MaterialTheme.typography.bodyMedium)
+                is MnemonicStatus.Invalid -> Text("✗ ${s.reason}", color = MaterialTheme.colorScheme.error)
+                is MnemonicStatus.Valid -> Text("✓ Valid ${s.count}-word mnemonic", color = MaterialTheme.colorScheme.primary)
+            }
         }
 
-        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        // Fixed height, so the keypad doesn't jump when the suggestions appear or disappear.
+        Row(
+            Modifier.fillMaxWidth().height(48.dp).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             vm.suggestions.forEach { w ->
                 SuggestionChip(onClick = { vm.pickWord(w) }, label = { Text(w) })
             }

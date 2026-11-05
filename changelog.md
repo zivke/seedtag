@@ -4,6 +4,12 @@ All notable user-visible changes to SeedTag. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are the
 `versionName` in `app/build.gradle.kts`.
 
+## [Unreleased]
+
+### Changed
+- The word-entry keypad stays fixed at the bottom of the screen. Only the
+  word list above it scrolls, and it follows the word being typed.
+
 ## [0.1.1] - 2026-11-05
 
 ### Fixed
