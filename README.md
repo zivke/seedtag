@@ -59,6 +59,50 @@ requests any permission other than NFC**, so a library can't quietly add network
 
 Leaving the app (home button, Recents, screen off) wipes everything typed or decrypted.
 
+## Choosing a tag
+
+Any tag Android can read and write as NDEF works. The app uses the generic NDEF API and listens for NFC-A, -B, -F
+and -V, and every write checks the size first. Tested hardware: MIFARE Ultralight C.
+
+**Space needed** (whole NDEF area, including the 3-byte TLV wrapper):
+
+| Words | Base64 on tag | NDEF bytes |
+|---|---|---|
+| 12 | 84 chars | ~94 |
+| 18 | 92 chars | ~102 |
+| 24 | 104 chars | ~114 |
+
+**Data retention matters most.** A seed backup has to last. Cheap Type 2 chips (NTAG21x, Ultralight C/EV1/AES) are
+typically rated for about 10 years, others for 25–50. Check the datasheet of the exact chip you buy. Treat a
+10-year tag as one copy among several, and verify it every now and then.
+
+**Tag families** (memory and retention are typical datasheet values; check yours):
+
+| Tag | Type / Android tech | User memory | 24 words? | Retention | Built-in write protection |
+|---|---|---|---|---|---|
+| MIFARE Ultralight C *(tested)* | Type 2, NfcA | 144 B | ✓ | ~10 y | 3DES key, mutual auth (strong) |
+| MIFARE Ultralight AES | Type 2, NfcA | 144 B | ✓ | ~10 y | AES-128 mutual auth (strong) |
+| MIFARE Ultralight EV1 (MF0UL21) | Type 2, NfcA | 128 B | ✓ (tight) | ~10 y | 32-bit password, sent in clear (weak) |
+| NTAG212 | Type 2, NfcA | 128 B | ✓ (tight) | ~10 y | 32-bit password (weak) |
+| NTAG213 / 215 / 216 | Type 2, NfcA | 144 / 504 / 888 B | ✓ | ~10 y | 32-bit password, sent in clear (weak) |
+| NTAG 424 DNA | Type 4, IsoDep | 416 B (256 B NDEF file) | ✓ | ~50 y | AES-128 keys per file, read stays free (strong) |
+| MIFARE DESFire EV2 / EV3 | Type 4, IsoDep | 2–8 KB | ✓ | ~25 y | AES keys, per-file access rights (strong) |
+| ICODE SLIX2 | Type 5, NfcV | 316 B | ✓ | ~50 y | 32-bit write password, sent in clear (weak) |
+| ICODE SLIX | Type 5, NfcV | 112 B | ✗ (≈18 words max) | ~50 y | none, only permanent block locks |
+| ST25TV (various) | Type 5, NfcV | 64 B – 2 KB | depends on model | ~40 y | 64-bit area passwords, sent in clear (medium) |
+| FeliCa Lite-S | Type 3, NfcF | 224 B | ✓ | — | MAC-protected writes with a card key |
+
+SeedTag doesn't use any of these write protections yet: the payload is encrypted either way, and **Make tag
+read-only** is the only protection against overwriting. Phones read Type 5 (ISO 15693) tags less reliably than
+Type 2 or 4, and a tag mounted on metal needs an on-metal version.
+
+**Avoid:**
+
+- Original MIFARE Ultralight, NTAG210 and Ultralight EV1 MF0UL11: 48 bytes, too small even for 12 words.
+- MIFARE Classic: not an NFC Forum type. Many phones (non-NXP NFC controllers) can't read it at all, and its
+  Crypto1 security is broken.
+- Type 1 (Topaz): obsolete and too small.
+
 ## Format v1
 
 ```
