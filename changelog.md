@@ -9,6 +9,8 @@ All notable user-visible changes to SeedTag. The format follows
 ### Changed
 - The word-entry keypad stays fixed at the bottom of the screen. Only the
   word list above it scrolls, and it follows the word being typed.
+- The app runs full screen: the status and navigation bars are hidden and
+  can be brought back briefly with a swipe from the edge.
 
 ## [0.1.1] - 2026-11-05
 

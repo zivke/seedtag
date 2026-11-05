@@ -13,6 +13,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.runtime.mutableStateOf
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 
 enum class NfcState { Ready, Disabled, Missing }
 
@@ -27,6 +30,7 @@ class MainActivity : ComponentActivity() {
         // No screenshots, no screen recording, blank thumbnail in Recents.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
+        hideSystemBars()
         adapter = NfcAdapter.getDefaultAdapter(this)
         setContent {
             SeedTagTheme {
@@ -56,6 +60,20 @@ class MainActivity : ComponentActivity() {
                 NfcAdapter.FLAG_READER_NFC_F or NfcAdapter.FLAG_READER_NFC_V,
             Bundle().apply { putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250) },
         )
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        // Coming back from a dialog, the shade or another app can bring the bars back.
+        if (hasFocus) hideSystemBars()
+    }
+
+    /** Full screen: no status or navigation bar. A swipe from the edge shows them briefly. */
+    private fun hideSystemBars() {
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.systemBars())
+        }
     }
 
     override fun onPause() {
