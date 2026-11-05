@@ -46,7 +46,8 @@ requests any permission other than NFC**, so a library can't quietly add network
 
 ## Using it
 
-1. **Back up**: enter the words with the in-app keypad (tap a suggestion to accept each word), then set a password.
+1. **Back up**: choose how many words your phrase has (12, 15, 18, 21 or 24), enter them with the in-app keypad
+   (tap a suggestion to accept each word), then set a password.
    Words already entered are hidden by default; turn off **Hide entered words** to check them.
    **Generate 7-word passphrase** is recommended (≈77 bits). Write it down. Tap *Encrypt & write*, then hold the tag to the phone.
    If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted

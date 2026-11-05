@@ -20,7 +20,7 @@ import rs.zivke.seedtag.core.SeedTagException
 import java.util.concurrent.atomic.AtomicReference
 
 enum class Screen(val title: String) { Backup("Back up"), Verify("Verify"), Restore("Restore") }
-enum class BackupStep { Words, Password, Done }
+enum class BackupStep { Length, Words, Password, Done }
 
 sealed interface MnemonicStatus {
     data class Incomplete(val count: Int) : MnemonicStatus
@@ -53,7 +53,10 @@ class SeedTagViewModel : ViewModel() {
         private set
     /** Mask the words already entered (on by default, back on after wipeAll). */
     var hideWords by mutableStateOf(true)
-    var step by mutableStateOf(BackupStep.Words)
+    var step by mutableStateOf(BackupStep.Length)
+        private set
+    /** Number of words chosen before typing; one of Bip39.validWordCounts. */
+    var wordCount by mutableStateOf(24)
         private set
     var password by mutableStateOf("")
     var passwordRepeat by mutableStateOf("")
@@ -93,7 +96,7 @@ class SeedTagViewModel : ViewModel() {
     val mnemonicStatus: MnemonicStatus
         get() {
             val n = words.size
-            if (n !in Bip39.validWordCounts) return MnemonicStatus.Incomplete(n)
+            if (n != wordCount) return MnemonicStatus.Incomplete(n)
             return try {
                 Bip39.wordsToEntropy(words.toList()).fill(0)
                 MnemonicStatus.Valid(n)
@@ -103,7 +106,7 @@ class SeedTagViewModel : ViewModel() {
         }
 
     fun typeLetter(c: Char) {
-        if (words.size >= 24 || prefix.length >= 8) return
+        if (words.size >= wordCount || prefix.length >= 8) return
         val next = prefix + c
         if (Bip39.suggest(next, 1).isNotEmpty()) prefix = next // ignore keys that lead nowhere
     }
@@ -116,10 +119,17 @@ class SeedTagViewModel : ViewModel() {
     }
 
     fun pickWord(w: String) {
-        if (words.size < 24 && Bip39.isWord(w)) { words += w; prefix = "" }
+        if (words.size < wordCount && Bip39.isWord(w)) { words += w; prefix = "" }
     }
 
     fun clearWords() { words.clear(); prefix = "" }
+
+    fun chooseLength(n: Int) {
+        if (n !in Bip39.validWordCounts || n < words.size) return
+        wordCount = n; step = BackupStep.Words
+    }
+
+    fun backToLength() { prefix = ""; step = BackupStep.Length }
 
     fun toPasswordStep() {
         if (mnemonicStatus is MnemonicStatus.Valid) { prefix = ""; step = BackupStep.Password }
@@ -199,7 +209,7 @@ class SeedTagViewModel : ViewModel() {
     fun hideRestored() { restoredWords = null }
 
     fun startOver() {
-        wipeBackup(); step = BackupStep.Words; backupFingerprint = null; lockTarget = null
+        wipeBackup(); step = BackupStep.Length; backupFingerprint = null; lockTarget = null
     }
 
     // ================================================================= NFC ===
@@ -283,7 +293,7 @@ class SeedTagViewModel : ViewModel() {
     // ============================================================== hygiene ===
 
     private fun wipeBackup() {
-        words.clear(); prefix = ""; password = ""; passwordRepeat = ""; hideWords = true
+        words.clear(); prefix = ""; password = ""; passwordRepeat = ""; hideWords = true; wordCount = 24
         generatedPassphrase = false; pendingText = null
     }
 
@@ -291,7 +301,7 @@ class SeedTagViewModel : ViewModel() {
     fun wipeAll() {
         wipes++
         cancelScan()
-        if (step != BackupStep.Done) step = BackupStep.Words
+        if (step != BackupStep.Done) step = BackupStep.Length
         wipeBackup()
         readPassword = ""; restoredWords = null
         if (dialog is Dialog.ConfirmOverwrite) dialog = null

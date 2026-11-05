@@ -16,6 +16,9 @@ All notable user-visible changes to SeedTag. The format follows
   decrypt, no longer right after writing.
 
 ### Added
+- Back up starts by asking how many words the phrase has (12, 15, 18, 21
+  or 24). The keypad stops at that count, and **Next** is enabled once
+  exactly that many words are entered and the checksum is valid.
 - **Hide entered words**, on by default: words already entered are shown as
   dots, only the word being typed is visible. Leaving the app turns it back on.
 - Verify and Restore compare the fingerprint with the backup just written

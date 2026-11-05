@@ -67,6 +67,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import rs.zivke.seedtag.core.Bip39
 
 // ============================================================== theme ===
 
@@ -142,9 +143,29 @@ private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun BackupScreen(vm: SeedTagViewModel) {
     when (vm.step) {
+        BackupStep.Length -> LengthStep(vm)
         BackupStep.Words -> WordsStep(vm)
         BackupStep.Password -> PasswordStep(vm)
         BackupStep.Done -> DoneStep(vm)
+    }
+}
+
+@Composable
+private fun LengthStep(vm: SeedTagViewModel) {
+    ScreenColumn {
+        Text("1 · How many words is your recovery phrase?", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Pick the length written on your backup. The keypad then stops at that many words.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Bip39.validWordCounts.sorted().forEach { n ->
+            // Can't pick fewer words than are already entered (after Back from the keypad).
+            OutlinedButton(
+                onClick = { vm.chooseLength(n) },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = n >= vm.words.size,
+            ) { Text("$n words") }
+        }
     }
 }
 
@@ -159,7 +180,7 @@ private fun WordsStep(vm: SeedTagViewModel) {
             Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("1 · Enter your recovery words", style = MaterialTheme.typography.titleMedium)
+            Text("2 · Enter your ${vm.wordCount} recovery words", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Type with the keypad below and tap the matching word. The system keyboard and clipboard are never used.",
                 style = MaterialTheme.typography.bodySmall,
@@ -168,10 +189,10 @@ private fun WordsStep(vm: SeedTagViewModel) {
                 Text("Hide entered words", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 Switch(checked = vm.hideWords, onCheckedChange = { vm.hideWords = it })
             }
-            WordGrid(vm.words, current = vm.prefix, hidden = vm.hideWords)
+            WordGrid(vm.words, current = vm.prefix, hidden = vm.hideWords, max = vm.wordCount)
 
             when (val s = vm.mnemonicStatus) {
-                is MnemonicStatus.Incomplete -> Text("${s.count} words", style = MaterialTheme.typography.bodyMedium)
+                is MnemonicStatus.Incomplete -> Text("${s.count} of ${vm.wordCount} words", style = MaterialTheme.typography.bodyMedium)
                 is MnemonicStatus.Invalid -> Text("✗ ${s.reason}", color = MaterialTheme.colorScheme.error)
                 is MnemonicStatus.Valid -> Text("✓ Valid ${s.count}-word mnemonic", color = MaterialTheme.colorScheme.primary)
             }
@@ -190,6 +211,7 @@ private fun WordsStep(vm: SeedTagViewModel) {
         Keypad(onLetter = vm::typeLetter, onBackspace = vm::backspace)
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = vm::backToLength) { Text("Back") }
             OutlinedButton(onClick = vm::clearWords, enabled = vm.words.isNotEmpty()) { Text("Clear") }
             Spacer(Modifier.weight(1f))
             Button(onClick = vm::toPasswordStep, enabled = vm.mnemonicStatus is MnemonicStatus.Valid) { Text("Next") }
@@ -198,10 +220,10 @@ private fun WordsStep(vm: SeedTagViewModel) {
 }
 
 @Composable
-private fun WordGrid(words: List<String>, current: String? = null, hidden: Boolean = false) {
+private fun WordGrid(words: List<String>, current: String? = null, hidden: Boolean = false, max: Int = 24) {
     // Same mask for every word, so it doesn't give away word lengths.
     val cells = words.mapIndexed { i, w -> "${i + 1}. ${if (hidden) "••••••" else w}" } +
-        if (current != null && words.size < 24) listOf("${words.size + 1}. $current▏") else emptyList()
+        if (current != null && words.size < max) listOf("${words.size + 1}. $current▏") else emptyList()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         cells.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -253,7 +275,7 @@ private fun Key(label: String, modifier: Modifier, onClick: () -> Unit) {
 @Composable
 private fun PasswordStep(vm: SeedTagViewModel) {
     ScreenColumn {
-        Text("2 · Choose the encryption password", style = MaterialTheme.typography.titleMedium)
+        Text("3 · Choose the encryption password", style = MaterialTheme.typography.titleMedium)
         Text(
             "Anyone who finds the tag can try passwords offline, so this password is the only thing protecting your seed. " +
                 "A generated 7-word passphrase (≈77 bits) is strongly recommended. Write it down and store it apart from the tag.",
