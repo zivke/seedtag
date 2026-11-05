@@ -8,6 +8,7 @@ import android.nfc.NdefMessage
 import android.nfc.NdefRecord
 import android.nfc.Tag
 import android.nfc.TagLostException
+import android.nfc.tech.MifareUltralight
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 import rs.zivke.seedtag.core.NdefText
@@ -39,6 +40,8 @@ sealed interface TagResult {
 /** Blocking tag I/O. Call only from the NFC reader-mode callback thread. */
 object TagIo {
 
+    private const val NOT_READ = "Couldn't read the tag properly (it may have moved away too soon). Hold it still against the phone and tap again."
+
     fun perform(tag: Tag, request: TagRequest): TagResult = try {
         when (request) {
             is TagRequest.Write -> write(tag, request)
@@ -64,6 +67,8 @@ object TagIo {
         if (ndef == null) {
             val formatable = NdefFormatable.get(tag)
                 ?: return TagResult.Failed("This tag doesn't support NDEF.")
+            // Never format a tag that may already hold a backup.
+            if (looksNdefFormatted(tag)) return TagResult.Failed(NOT_READ)
             formatable.use { it.connect(); it.format(message) }
             // This Tag object only knows the techs it had when discovered, so Ndef.get()
             // stays null after formatting: the read-back has to wait for the next tap.
@@ -76,24 +81,28 @@ object TagIo {
                 return TagResult.Failed("Tag too small: needs ${message.byteArrayLength} bytes, has ${it.maxSize}.")
             }
             if (!req.allowOverwrite) {
-                val existing = it.ndefMessage
+                // Overwriting without asking is only OK if every read says the tag is empty.
+                val existing = readMessage(it)
                 if (existing != null && existing.records.any { r -> r.tnf != NdefRecord.TNF_EMPTY }) {
                     return TagResult.NotEmpty(firstText(existing))
                 }
             }
             it.writeNdefMessage(message)
-            // Read back over the same connection; getNdefMessage() re-reads the tag.
-            val back = firstText(it.ndefMessage)
-            if (back != req.text) return TagResult.Failed("Read-back mismatch after writing. The tag may be faulty – don't use it.")
+            // Read back over the same connection; getNdefMessage() re-reads the tag. Not the
+            // cached message: that's what the tag held before this write.
+            val back = it.ndefMessage ?: it.ndefMessage
+                ?: return TagResult.WrittenUnchecked(req.text) // couldn't read: check on the next tap
+            if (firstText(back) != req.text) return TagResult.Failed("Read-back mismatch after writing. The tag may be faulty – don't use it.")
             return TagResult.Written(req.text)
         }
     }
 
     private fun checkWritten(tag: Tag, expected: String): TagResult {
-        val ndef = Ndef.get(tag) ?: return TagResult.Failed("This tag has no NDEF data. Hold the tag you just wrote.")
+        val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
         ndef.use {
             it.connect()
-            if (firstText(it.ndefMessage) != expected) {
+            val msg = readMessage(it) ?: return TagResult.Failed(NOT_READ)
+            if (firstText(msg) != expected) {
                 return TagResult.Failed("This tag doesn't hold what was just written. Hold the same tag again; if this keeps failing, the tag may be faulty.")
             }
             return TagResult.Written(expected)
@@ -101,26 +110,50 @@ object TagIo {
     }
 
     private fun read(tag: Tag): TagResult {
-        val ndef = Ndef.get(tag) ?: return TagResult.Failed("This tag has no NDEF data.")
+        val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
         ndef.use {
             it.connect()
-            val msg = it.ndefMessage ?: return TagResult.Failed("The tag is empty.")
+            val msg = readMessage(it) ?: return TagResult.Failed(
+                "The tag is empty, or it couldn't be read properly. Hold it still against the phone and tap again.",
+            )
             val text = firstText(msg) ?: return TagResult.Failed("The tag holds no text record.")
             return TagResult.Read(text)
         }
     }
 
     private fun lock(tag: Tag, expected: String): TagResult {
-        val ndef = Ndef.get(tag) ?: return TagResult.Failed("This tag has no NDEF data.")
+        val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
         ndef.use {
             it.connect()
             // Locking is permanent: only the tag that was just written or verified.
-            if (firstText(it.ndefMessage) != expected) {
+            val msg = readMessage(it) ?: return TagResult.Failed(NOT_READ)
+            if (firstText(msg) != expected) {
                 return TagResult.Failed("This isn't the tag you last wrote or verified. Nothing was changed.")
             }
             if (!it.isWritable) return TagResult.Locked
             if (!it.canMakeReadOnly()) return TagResult.Failed("This tag can't be made read-only.")
             return if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Locking failed. The tag is unchanged.")
+        }
+    }
+
+    /**
+     * getNdefMessage() returns null both for an empty tag and for a failed read when the tag is
+     * still in range afterwards. So: read twice, then fall back to the message Android read at
+     * discovery (same tap). Null only if all three say the tag is empty.
+     */
+    private fun readMessage(ndef: Ndef): NdefMessage? =
+        ndef.ndefMessage ?: ndef.ndefMessage ?: ndef.cachedNdefMessage
+
+    /**
+     * Android offers only NdefFormatable when its NDEF check at discovery failed, which a too-quick
+     * tap can cause on a tag that already holds data. On a Type 2 tag (MIFARE Ultralight / NTAG),
+     * byte 0 of page 3, the capability container, is 0xE1 once the tag is NDEF-formatted.
+     */
+    private fun looksNdefFormatted(tag: Tag): Boolean {
+        val ul = MifareUltralight.get(tag) ?: return false
+        ul.use {
+            it.connect()
+            return (it.readPages(3)[0].toInt() and 0xFF) == 0xE1
         }
     }
 

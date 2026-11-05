@@ -21,6 +21,15 @@ All notable user-visible changes to SeedTag. The format follows
 - Verify and Restore compare the fingerprint with the backup just written
   and say whether it's the same seed, with a warning if it isn't.
 
+### Fixed
+- A tag that moved away too soon could read as empty. Before writing, the app
+  now reads the tag twice and checks what Android read at discovery, so a
+  failed read can't skip the overwrite confirmation. It also never formats a
+  tag that is already NDEF-formatted.
+- A failed read-back after writing asks for another tap to check the tag
+  instead of calling it faulty. Verify, Restore and Lock say the tag couldn't
+  be read instead of "empty" or "not the tag you verified".
+
 ## [0.1.1] - 2026-11-05
 
 ### Fixed
