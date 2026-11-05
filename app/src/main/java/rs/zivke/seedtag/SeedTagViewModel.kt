@@ -50,6 +50,8 @@ class SeedTagViewModel : ViewModel() {
     val words = mutableStateListOf<String>()
     var prefix by mutableStateOf("")
         private set
+    /** Mask the words already entered (on by default, back on after wipeAll). */
+    var hideWords by mutableStateOf(true)
     var step by mutableStateOf(BackupStep.Words)
         private set
     var password by mutableStateOf("")
@@ -280,7 +282,7 @@ class SeedTagViewModel : ViewModel() {
     // ============================================================== hygiene ===
 
     private fun wipeBackup() {
-        words.clear(); prefix = ""; password = ""; passwordRepeat = ""
+        words.clear(); prefix = ""; password = ""; passwordRepeat = ""; hideWords = true
         generatedPassphrase = false; pendingText = null
     }
 

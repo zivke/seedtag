@@ -12,6 +12,10 @@ All notable user-visible changes to SeedTag. The format follows
 - The app runs full screen: the status and navigation bars are hidden and
   can be brought back briefly with a swipe from the edge.
 
+### Added
+- **Hide entered words**, on by default: words already entered are shown as
+  dots, only the word being typed is visible. Leaving the app turns it back on.
+
 ## [0.1.1] - 2026-11-05
 
 ### Fixed

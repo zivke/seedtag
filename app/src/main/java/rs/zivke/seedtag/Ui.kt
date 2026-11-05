@@ -37,6 +37,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SuggestionChip
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
@@ -163,7 +164,11 @@ private fun WordsStep(vm: SeedTagViewModel) {
                 "Type with the keypad below and tap the matching word. The system keyboard and clipboard are never used.",
                 style = MaterialTheme.typography.bodySmall,
             )
-            WordGrid(vm.words, current = vm.prefix)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Hide entered words", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                Switch(checked = vm.hideWords, onCheckedChange = { vm.hideWords = it })
+            }
+            WordGrid(vm.words, current = vm.prefix, hidden = vm.hideWords)
 
             when (val s = vm.mnemonicStatus) {
                 is MnemonicStatus.Incomplete -> Text("${s.count} words", style = MaterialTheme.typography.bodyMedium)
@@ -193,8 +198,9 @@ private fun WordsStep(vm: SeedTagViewModel) {
 }
 
 @Composable
-private fun WordGrid(words: List<String>, current: String? = null) {
-    val cells = words.mapIndexed { i, w -> "${i + 1}. $w" } +
+private fun WordGrid(words: List<String>, current: String? = null, hidden: Boolean = false) {
+    // Same mask for every word, so it doesn't give away word lengths.
+    val cells = words.mapIndexed { i, w -> "${i + 1}. ${if (hidden) "••••••" else w}" } +
         if (current != null && words.size < 24) listOf("${words.size + 1}. $current▏") else emptyList()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         cells.chunked(3).forEach { row ->
