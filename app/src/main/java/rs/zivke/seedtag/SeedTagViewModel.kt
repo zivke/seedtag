@@ -80,6 +80,8 @@ class SeedTagViewModel : ViewModel() {
     private val pending = AtomicReference<Pending?>(null)
     /** Bumped on every arm and cancel. Main thread only. */
     private var scanId = 0L
+    /** Bumped by wipeAll(): Argon2 work that finishes after it is thrown away. */
+    private var wipes = 0L
 
     // =========================================================== word entry ===
 
@@ -140,6 +142,7 @@ class SeedTagViewModel : ViewModel() {
         if (password != passwordRepeat) return showError("The passwords don't match.")
         val snapshot = words.toList()
         val pw = password.toCharArray()
+        val wipesAtStart = wipes
         viewModelScope.launch {
             busy = "Encrypting… (deriving key with Argon2id, a few seconds)"
             try {
@@ -149,6 +152,7 @@ class SeedTagViewModel : ViewModel() {
                         SeedBox.toBase64(SeedBox.seal(entropy, pw)) to SeedBox.fingerprint(entropy)
                     } finally { entropy.fill(0) }
                 }
+                if (wipes != wipesAtStart) return@launch
                 backupFingerprint = fp
                 pendingText = text
                 arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the tag to the back of the phone to write")
@@ -249,6 +253,7 @@ class SeedTagViewModel : ViewModel() {
 
     private fun decrypt(text: String, reveal: Boolean) {
         val pw = readPassword.toCharArray()
+        val wipesAtStart = wipes
         viewModelScope.launch {
             busy = "Decrypting… (deriving key with Argon2id, a few seconds)"
             try {
@@ -258,6 +263,7 @@ class SeedTagViewModel : ViewModel() {
                         Bip39.entropyToWords(entropy) to SeedBox.fingerprint(entropy)
                     } finally { entropy.fill(0) }
                 }
+                if (wipes != wipesAtStart) return@launch
                 verifyResult = VerifyResult(words.size, fp)
                 lockTarget = text
                 if (reveal) restoredWords = words
@@ -280,6 +286,7 @@ class SeedTagViewModel : ViewModel() {
 
     /** Called when the app leaves the foreground: drop every secret from the UI state. */
     fun wipeAll() {
+        wipes++
         cancelScan()
         if (step != BackupStep.Done) step = BackupStep.Words
         wipeBackup()
