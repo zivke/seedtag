@@ -112,6 +112,38 @@ on-metal version.
 - Type 1 (Topaz): rarely sold any more. The original Topaz has only 96 bytes; Topaz 512 is big enough but
   untested with SeedTag.
 
+**Buying one.** Online marketplaces (Temu, AliExpress, Amazon, …) sell these cheaply. Search for the exact
+chip, plus the form factor you want:
+
+```
+NTAG216 NFC card PVC
+NTAG215 NFC sticker
+NTAG216 anti-metal NFC tag
+MIFARE Ultralight C NFC card      (also listed as MF0ICU2)
+NTAG424 DNA NFC tag
+ICODE SLIX2 NFC label
+NTAG216 NFC ring
+```
+
+- Only buy a listing that names the chip, e.g. "Chip: NTAG216". "13.56 MHz IC card", "NFC compatible" or
+  "S50" without a chip name is usually MIFARE Classic 1K.
+- Skip "UID changeable", "Gen1a", "CUID" or "magic card" (Classic clones), and "NTAG21x compatible" (unknown
+  clones whose memory and retention aren't documented).
+- For durability prefer PVC cards, epoxy tags or coin tags over paper stickers.
+- A cheap listing can carry a fake chip. NXP's free **NFC TagInfo** app shows the real chip and whether it's
+  genuine NXP silicon. Buy a few, test one with a throwaway phrase first, and prefer sellers who name the chip
+  maker.
+
+**Idea: an NFC ring.** An epoxy or ceramic ring with an NTAG215/216 inside (search `NTAG216 NFC ring`) keeps
+the encrypted backup on you, and it looks like jewellery, not a seed backup. Things to know:
+
+- The antenna is small, so the ring has to sit right on the phone's NFC spot, and it reads at a shorter range.
+  Check that your phone reads it reliably before trusting it.
+- Look for rings that say 13.56 MHz / NTAG. Many "dual-chip" rings also carry a 125 kHz chip (T5577, EM4305)
+  that the phone can't see, and some only have that one. Fitness "smart rings" aren't NFC tags at all.
+- Worn every day, it gets knocked about and is easier to lose. Treat it as an extra copy, never the only one.
+  Losing it doesn't expose the seed as long as the password is strong.
+
 ## Format v1
 
 ```
