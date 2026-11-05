@@ -37,8 +37,10 @@ class Bip39(unittest.TestCase):
             seedtag.words_to_entropy(["abandon"] * 24)
 
     def test_unknown_word_and_count(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(ValueError) as cm:
             seedtag.words_to_entropy(["abandon"] * 11 + ["bitcoinz"])
+        self.assertIn("#12", str(cm.exception))
+        self.assertNotIn("bitcoinz", str(cm.exception))  # never echo a seed word
         with self.assertRaises(ValueError):
             seedtag.words_to_entropy(["abandon"] * 13)
 

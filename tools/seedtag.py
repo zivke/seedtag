@@ -240,9 +240,10 @@ def words_to_entropy(words: list[str]) -> bytes:
     if len(words) not in (12, 15, 18, 21, 24):
         raise ValueError(f"expected 12/15/18/21/24 words, got {len(words)}")
     bits = 0
-    for w in words:
+    for i, w in enumerate(words, 1):
         if w not in _INDEX:
-            raise ValueError(f"not a BIP39 word: {w!r}")
+            # position only: the word itself may be (part of) the seed
+            raise ValueError(f"word #{i} is not in the BIP39 English list")
         bits = bits << 11 | _INDEX[w]
     total = len(words) * 11
     cs_bits = total // 33
