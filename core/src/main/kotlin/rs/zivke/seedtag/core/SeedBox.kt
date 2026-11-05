@@ -123,7 +123,12 @@ object SeedBox {
 
     /** Short non-secret check value for comparing backups (same as seedtag.py `verify`). */
     fun fingerprint(entropy: ByteArray): String {
-        val h = Bip39.sha256("seedtag-fp".toByteArray() + entropy)
-        return h.take(4).joinToString("") { "%02x".format(it) }.also { h.fill(0) }
+        val input = "seedtag-fp".toByteArray() + entropy
+        val h = Bip39.sha256(input)
+        try {
+            return h.take(4).joinToString("") { "%02x".format(it) }
+        } finally {
+            input.fill(0); h.fill(0)
+        }
     }
 }
