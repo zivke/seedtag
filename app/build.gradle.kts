@@ -26,9 +26,10 @@ val keystorePath = signingValue("KEYSTORE")
 val keyPass = signingValue("KEY_PASS")
 val keystoreFile = keystorePath?.let { file(it) }?.takeIf { it.isFile }
 // Opening the store checks the password and tells JKS from PKCS12.
-val keystore: KeyStore? = if (keystoreFile != null && keyPass != null) {
-    runCatching { KeyStore.getInstance(keystoreFile, keyPass.toCharArray()) }.getOrNull()
-} else null
+// Bound to locals: script-level vals don't smart-cast.
+val keystore: KeyStore? = keystoreFile?.let { f ->
+    keyPass?.let { p -> runCatching { KeyStore.getInstance(f, p.toCharArray()) }.getOrNull() }
+}
 val releaseKeyAlias: String? = signingValue("KEY_ALIAS") ?: keystore?.aliases()?.toList()?.singleOrNull()
 
 val releaseSigningProblem: String? = when {
