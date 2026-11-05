@@ -17,6 +17,8 @@ import java.io.IOException
 sealed interface TagRequest {
     /** Write [text]; refuses to overwrite a non-empty tag unless [allowOverwrite]. */
     data class Write(val text: String, val allowOverwrite: Boolean = false) : TagRequest
+    /** Read the tag back and compare with [expected] (second tap after formatting a blank tag). */
+    data class CheckWritten(val expected: String) : TagRequest
     data object Read : TagRequest
     /** Make the tag read-only, but only if it holds exactly [expected]. */
     data class Lock(val expected: String) : TagRequest
@@ -25,6 +27,8 @@ sealed interface TagRequest {
 sealed interface TagResult {
     /** [text] was written and read back. */
     data class Written(val text: String) : TagResult
+    /** A blank tag was formatted with [text], but couldn't be read back on the same tap. */
+    data class WrittenUnchecked(val text: String) : TagResult
     data class Read(val text: String) : TagResult
     data object Locked : TagResult
     /** Tag already holds data; [existing] is its text if it was a Text record. */
@@ -38,6 +42,7 @@ object TagIo {
     fun perform(tag: Tag, request: TagRequest): TagResult = try {
         when (request) {
             is TagRequest.Write -> write(tag, request)
+            is TagRequest.CheckWritten -> checkWritten(tag, request.expected)
             TagRequest.Read -> read(tag)
             is TagRequest.Lock -> lock(tag, request.expected)
         }
@@ -60,7 +65,9 @@ object TagIo {
             val formatable = NdefFormatable.get(tag)
                 ?: return TagResult.Failed("This tag doesn't support NDEF.")
             formatable.use { it.connect(); it.format(message) }
-            return verifyAfterWrite(tag, req.text)
+            // This Tag object only knows the techs it had when discovered, so Ndef.get()
+            // stays null after formatting: the read-back has to wait for the next tap.
+            return TagResult.WrittenUnchecked(req.text)
         }
         ndef.use {
             it.connect()
@@ -82,12 +89,13 @@ object TagIo {
         }
     }
 
-    private fun verifyAfterWrite(tag: Tag, expected: String): TagResult {
-        val ndef = Ndef.get(tag) ?: return TagResult.Failed("Formatted, but couldn't re-open the tag to verify. Scan again with Verify.")
+    private fun checkWritten(tag: Tag, expected: String): TagResult {
+        val ndef = Ndef.get(tag) ?: return TagResult.Failed("This tag has no NDEF data. Hold the tag you just wrote.")
         ndef.use {
             it.connect()
-            val back = firstText(it.ndefMessage)
-            if (back != expected) return TagResult.Failed("Read-back mismatch after writing. The tag may be faulty – don't use it.")
+            if (firstText(it.ndefMessage) != expected) {
+                return TagResult.Failed("This tag doesn't hold what was just written. Hold the same tag again; if this keeps failing, the tag may be faulty.")
+            }
             return TagResult.Written(expected)
         }
     }

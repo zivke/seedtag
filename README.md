@@ -48,7 +48,8 @@ requests any permission other than NFC**, so a library can't quietly add network
 
 1. **Back up**: enter the words with the in-app keypad (tap a suggestion to accept each word), then set a password.
    **Generate 7-word passphrase** is recommended (≈77 bits). Write it down. Tap *Encrypt & write*, then hold the tag to the phone.
-   If the tag already has data, the app asks before overwriting it.
+   If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted
+   first and then needs a second tap so the app can read it back.
 2. **Verify**: type the password from your written copy and scan. You get ✓ plus a fingerprint, and the words stay hidden.
 3. Optionally recover once with `seedtag.py` on an offline computer.
 4. Only then use **Make tag read-only…**. It's permanent, and it only works on the tag you last wrote or verified.

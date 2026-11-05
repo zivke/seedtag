@@ -218,6 +218,9 @@ class SeedTagViewModel : ViewModel() {
                 val looksLike = r.existing?.let { runCatching { SeedBox.fromBase64(it).let { b -> b.isNotEmpty() && b[0].toInt() == SeedBox.VERSION } }.getOrNull() } == true
                 dialog = Dialog.ConfirmOverwrite(looksLike)
             }
+            is TagResult.WrittenUnchecked -> {
+                arm(TagRequest.CheckWritten(r.text), Purpose.BackupWrite, "Written. Hold the tag to the phone once more to check it")
+            }
             is TagResult.Written -> {
                 scanPrompt = null
                 wipeBackup()
