@@ -106,5 +106,7 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   update `README.md` if behaviour or setup changed.
 - Versions are semver: `versionName` is `MAJOR.MINOR.PATCH`, the changelog
   heading matches, and a release is an annotated tag `vX.Y.Z`.
+- Branching: small fixes and changes go on the current branch; new features
+  and bigger or more significant changes get a separate branch.
 - Never commit `*.p12` / `*.jks` / `*.keystore`, `.env` or an APK (`.gitignore`
   covers them).
