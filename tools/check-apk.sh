@@ -30,10 +30,12 @@ done
 
 # androidx.core declares and uses <applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION,
 # a signature permission private to this app. Everything else except NFC is an error.
-extra="$("$AAPT2" dump permissions "$APK" \
-    | sed -n "s/^uses-permission: name='\([^']*\)'.*/\1/p" \
-    | grep -vx 'android.permission.NFC' \
-    | grep -v '\.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION$' || true)"
+# uses-permission-sdk-23 grants the same permissions, so it counts too.
+perms="$("$AAPT2" dump permissions "$APK")"
+pkg="$(printf '%s\n' "$perms" | sed -n 's/^package: //p')"
+extra="$(printf '%s\n' "$perms" \
+    | sed -nE "s/^uses-permission(-sdk-23)?: name='([^']*)'.*/\2/p" \
+    | grep -vxF -e 'android.permission.NFC' -e "$pkg.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" || true)"
 if [ -n "$extra" ]; then
     echo "!! $APK requests permissions it must not have:" >&2
     echo "$extra" | sed 's/^/!!   /' >&2
