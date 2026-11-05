@@ -72,36 +72,44 @@ and -V, and every write checks the size first. Tested hardware: MIFARE Ultraligh
 | 18 | 92 chars | ~102 |
 | 24 | 104 chars | ~114 |
 
-**Data retention matters most.** A seed backup has to last. Cheap Type 2 chips (NTAG21x, Ultralight C/EV1/AES) are
-typically rated for about 10 years, others for 25–50. Check the datasheet of the exact chip you buy. Treat a
-10-year tag as one copy among several, and verify it every now and then.
+**Data retention matters most.** A seed backup has to last. Cheap Type 2 chips (NTAG21x, Ultralight C/EV1) are
+rated for 10 years (at 22 °C), others for 25–60. Check the datasheet of the exact chip you buy: older revisions
+can differ (MIFARE Ultralight C was rated for 5 years before the current datasheet). Treat a 10-year tag as one
+copy among several, and verify it every now and then.
 
-**Tag families** (memory and retention are typical datasheet values; check yours):
+**Tag families** (manufacturer figures, checked November 2026; check the datasheet of your chip):
 
 | Tag | Type / Android tech | User memory | 24 words? | Retention | Built-in write protection |
 |---|---|---|---|---|---|
-| MIFARE Ultralight C *(tested)* | Type 2, NfcA | 144 B | ✓ | ~10 y | 3DES key, mutual auth (strong) |
-| MIFARE Ultralight AES | Type 2, NfcA | 144 B | ✓ | ~10 y | AES-128 mutual auth (strong) |
-| MIFARE Ultralight EV1 (MF0UL21) | Type 2, NfcA | 128 B | ✓ (tight) | ~10 y | 32-bit password, sent in clear (weak) |
-| NTAG212 | Type 2, NfcA | 128 B | ✓ (tight) | ~10 y | 32-bit password (weak) |
-| NTAG213 / 215 / 216 | Type 2, NfcA | 144 / 504 / 888 B | ✓ | ~10 y | 32-bit password, sent in clear (weak) |
-| NTAG 424 DNA | Type 4, IsoDep | 416 B (256 B NDEF file) | ✓ | ~50 y | AES-128 keys per file, read stays free (strong) |
-| MIFARE DESFire EV2 / EV3 | Type 4, IsoDep | 2–8 KB | ✓ | ~25 y | AES keys, per-file access rights (strong) |
-| ICODE SLIX2 | Type 5, NfcV | 316 B | ✓ | ~50 y | 32-bit write password, sent in clear (weak) |
-| ICODE SLIX | Type 5, NfcV | 112 B | ✗ (≈18 words max) | ~50 y | none, only permanent block locks |
-| ST25TV (various) | Type 5, NfcV | 64 B – 2 KB | depends on model | ~40 y | 64-bit area passwords, sent in clear (medium) |
-| FeliCa Lite-S | Type 3, NfcF | 224 B | ✓ | — | MAC-protected writes with a card key |
+| MIFARE Ultralight C *(tested)* ¹ | Type 2, NfcA | 144 B | ✓ | 10 y | 3DES key, mutual auth; can restrict writes only (strong) |
+| MIFARE Ultralight AES | Type 2, NfcA | 144 B | ✓ | not on NXP's product page | AES-128 mutual auth (strong) |
+| MIFARE Ultralight EV1 (MF0UL21) | Type 2, NfcA | 128 B | ✓ (tight) | 10 y | 32-bit password (weak) |
+| NTAG212 | Type 2, NfcA | 128 B | ✓ (tight) | 10 y | 32-bit password (weak) |
+| NTAG213 / 215 / 216 | Type 2, NfcA | 144 / 504 / 888 B | ✓ | 10 y | 32-bit password, sent in clear (weak) |
+| NTAG 424 DNA | Type 4, IsoDep | 416 B (256 B NDEF file) | ✓ | 50 y | AES-128 keys, per-file access rights (strong) |
+| MIFARE DESFire EV3 ² | Type 4, IsoDep | 2–16 KB | ✓ | 25 y | AES keys, per-file access rights (strong) |
+| ICODE SLIX2 | Type 5, NfcV | 316 B | ✓ | 50 y | 32-bit read/write passwords (weak) |
+| ICODE SLIX | Type 5, NfcV | 112 B | ✗ (≈18 words max) | 50 y | none, only permanent block locks |
+| ST25TV (02K … 64K) ³ | Type 5, NfcV | 64 B – 8 KB | depends on model | 40–60 y | 32- or 64-bit area passwords (medium) |
+| FeliCa Lite-S | Type 3, NfcF | 224 B | ✓ | not published | per-block write-with-MAC using a card key |
+
+¹ NXP marks Ultralight C *not recommended for new designs*; its replacement is Ultralight AES. It's still sold.
+² DESFire EV2 (also 25 y) is *not recommended for new designs*; EV3 replaces it.
+³ Retention and password scheme differ by model: ST25TV02K is rated for 60 y with 32- or 64-bit passwords,
+ST25TV16K/64K for 40 y with 64-bit passwords (ST25TV16K is *not recommended for new designs*).
 
 SeedTag doesn't use any of these write protections yet: the payload is encrypted either way, and **Make tag
-read-only** is the only protection against overwriting. Phones read Type 5 (ISO 15693) tags less reliably than
-Type 2 or 4, and a tag mounted on metal needs an on-metal version.
+read-only** is the only protection against overwriting. Only Ultralight C has been tested with SeedTag: try
+any other tag with your phone (write, verify, restore) before relying on it. A tag mounted on metal needs an
+on-metal version.
 
 **Avoid:**
 
 - Original MIFARE Ultralight, NTAG210 and Ultralight EV1 MF0UL11: 48 bytes, too small even for 12 words.
-- MIFARE Classic: not an NFC Forum type. Many phones (non-NXP NFC controllers) can't read it at all, and its
-  Crypto1 security is broken.
-- Type 1 (Topaz): obsolete and too small.
+- MIFARE Classic: not an NFC Forum type. Android support for it is optional, so many phones can't read it at
+  all, and its Crypto1 security is broken.
+- Type 1 (Topaz): rarely sold any more. The original Topaz has only 96 bytes; Topaz 512 is big enough but
+  untested with SeedTag.
 
 ## Format v1
 
