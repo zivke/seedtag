@@ -331,7 +331,9 @@ def main(argv):
                 print("Passwords differ.", file=sys.stderr)
                 return 1
             blob = seal(entropy, pw)
-            assert open_blob(blob, pw) == entropy
+            if open_blob(blob, pw) != entropy:  # not assert: survives python -O
+                print("Self-check failed: the blob doesn't decrypt.", file=sys.stderr)
+                return 1
             print(base64.b64encode(blob).decode())
             print(f"fingerprint: {fingerprint(entropy)}", file=sys.stderr)
         else:
