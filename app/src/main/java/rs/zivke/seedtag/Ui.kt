@@ -313,11 +313,10 @@ private fun DoneStep(vm: SeedTagViewModel) {
         Text(
             "1. Go to Verify and decrypt the tag by typing the password from your written copy.\n" +
                 "2. Optionally recover it on an offline computer with seedtag.py.\n" +
-                "3. Only then lock the tag (permanent) and keep another backup of the seed elsewhere.",
+                "3. Only then lock the tag (permanent, on the Verify tab) and keep another backup of the seed elsewhere.",
             style = MaterialTheme.typography.bodyMedium,
         )
         Button(onClick = { vm.tab = Screen.Verify }, modifier = Modifier.fillMaxWidth()) { Text("Verify now") }
-        LockButton(vm)
         TextButton(onClick = vm::startOver, modifier = Modifier.fillMaxWidth()) { Text("Back up another seed") }
     }
 }

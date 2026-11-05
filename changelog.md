@@ -12,7 +12,8 @@ All notable user-visible changes to SeedTag. The format follows
 - The app runs full screen: the status and navigation bars are hidden and
   can be brought back briefly with a swipe from the edge.
 - **Make tag read-only** is now a red button, so it stands out as the one
-  permanent action.
+  permanent action, and it's only offered on Verify after a successful
+  decrypt, no longer right after writing.
 
 ### Added
 - **Hide entered words**, on by default: words already entered are shown as

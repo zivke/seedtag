@@ -53,7 +53,7 @@ requests any permission other than NFC**, so a library can't quietly add network
    first and then needs a second tap so the app can read it back.
 2. **Verify**: type the password from your written copy and scan. You get ✓ plus a fingerprint, and the words stay hidden.
 3. Optionally recover once with `seedtag.py` on an offline computer.
-4. Only then use **Make tag read-only**. It's permanent, and it only works on the tag you last wrote or verified.
+4. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
 5. **Restore**: same as Verify, but the words are shown.
 
 Leaving the app (home button, Recents, screen off) wipes everything typed or decrypted.
