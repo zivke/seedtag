@@ -39,7 +39,8 @@ sealed interface Dialog {
 }
 
 private enum class Purpose { BackupWrite, Verify, Restore, Lock }
-private data class Pending(val request: TagRequest, val purpose: Purpose)
+/** [id] tells a result for the current scan from one that arrives after Cancel or a new scan. */
+private data class Pending(val request: TagRequest, val purpose: Purpose, val id: Long)
 
 class SeedTagViewModel : ViewModel() {
 
@@ -77,6 +78,8 @@ class SeedTagViewModel : ViewModel() {
 
     /** Read from the NFC binder thread, hence atomic rather than Compose state. */
     private val pending = AtomicReference<Pending?>(null)
+    /** Bumped on every arm and cancel. Main thread only. */
+    private var scanId = 0L
 
     // =========================================================== word entry ===
 
@@ -184,7 +187,7 @@ class SeedTagViewModel : ViewModel() {
         arm(TagRequest.Lock(target), Purpose.Lock, "Hold the same tag to make it permanently read-only")
     }
 
-    fun cancelScan() { pending.set(null); scanPrompt = null }
+    fun cancelScan() { scanId++; pending.set(null); scanPrompt = null }
 
     fun hideRestored() { restoredWords = null }
 
@@ -195,7 +198,7 @@ class SeedTagViewModel : ViewModel() {
     // ================================================================= NFC ===
 
     private fun arm(request: TagRequest, purpose: Purpose, title: String) {
-        pending.set(Pending(request, purpose))
+        pending.set(Pending(request, purpose, ++scanId))
         scanPrompt = ScanPrompt(title)
     }
 
@@ -207,13 +210,18 @@ class SeedTagViewModel : ViewModel() {
     }
 
     private fun handle(p: Pending, r: TagResult) {
+        // Cancelled, left the app or started another scan while the tag was busy: drop results
+        // that only ask for more input. Writes and locks did happen, so those are still shown.
+        val stale = p.id != scanId
         when (r) {
             is TagResult.Failed -> {
+                if (stale) return
                 // stay armed so the user can simply tap again
                 pending.set(p)
                 scanPrompt = scanPrompt?.copy(error = r.message) ?: ScanPrompt("Hold the tag to the phone", r.message)
             }
             is TagResult.NotEmpty -> {
+                if (stale) return
                 scanPrompt = null
                 val looksLike = r.existing?.let { runCatching { SeedBox.fromBase64(it).let { b -> b.isNotEmpty() && b[0].toInt() == SeedBox.VERSION } }.getOrNull() } == true
                 dialog = Dialog.ConfirmOverwrite(looksLike)
@@ -232,6 +240,7 @@ class SeedTagViewModel : ViewModel() {
                 dialog = Dialog.Info("Tag locked", "The tag is now permanently read-only.")
             }
             is TagResult.Read -> {
+                if (stale) return
                 scanPrompt = null
                 decrypt(r.text, reveal = p.purpose == Purpose.Restore)
             }
