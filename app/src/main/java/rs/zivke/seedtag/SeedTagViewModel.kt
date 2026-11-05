@@ -29,7 +29,8 @@ sealed interface MnemonicStatus {
 }
 
 data class ScanPrompt(val title: String, val error: String? = null)
-data class VerifyResult(val wordCount: Int, val fingerprint: String)
+/** [matchesBackup]: compared with the backup written in this session, null if there was none. */
+data class VerifyResult(val wordCount: Int, val fingerprint: String, val matchesBackup: Boolean? = null)
 
 sealed interface Dialog {
     data class Error(val message: String) : Dialog
@@ -266,7 +267,7 @@ class SeedTagViewModel : ViewModel() {
                     } finally { entropy.fill(0) }
                 }
                 if (wipes != wipesAtStart) return@launch
-                verifyResult = VerifyResult(words.size, fp)
+                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp })
                 lockTarget = text
                 if (reveal) restoredWords = words
                 readPassword = ""

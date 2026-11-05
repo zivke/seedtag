@@ -18,6 +18,8 @@ All notable user-visible changes to SeedTag. The format follows
 ### Added
 - **Hide entered words**, on by default: words already entered are shown as
   dots, only the word being typed is visible. Leaving the app turns it back on.
+- Verify and Restore compare the fingerprint with the backup just written
+  and say whether it's the same seed, with a warning if it isn't.
 
 ## [0.1.1] - 2026-11-05
 

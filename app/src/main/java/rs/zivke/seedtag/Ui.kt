@@ -358,10 +358,24 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
 
         val result = vm.verifyResult
         if (result != null) {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)) {
+            val differs = result.matchesBackup == false
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = if (differs) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+                ),
+            ) {
                 Column(Modifier.padding(12.dp)) {
                     Text("✓ Decrypted: ${result.wordCount}-word seed, checksum OK", fontWeight = FontWeight.SemiBold)
                     Text("Fingerprint: ${result.fingerprint}", fontFamily = FontFamily.Monospace)
+                    when (result.matchesBackup) {
+                        true -> Text("✓ Matches the backup you just wrote", fontWeight = FontWeight.SemiBold)
+                        false -> Text(
+                            "✗ A different seed from the backup you just wrote (${vm.backupFingerprint}). Check you scanned the right tag.",
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        null -> Unit
+                    }
                 }
             }
             if (!reveal) {

@@ -52,6 +52,7 @@ requests any permission other than NFC**, so a library can't quietly add network
    If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted
    first and then needs a second tap so the app can read it back.
 2. **Verify**: type the password from your written copy and scan. You get ✓ plus a fingerprint, and the words stay hidden.
+   Right after a backup, it also says whether the tag holds the same seed you just wrote.
 3. Optionally recover once with `seedtag.py` on an offline computer.
 4. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
 5. **Restore**: same as Verify, but the words are shown.
