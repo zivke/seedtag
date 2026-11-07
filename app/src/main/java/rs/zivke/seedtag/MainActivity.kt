@@ -4,9 +4,11 @@
 package rs.zivke.seedtag
 
 import android.content.Intent
+import android.os.Build
 import android.nfc.NfcAdapter
 import android.os.Bundle
 import android.provider.Settings
+import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -24,6 +26,10 @@ class MainActivity : ComponentActivity() {
     private val vm: SeedTagViewModel by viewModels()
     private var adapter: NfcAdapter? = null
     private val nfcState = mutableStateOf(NfcState.Ready)
+    /** The last touch came through another app's overlay and was dropped. */
+    private val overlayDetected = mutableStateOf(false)
+    /** The current gesture is being dropped because an overlay covered it. */
+    private var droppingGesture = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -32,6 +38,9 @@ class MainActivity : ComponentActivity() {
         // All typing uses the app's own keyboards and there are no text fields. On top of that,
         // this window never takes input from a keyboard app, so none can open over the app.
         window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+        // Android 12+: other apps' overlays ("Display over other apps") are hidden while SeedTag is
+        // on screen, so none can pose as SeedTag's keypad or hide what a button does.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) window.setHideOverlayWindows(true)
         enableEdgeToEdge()
         hideSystemBars()
         adapter = NfcAdapter.getDefaultAdapter(this)
@@ -40,6 +49,7 @@ class MainActivity : ComponentActivity() {
                 SeedTagApp(
                     vm = vm,
                     nfcState = nfcState.value,
+                    overlayDetected = overlayDetected.value,
                     openNfcSettings = { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) },
                 )
             }
@@ -63,6 +73,30 @@ class MainActivity : ComponentActivity() {
                 NfcAdapter.FLAG_READER_NFC_F or NfcAdapter.FLAG_READER_NFC_V,
             Bundle().apply { putInt(NfcAdapter.EXTRA_READER_PRESENCE_CHECK_DELAY, 250) },
         )
+    }
+
+    /**
+     * Tapjacking guard for every Android version: a touch that reaches us through another app's
+     * window (FLAG_WINDOW_IS_OBSCURED) never gets to the UI, and the app says why. If an overlay
+     * shows up in the middle of a gesture, what the UI saw so far is cancelled, so a tap can't land.
+     * Dialogs are windows of their own; they filter touches in Ui.kt (GuardDialogWindow).
+     */
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        val obscured = ev.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED != 0
+        if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
+            droppingGesture = false
+            overlayDetected.value = obscured
+        }
+        if (obscured && !droppingGesture) {
+            droppingGesture = true
+            overlayDetected.value = true
+            if (ev.actionMasked != MotionEvent.ACTION_DOWN) {
+                val cancel = MotionEvent.obtain(ev).apply { action = MotionEvent.ACTION_CANCEL }
+                super.dispatchTouchEvent(cancel)
+                cancel.recycle()
+            }
+        }
+        return if (droppingGesture) true else super.dispatchTouchEvent(ev)
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

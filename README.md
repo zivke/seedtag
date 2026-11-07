@@ -6,6 +6,7 @@ plus a single-file Python tool to recover it on any computer.
 - Encrypts the raw seed entropy (not the words) → 77 bytes for 24 words, fits a 137-byte MIFARE Ultralight C.
 - Argon2id (64 MiB) + AES-256-GCM. Documented, versioned format.
 - **No `INTERNET` permission.** Screenshots blocked, no backups, no clipboard.
+- **Other apps' overlays are hidden** (Android 12+), and taps that come through another app's window are ignored.
 - **No system keyboard.** Seed words and passwords are typed on the app's own keyboards, so no keyboard app ever sees them.
 - The encrypted backup is decrypted once before it's written, and every write is read back and compared before it's
   reported as success.
@@ -44,7 +45,9 @@ KEY_PASS=<password>
 ```
 
 Both builds end with `tools/check-apk.sh`. It verifies the signature and **fails the build if the APK
-requests any permission other than NFC**, so a library can't quietly add network access.
+requests any permission other than NFC and `HIDE_OVERLAY_WINDOWS`**, so a library can't quietly add network access.
+(`HIDE_OVERLAY_WINDOWS` is granted at install without a prompt and gives no access to anything: it only lets
+SeedTag hide other apps' overlays.)
 
 ## Using it
 
@@ -175,6 +178,30 @@ python3 seedtag.py encrypt            # create a tag string on the computer inst
 To get the Base64 string off the tag without this app, read it with any NFC reader app (e.g. NFC Tools).
 It's ciphertext, so that's safe.
 
+## Warnings: other apps on the phone
+
+SeedTag can only protect you from what happens inside its own window. Other apps on the same phone can still get at
+your seed and password:
+
+- **Fake-screen overlays.** An app allowed to *Display over other apps* can draw a copy of SeedTag's keypad on top
+  of it and record what you type. On **Android 12 and later**, SeedTag hides every such overlay while it's on
+  screen. On **Android 8–11 it can't.** There, open *Settings › Apps › Special app access › Display over other
+  apps* (the path varies by phone) and turn it off for every app you don't fully trust, or use a phone with
+  Android 12+.
+- **Tapjacking.** An overlay can let your taps through while hiding what's underneath, to make you confirm
+  *Overwrite*, *Write anyway* or *Lock forever* without seeing it. SeedTag ignores every tap that comes through
+  another app's window, on every Android version, and shows a red banner saying so. Screen dimmers, blue-light
+  filters and chat bubbles trigger it too: turn them off while using SeedTag. If you can't tell which app it is,
+  don't enter your seed.
+- **Accessibility services.** A service with accessibility access can read everything on screen, including the
+  restored words and every key you tap. Neither overlay hiding nor screenshot blocking stops it. Open
+  *Settings › Accessibility* and remove any service you didn't knowingly install.
+- **Fake SeedTag apps.** Nothing inside SeedTag can protect you from a different app that looks like it. Install
+  only an APK you built yourself or got from a source you trust, and check its signing certificate with
+  `apksigner verify --print-certs seedtag.apk`.
+
+The safest setup is a spare phone that was factory-reset, has nothing else installed and stays offline.
+
 ## Security notes
 
 - **The password is the whole security.** A tag can be read by anyone who holds it, and the attack is offline password guessing.
@@ -185,7 +212,7 @@ It's ciphertext, so that's safe.
 - **Password characters.** The app's keyboard has letters, digits, all ASCII symbols and common Latin accented letters
   (č, ć, đ, š, ž, é, ö, ß …). A password with any other character, such as Cyrillic or emoji, set with an earlier version
   or with `seedtag.py`, can't be typed in the app: decrypt that tag with `seedtag.py`.
-- JVM/Compose limitations: text fields and the decrypted word list exist briefly as immutable `String`s, which can't be zeroed.
+- JVM/Compose limitations: the typed password and the decrypted word list exist briefly as immutable `String`s, which can't be zeroed.
   Byte and char arrays (entropy, keys, password bytes) are zeroed after use. State is dropped when the app is backgrounded.
 - The Ultralight C's own 3DES access protection isn't used, and isn't needed: the payload is encrypted.
 

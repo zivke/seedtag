@@ -3,6 +3,9 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.NFC" />
+    <!-- Android 12+: hide other apps' overlays while SeedTag is on screen (Window.setHideOverlayWindows).
+         A normal permission: granted at install, no prompt, no access to any data. -->
+    <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
 
     <!-- Hard guarantee: no network access, even if a library tries to add it.

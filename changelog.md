@@ -39,6 +39,14 @@ All notable user-visible changes to SeedTag. The format follows
   second key derivation, and writes nothing if that fails. A fault on the
   phone can no longer produce a tag that can't be decrypted. Encrypting takes
   about twice as long.
+- Other apps can no longer draw over SeedTag to pose as its keypad or hide
+  what a button does. On Android 12+ their overlays are hidden while SeedTag
+  is on screen. On every version, a tap that comes through another app's
+  window is ignored and a red banner says so. This adds the
+  `HIDE_OVERLAY_WINDOWS` permission, which is granted at install without a
+  prompt and gives no access to anything.
+- The README has a new **Warnings** section on what other apps on the phone
+  can still do: overlays on Android 8–11, accessibility services, fake apps.
 - Another app can no longer slip its own screen into SeedTag's task (task
   hijacking, possible on Android 8 and 9) to pose as SeedTag.
 - A tag that moved away too soon could read as empty. Before writing, the app

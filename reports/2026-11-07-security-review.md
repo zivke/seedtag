@@ -18,7 +18,7 @@ signing key living in a dev container that an AI agent can run commands in.
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
 | 2 | Weak passwords accepted and rated strong | **Fixed**: "Rate passwords honestly and confirm weak ones" (confirmation below 60 bits) |
 | 6 | No decrypt check before writing | **Fixed**: "Decrypt the backup once before writing it" |
-| 8 | Task hijacking (StrandHogg) | **Fixed**: "Keep other apps out of SeedTag's task" (`taskAffinity=""`; overlays still open) |
+| 8 | Task hijacking (StrandHogg) | **Fixed**: "Keep other apps out of SeedTag's task" (`taskAffinity=""`); overlays: **fixed**: "Hide other apps' overlays and ignore taps through them" (Android 8–11 can't hide overlays; README warns) |
 | all others | | Open |
 
 ## What's done well
@@ -124,7 +124,7 @@ signing key living in a dev container that an AI agent can run commands in.
 
 ## Low
 
-8. **Hijacking the app's task (StrandHogg)** — *fixed with `taskAffinity=""`; overlay blocking still open*. Devices running Android 8–9, which `minSdk` 26 allows, let
+8. **Hijacking the app's task (StrandHogg)** — *fixed with `taskAffinity=""`, and overlays are hidden (Android 12+) and obscured taps ignored (all versions)*. Devices running Android 8–9, which `minSdk` 26 allows, let
    another app slip a fake screen into SeedTag's task to phish the seed. The fix is a single attribute,
    `android:taskAffinity=""`. Blocking screen overlays (`HIDE_OVERLAY_WINDOWS`) would need that permission
    added to `check-apk.sh`'s allow list.

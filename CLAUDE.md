@@ -34,7 +34,8 @@ the `Makefile` (`make help` lists targets).
 - `make build`: signed release `seedtag.apk` (R8 on). Fails before R8 if the
   key in `.env` is missing or can't be opened.
 - Both builds finish with `tools/check-apk.sh`, which verifies the signature
-  and **fails if the APK requests any permission except NFC**.
+  and **fails if the APK requests any permission except NFC and
+  `HIDE_OVERLAY_WINDOWS`** (Android 12+ overlay hiding; no access to anything).
 - `make connect DEVICE_IP=… [ADB_PORT=…]`, `make run` / `make run-debug`,
   `make logcat`, `make stop`, `make uninstall`, `make clean`, `make check` (+ lint).
 
@@ -57,6 +58,10 @@ Two Gradle modules plus the Python tool:
 - **`app/`**: Compose, single activity.
   - `MainActivity.kt`: `FLAG_SECURE`, NFC **reader mode** while in the
     foreground (no other app sees the tag), `vm.wipeAll()` in `onStop`.
+    Overlay defence: `setHideOverlayWindows` (Android 12+) and
+    `dispatchTouchEvent` drops touches flagged `FLAG_WINDOW_IS_OBSCURED`
+    (all versions, with a banner). Dialogs are separate windows and use
+    `GuardDialogWindow()` in `Ui.kt`.
   - `SeedTagViewModel.kt`: all UI state and flows. Argon2 runs on
     `Dispatchers.Default`. The pending tag operation is an `AtomicReference`
     because the reader callback runs on a binder thread. A failed tag operation
@@ -85,7 +90,7 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
 
 - **No network.** The manifest removes `INTERNET` / `ACCESS_NETWORK_STATE`
   with `tools:node="remove"`, and `check-apk.sh` enforces it on every build.
-  Don't add permissions, analytics, crash reporting or anything that phones home.
+  The only permissions are NFC and `HIDE_OVERLAY_WINDOWS`. Don't add permissions, analytics, crash reporting or anything that phones home.
 - Never log, toast, persist or put on the clipboard any seed word, password,
   entropy, key or decrypted output. No `Log.*` with user data at all.
 - Keep `allowBackup="false"` and the data-extraction rules; store nothing on disk.

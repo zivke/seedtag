@@ -46,6 +46,7 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -55,12 +56,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.Passphrase
 
@@ -85,7 +88,7 @@ fun SeedTagTheme(content: @Composable () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SeedTagApp(vm: SeedTagViewModel, nfcState: NfcState, openNfcSettings: () -> Unit) {
+fun SeedTagApp(vm: SeedTagViewModel, nfcState: NfcState, overlayDetected: Boolean, openNfcSettings: () -> Unit) {
     Scaffold(
         topBar = { TopAppBar(title = { Text("SeedTag") }) },
     ) { pad ->
@@ -96,6 +99,7 @@ fun SeedTagApp(vm: SeedTagViewModel, nfcState: NfcState, openNfcSettings: () -> 
                 }
             }
             NfcBanner(nfcState, openNfcSettings)
+            if (overlayDetected) OverlayBanner()
             when (vm.tab) {
                 Screen.Backup -> BackupScreen(vm)
                 Screen.Verify -> ReadScreen(vm, reveal = false)
@@ -121,6 +125,37 @@ private fun NfcBanner(state: NfcState, openNfcSettings: () -> Unit) {
             )
             if (state == NfcState.Disabled) TextButton(onClick = openNfcSettings) { Text("Turn on") }
         }
+    }
+}
+
+@Composable
+private fun OverlayBanner() {
+    Card(
+        Modifier.fillMaxWidth().padding(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+    ) {
+        Text(
+            "Another app is drawing over SeedTag, so your taps are ignored. Close it, or turn off apps such as " +
+                "screen dimmers or chat bubbles, then tap again. If you don't know which app it is, don't enter your seed.",
+            Modifier.padding(12.dp),
+            color = MaterialTheme.colorScheme.onErrorContainer,
+        )
+    }
+}
+
+/**
+ * Dialogs are windows of their own, so the activity's guards don't cover them: drop touches that
+ * come through another app's overlay, and hide overlays on Android 12+.
+ */
+@Composable
+private fun GuardDialogWindow() {
+    val view = LocalView.current
+    DisposableEffect(view) {
+        view.rootView.filterTouchesWhenObscured = true
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (view.parent as? DialogWindowProvider)?.window?.setHideOverlayWindows(true)
+        }
+        onDispose {}
     }
 }
 
@@ -632,6 +667,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
             onDismissRequest = { vm.dialog = null },
             title = { Text("Tag is not empty") },
             text = {
+                GuardDialogWindow()
                 Text(
                     if (d.looksLikeSeedTag) "This tag already holds a SeedTag backup. Overwriting destroys it. Continue?"
                     else "This tag already contains data. Overwriting replaces it. Continue?",
@@ -646,6 +682,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
             onDismissRequest = { vm.dialog = null },
             title = { Text("Weak password") },
             text = {
+                GuardDialogWindow()
                 val parts = buildList {
                     if (d.sharesSeedWords) {
                         add("The password uses words from the seed phrase itself. Anyone who sees the password learns part of your seed.")
@@ -669,6 +706,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
             onDismissRequest = { vm.dialog = null },
             title = { Text("Make tag read-only?") },
             text = {
+                GuardDialogWindow()
                 Text(
                     "This is permanent: the tag can never be rewritten or erased. " +
                         "Only do it after you have successfully verified the backup with your written password.",
