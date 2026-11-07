@@ -35,6 +35,10 @@ All notable user-visible changes to SeedTag. The format follows
   and say whether it's the same seed, with a warning if it isn't.
 
 ### Fixed
+- Before writing, the app decrypts the encrypted backup once more, with a
+  second key derivation, and writes nothing if that fails. A fault on the
+  phone can no longer produce a tag that can't be decrypted. Encrypting takes
+  about twice as long.
 - A tag that moved away too soon could read as empty. Before writing, the app
   now reads the tag twice and checks what Android read at discovery, so a
   failed read can't skip the overwrite confirmation. It also never formats a

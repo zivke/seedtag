@@ -9,7 +9,8 @@ BIP39 seed phrase on an NFC tag and reads it back:
 
 - **Back up**: the words are entered with the app's own keypad, checked
   (wordlist + checksum), turned into raw entropy, encrypted and written to the
-  tag as one NDEF Text record. Every write is read back and compared.
+  tag as one NDEF Text record. The blob is decrypted once before writing, and
+  every write is read back and compared.
 - **Verify**: decrypt and show only ✓ plus a fingerprint, never the words.
 - **Restore**: decrypt and show the words.
 - **Lock**: make the tag permanently read-only, behind a confirmation.

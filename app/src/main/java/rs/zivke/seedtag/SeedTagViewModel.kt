@@ -180,15 +180,25 @@ class SeedTagViewModel : ViewModel() {
         val pw = password.toCharArray()
         val wipesAtStart = wipes
         viewModelScope.launch {
-            busy = "Encrypting… (deriving key with Argon2id, a few seconds)"
+            busy = "Encrypting and checking… (Argon2id runs twice, a few seconds)"
             try {
-                val (text, fp) = withContext(Dispatchers.Default) {
+                val sealed = withContext(Dispatchers.Default) {
                     val entropy = Bip39.wordsToEntropy(snapshot)
                     try {
-                        SeedBox.toBase64(SeedBox.seal(entropy, pw)) to SeedBox.fingerprint(entropy)
+                        val text = SeedBox.toBase64(SeedBox.seal(entropy, pw))
+                        // Decrypt exactly what will be written, with a second, independent key derivation,
+                        // so a fault on this device can't produce a backup nobody can open.
+                        if (decryptsTo(text, pw, entropy)) text to SeedBox.fingerprint(entropy) else null
                     } finally { entropy.fill(0) }
                 }
                 if (wipes != wipesAtStart) return@launch
+                if (sealed == null) {
+                    return@launch showError(
+                        "Self-check failed: the encrypted backup didn't decrypt again. Nothing was written to the tag. " +
+                            "Try again; if it keeps failing, don't make backups on this phone.",
+                    )
+                }
+                val (text, fp) = sealed
                 backupFingerprint = fp
                 pendingText = text
                 arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the tag to the back of the phone to write")
@@ -199,6 +209,13 @@ class SeedTagViewModel : ViewModel() {
                 busy = null
             }
         }
+    }
+
+    private fun decryptsTo(text: String, pw: CharArray, entropy: ByteArray): Boolean = try {
+        val back = SeedBox.open(SeedBox.fromBase64(text), pw)
+        try { back.contentEquals(entropy) } finally { back.fill(0) }
+    } catch (e: SeedTagException) {
+        false
     }
 
     fun confirmOverwrite() {

@@ -17,6 +17,7 @@ signing key living in a dev container that an AI agent can run commands in.
 | 4 | A revealed password can be copied to the clipboard | **Fixed** in `51afe6a` (no text fields left) |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
 | 2 | Weak passwords accepted and rated strong | **Fixed**: "Rate passwords honestly and confirm weak ones" (confirmation below 60 bits) |
+| 6 | No decrypt check before writing | **Fixed**: "Decrypt the backup once before writing it" |
 | all others | | Open |
 
 ## What's done well
@@ -96,7 +97,7 @@ signing key living in a dev container that an AI agent can run commands in.
   every accessibility service not flagged as an accessibility tool. This needs checking on a device, since
   Compose's support for it isn't certain. Also document the risk.
 
-### 6. The app doesn't decrypt the blob before writing it
+### 6. The app doesn't decrypt the blob before writing it — *fixed*
 
 `app/src/main/java/rs/zivke/seedtag/SeedTagViewModel.kt:150`
 

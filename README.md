@@ -7,7 +7,8 @@ plus a single-file Python tool to recover it on any computer.
 - Argon2id (64 MiB) + AES-256-GCM. Documented, versioned format.
 - **No `INTERNET` permission.** Screenshots blocked, no backups, no clipboard.
 - **No system keyboard.** Seed words and passwords are typed on the app's own keyboards, so no keyboard app ever sees them.
-- Every write is read back and compared before it's reported as success.
+- The encrypted backup is decrypted once before it's written, and every write is read back and compared before it's
+  reported as success.
 
 ## Project layout
 
