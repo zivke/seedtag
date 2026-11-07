@@ -7,6 +7,11 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- Passwords are typed on the app's own keyboard (letters, digits, all ASCII
+  symbols, common accented Latin letters), with BIP39 word suggestions. The
+  app has no text fields any more, so the system keyboard, or any other
+  keyboard app, never opens and never sees a password. A password with other
+  characters can still be decrypted with `seedtag.py`.
 - The word-entry keypad stays fixed at the bottom of the screen. Only the
   word list above it scrolls, and it follows the word being typed.
 - The app runs full screen: the status and navigation bars are hidden and

@@ -5,7 +5,8 @@ plus a single-file Python tool to recover it on any computer.
 
 - Encrypts the raw seed entropy (not the words) → 77 bytes for 24 words, fits a 137-byte MIFARE Ultralight C.
 - Argon2id (64 MiB) + AES-256-GCM. Documented, versioned format.
-- **No `INTERNET` permission.** Screenshots blocked, no backups, no clipboard, own keypad for seed words.
+- **No `INTERNET` permission.** Screenshots blocked, no backups, no clipboard.
+- **No system keyboard.** Seed words and passwords are typed on the app's own keyboards, so no keyboard app ever sees them.
 - Every write is read back and compared before it's reported as success.
 
 ## Project layout
@@ -50,6 +51,7 @@ requests any permission other than NFC**, so a library can't quietly add network
    (tap a suggestion to accept each word), then set a password.
    Words already entered are hidden by default; turn off **Hide entered words** to check them.
    **Generate 7-word passphrase** is recommended (≈77 bits). Write it down. Tap *Encrypt & write*, then hold the tag to the phone.
+   The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
    If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted
    first and then needs a second tap so the app can read it back.
 2. **Verify**: type the password from your written copy and scan. You get ✓ plus a fingerprint, and the words stay hidden.
@@ -178,6 +180,9 @@ It's ciphertext, so that's safe.
 - **This is not your only backup.** NFC chips can fail. Keep a metal or paper copy of the seed somewhere separate.
 - The phone is still a general-purpose, normally online device. For maximum safety use it in airplane mode, or on a spare
   phone that is never online.
+- **Password characters.** The app's keyboard has letters, digits, all ASCII symbols and common Latin accented letters
+  (č, ć, đ, š, ž, é, ö, ß …). A password with any other character, such as Cyrillic or emoji, set with an earlier version
+  or with `seedtag.py`, can't be typed in the app: decrypt that tag with `seedtag.py`.
 - JVM/Compose limitations: text fields and the decrypted word list exist briefly as immutable `String`s, which can't be zeroed.
   Byte and char arrays (entropy, keys, password bytes) are zeroed after use. State is dropped when the app is backgrounded.
 - The Ultralight C's own 3DES access protection isn't used, and isn't needed: the payload is encrypted.

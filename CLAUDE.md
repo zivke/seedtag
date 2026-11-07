@@ -62,7 +62,7 @@ Two Gradle modules plus the Python tool:
     stays armed so the user can just tap again.
   - `TagIo.kt`: blocking NFC I/O (write + read-back, read, lock), returns a
     `TagResult`, never throws.
-  - `Ui.kt`: screens, keypad, dialogs, theme.
+  - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
 - **`tools/seedtag.py`**: single file, wordlist embedded, `encrypt` /
   `decrypt` / `verify`. Needs `cryptography` ≥ 44, or `argon2-cffi` as fallback.
 
@@ -91,7 +91,9 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
 - Secrets live in `ByteArray` / `CharArray` and are zeroed in `finally`.
   Compose text fields and the restored word list are `String`s; keep those
   short-lived and cleared by `wipeAll()`.
-- Seed words are entered only with the in-app keypad, never the system keyboard.
+- All input uses the app's own keyboards: the word keypad for seed words, the
+  full keyboard for passwords. No text fields (`TextField`, `EditText`), so the
+  system keyboard can never open; the window also sets `FLAG_ALT_FOCUSABLE_IM`.
 - Use throwaway mnemonics in tests and examples (e.g. Trezor vectors), never
   anything that looks like a real seed.
 

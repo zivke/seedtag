@@ -29,6 +29,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         // No screenshots, no screen recording, blank thumbnail in Recents.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        // All typing uses the app's own keyboards and there are no text fields. On top of that,
+        // this window never takes input from a keyboard app, so none can open over the app.
+        window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
         enableEdgeToEdge()
         hideSystemBars()
         adapter = NfcAdapter.getDefaultAdapter(this)
