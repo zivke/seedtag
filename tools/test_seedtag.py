@@ -93,5 +93,34 @@ class SeedBoxV1(unittest.TestCase):
         self.assertNotEqual(blob, seedtag.seal(ent, "pw"))  # fresh salt + nonce
 
 
+class PasswordVariants(unittest.TestCase):
+    """Same file PasswordVariantsTest.kt reads: both tools must retry the same passwords."""
+
+    def test_variants_match_vectors(self):
+        vecs = rows("password-variants.tsv")
+        self.assertEqual(11, len(vecs))
+        for cols in vecs:
+            pw = bytes.fromhex(cols[0]).decode("utf-8")
+            expected = [(cols[i], bytes.fromhex(cols[i + 1]).decode("utf-8")) for i in range(1, len(cols), 2)]
+            self.assertEqual(expected, seedtag.password_variants(pw), msg=repr(pw))
+
+    def test_forgiving_open(self):
+        pw, ent, _, _, b64, _ = rows("seedtag-v1-vectors.tsv")[0]
+        self.assertEqual("correct horse battery staple", bytes.fromhex(pw).decode())
+        blob = base64.b64decode(b64)
+        self.assertEqual((bytes.fromhex(ent), None), seedtag.open_forgiving(blob, "correct horse battery staple"))
+        self.assertEqual("Spaces", seedtag.open_forgiving(blob, " correct  horse battery staple ")[1])
+        self.assertEqual("Case", seedtag.open_forgiving(blob, "Correct Horse Battery Staple")[1])
+        self.assertEqual("SpacesAndCase", seedtag.open_forgiving(blob, "  Correct horse\tbattery  staple")[1])
+        for wrong in ("correct horse battery", "Correct  horse battery stapler"):
+            with self.assertRaises(seedtag.WrongPassword):
+                seedtag.open_forgiving(blob, wrong)
+
+    def test_bad_blob_is_not_retried(self):
+        with self.assertRaises(ValueError) as cm:
+            seedtag.open_forgiving(b"\x02" + bytes(76), " Pw ")
+        self.assertNotIsInstance(cm.exception, seedtag.WrongPassword)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

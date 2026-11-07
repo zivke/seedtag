@@ -30,6 +30,9 @@ Run it on an offline machine.
     python3 seedtag.py verify  [BLOB]   # like decrypt, but only prints OK / FAIL
                                         # plus a short fingerprint, not the words
 
+decrypt and verify forgive extra spaces and wrong capitals: a wrong password
+is tried again trimmed and with single spaces, then also lower-cased.
+
 Format v1 (all multi-byte fields raw bytes):
     blob   = 0x01 | salt[16] | nonce[12] | AES-256-GCM(entropy) [len(entropy)+16]
     key    = Argon2id(NFKD(password) as UTF-8, salt, t=3, m=65536 KiB, p=1, len=32)
@@ -289,6 +292,10 @@ def seal(entropy: bytes, password: str, salt: bytes | None = None,
     return header + salt + nonce + ct
 
 
+class WrongPassword(ValueError):
+    pass
+
+
 def open_blob(blob: bytes, password: str) -> bytes:
     if not blob or blob[0] != VERSION:
         raise ValueError(f"unsupported blob version: {blob[:1].hex() or 'empty'}")
@@ -302,7 +309,40 @@ def open_blob(blob: bytes, password: str) -> bytes:
     try:
         return _aesgcm(derive_key(password, salt)).decrypt(nonce, ct, blob[:1])
     except InvalidTag:
-        raise ValueError("wrong password or corrupted blob") from None
+        raise WrongPassword("wrong password or corrupted blob") from None
+
+
+FIXES = {"Spaces": "extra spaces", "Case": "capital letters", "SpacesAndCase": "extra spaces and capital letters"}
+
+
+def password_variants(password: str) -> list[tuple[str, str]]:
+    """Retry candidates for a password that didn't match: whitespace trimmed and collapsed to
+    single spaces, then that lower-cased (char by char, except U+0130, whose lower case is two
+    chars). Only variants that differ. Same rules as SeedBox.passwordVariants in the app."""
+    collapsed = " ".join(password.split())
+    lowered = "".join(c if len(c.lower()) != 1 else c.lower() for c in collapsed)
+    out = []
+    spaces = collapsed != password
+    if spaces:
+        out.append(("Spaces", collapsed))
+    if lowered != collapsed:
+        out.append(("SpacesAndCase" if spaces else "Case", lowered))
+    return out
+
+
+def open_forgiving(blob: bytes, password: str) -> tuple[bytes, str | None]:
+    """Like open_blob, but a wrong password is also tried without extra spaces, then lower-cased.
+    Returns (entropy, fix), fix being None or a key of FIXES."""
+    try:
+        return open_blob(blob, password), None
+    except WrongPassword as first:
+        wrong = first
+    for fix, candidate in password_variants(password):
+        try:
+            return open_blob(blob, candidate), fix
+        except WrongPassword:
+            pass
+    raise wrong
 
 
 def fingerprint(entropy: bytes) -> str:
@@ -338,7 +378,10 @@ def main(argv):
             print(f"fingerprint: {fingerprint(entropy)}", file=sys.stderr)
         else:
             blob = _read_blob(rest)
-            entropy = open_blob(blob, getpass.getpass("Password: "))
+            entropy, fix = open_forgiving(blob, getpass.getpass("Password: "))
+            if fix:
+                print(f"note: the password only matched with {FIXES[fix]} ignored; "
+                      "check your written copy.", file=sys.stderr)
             if cmd == "decrypt":
                 print(" ".join(entropy_to_words(entropy)))
             else:

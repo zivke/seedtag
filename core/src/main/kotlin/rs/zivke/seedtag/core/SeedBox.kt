@@ -23,6 +23,12 @@ import javax.crypto.spec.SecretKeySpec
  *   AAD   = 0x01 (the header byte)
  *   tag   = NDEF Text record, lang "en", standard Base64 of blob
  */
+/** What [SeedBox.openForgiving] had to change in the typed password before it matched. */
+enum class PasswordFix { None, Spaces, Case, SpacesAndCase }
+
+/** Decrypted entropy (the caller zeroes it) and the fix the password needed. */
+class Opened(val entropy: ByteArray, val fix: PasswordFix)
+
 object SeedBox {
     const val VERSION: Int = 0x01
     const val SALT_LEN = 16
@@ -81,6 +87,69 @@ object SeedBox {
             throw SeedTagException.WrongPassword()
         } finally {
             key.fill(0)
+        }
+    }
+
+    /**
+     * Like [open], but if the password is wrong, also tries it with extra spaces removed, then
+     * also lower-cased ([passwordVariants]): a typo there shouldn't look like a lost backup.
+     * Each retry is one more Argon2 run. Caller must zero [Opened.entropy].
+     * @throws SeedTagException.WrongPassword if no variant matches, or open's other errors at once.
+     */
+    fun openForgiving(blob: ByteArray, password: CharArray): Opened {
+        val wrong = try {
+            return Opened(open(blob, password), PasswordFix.None)
+        } catch (e: SeedTagException.WrongPassword) {
+            e
+        }
+        val variants = passwordVariants(password)
+        try {
+            for ((fix, candidate) in variants) {
+                try {
+                    return Opened(open(blob, candidate), fix)
+                } catch (_: SeedTagException.WrongPassword) {
+                    // try the next one
+                }
+            }
+        } finally {
+            variants.forEach { it.second.fill('\u0000') }
+        }
+        throw wrong
+    }
+
+    /**
+     * Retry candidates for a password that didn't match, each a new array the caller zeroes:
+     * whitespace trimmed and collapsed to single spaces, then that lower-cased (char by char,
+     * except U+0130 İ, whose lower case is two chars). Only variants that differ are returned.
+     * Same rules as password_variants() in seedtag.py.
+     */
+    fun passwordVariants(password: CharArray): List<Pair<PasswordFix, CharArray>> {
+        val collapsed = collapseSpaces(password)
+        val lowered = CharArray(collapsed.size) { i -> collapsed[i].let { if (it == '\u0130') it else it.lowercaseChar() } }
+        val spaces = !collapsed.contentEquals(password)
+        val case = !lowered.contentEquals(collapsed)
+        val out = ArrayList<Pair<PasswordFix, CharArray>>(2)
+        if (spaces) out += PasswordFix.Spaces to collapsed else collapsed.fill('\u0000')
+        if (case) out += (if (spaces) PasswordFix.SpacesAndCase else PasswordFix.Case) to lowered else lowered.fill('\u0000')
+        return out
+    }
+
+    private fun collapseSpaces(password: CharArray): CharArray {
+        val tmp = CharArray(password.size)
+        var n = 0
+        var gap = false
+        for (c in password) {
+            if (c.isWhitespace()) {
+                if (n > 0) gap = true
+            } else {
+                if (gap) { tmp[n++] = ' '; gap = false }
+                tmp[n++] = c
+            }
+        }
+        try {
+            return tmp.copyOf(n)
+        } finally {
+            tmp.fill('\u0000')
         }
     }
 
