@@ -52,6 +52,7 @@ Two Gradle modules plus the Python tool:
     SHA-256 `2f5eed53…dbda`), words ↔ entropy, checksum, `suggest(prefix)`.
   - `SeedBox.kt`: the blob format (below), `seal` / `open`, Base64, `fingerprint`.
   - `Passphrase.kt`: 7-word generator from the BIP39 list, rough strength estimate.
+  - `SecretChars.kt`: zeroable, in-place password buffer.
   - `NdefText.kt`: Text-record payload decode (encode is `NdefRecord.createTextRecord`).
   - `Errors.kt`: `SeedTagException` subclasses; messages are shown to the user
     and must never contain secrets.
@@ -95,8 +96,13 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   entropy, key or decrypted output. No `Log.*` with user data at all.
 - Keep `allowBackup="false"` and the data-extraction rules; store nothing on disk.
 - Secrets live in `ByteArray` / `CharArray` and are zeroed in `finally`.
-  Compose text fields and the restored word list are `String`s; keep those
-  short-lived and cleared by `wipeAll()`.
+  Passwords live in `SecretChars` buffers in the view model, edited in place
+  by the keyboard: never turn one into a `String` (`reveal()` is only for
+  showing it on screen). Seed words, typed or restored, are the wordlist's own
+  `String` objects, not copies. `wipeAll()` clears all of it.
+- The AES key stays in the platform cipher (hardware-accelerated,
+  constant-time) even though `SecretKeySpec` copies it; don't swap in a Java
+  AES just to be able to zero the key.
 - All input uses the app's own keyboards: the word keypad for seed words, the
   full keyboard for passwords. No text fields (`TextField`, `EditText`), so the
   system keyboard can never open; the window also sets `FLAG_ALT_FOCUSABLE_IM`.

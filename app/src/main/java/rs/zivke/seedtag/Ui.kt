@@ -304,8 +304,6 @@ private fun Key(label: String, modifier: Modifier, active: Boolean = false, onCl
     }
 }
 
-private enum class PwField { Password, Repeat }
-
 @Composable
 private fun PasswordStep(vm: SeedTagViewModel) {
     var field by remember { mutableStateOf(PwField.Password) }
@@ -328,18 +326,18 @@ private fun PasswordStep(vm: SeedTagViewModel) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
                     Column(Modifier.padding(12.dp)) {
                         Text("Write this down now:", style = MaterialTheme.typography.labelMedium)
-                        Text(vm.password, fontFamily = FontFamily.Monospace, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                        Text(vm.revealPassword(PwField.Password), fontFamily = FontFamily.Monospace, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
-            SecretDisplay("Password", vm.password, vm.generatedPassphrase, active = field == PwField.Password) {
+            SecretDisplay("Password", vm, PwField.Password, vm.generatedPassphrase, active = field == PwField.Password) {
                 field = PwField.Password
             }
-            SecretDisplay("Repeat password", vm.passwordRepeat, vm.generatedPassphrase, active = field == PwField.Repeat) {
+            SecretDisplay("Repeat password", vm, PwField.Repeat, vm.generatedPassphrase, active = field == PwField.Repeat) {
                 field = PwField.Repeat
             }
 
-            if (vm.password.isNotEmpty()) {
+            if (vm.passwordLength(PwField.Password) > 0) {
                 val bits = vm.passwordBits
                 val (msg, color) = when {
                     bits < 50 -> "Weak (≈$bits bits) – crackable offline. Use a passphrase." to MaterialTheme.colorScheme.error
@@ -355,22 +353,19 @@ private fun PasswordStep(vm: SeedTagViewModel) {
                     )
                 }
             }
-            if (vm.passwordRepeat.isNotEmpty() && vm.password != vm.passwordRepeat) {
+            if (vm.passwordLength(PwField.Repeat) > 0 && !vm.passwordsMatch) {
                 Text("Passwords don't match", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
             }
         }
 
-        PasswordKeyboard(if (field == PwField.Password) vm.password else vm.passwordRepeat) {
-            if (field == PwField.Password) vm.password = it else vm.passwordRepeat = it
-            vm.onPasswordEdited()
-        }
+        PasswordKeyboard(vm, field)
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedButton(onClick = vm::backToWords) { Text("Back") }
             Spacer(Modifier.weight(1f))
             Button(
                 onClick = vm::encryptAndWrite,
-                enabled = vm.password.isNotEmpty() && vm.password == vm.passwordRepeat,
+                enabled = vm.passwordLength(PwField.Password) > 0 && vm.passwordsMatch,
             ) { Text("Encrypt & write tag") }
         }
     }
@@ -436,7 +431,7 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            SecretDisplay("Password", vm.readPassword, revealDefault = false, active = typing) { typing = true }
+            SecretDisplay("Password", vm, PwField.Read, revealDefault = false, active = typing) { typing = true }
 
             val result = vm.verifyResult
             if (result != null) {
@@ -475,10 +470,10 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
             }
         }
 
-        if (typing) PasswordKeyboard(vm.readPassword) { vm.readPassword = it }
+        if (typing) PasswordKeyboard(vm, PwField.Read)
         Button(
             onClick = if (reveal) vm::scanForRestore else vm::scanForVerify,
-            enabled = vm.readPassword.isNotEmpty(),
+            enabled = vm.passwordLength(PwField.Read) > 0,
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Scan tag") }
     }
@@ -489,7 +484,14 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
  * can't open, so no keyboard app sees what's typed, and there's nothing to copy, paste or autofill.
  */
 @Composable
-private fun SecretDisplay(label: String, value: String, revealDefault: Boolean, active: Boolean, onSelect: () -> Unit) {
+private fun SecretDisplay(
+    label: String,
+    vm: SeedTagViewModel,
+    field: PwField,
+    revealDefault: Boolean,
+    active: Boolean,
+    onSelect: () -> Unit,
+) {
     var reveal by remember(revealDefault) { mutableStateOf(revealDefault) }
     val accent = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
     Row(
@@ -501,37 +503,33 @@ private fun SecretDisplay(label: String, value: String, revealDefault: Boolean, 
     ) {
         Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.labelSmall, color = accent)
-            val shown = if (reveal) value else "•".repeat(value.length)
+            // Masked, only the length is read; the text itself only while it's shown.
+            val shown = if (reveal) vm.revealPassword(field) else "•".repeat(vm.passwordLength(field))
             Text(shown + if (active) "▏" else "", fontFamily = FontFamily.Monospace, fontSize = 16.sp)
         }
         TextButton(onClick = { reveal = !reveal }) { Text(if (reveal) "Hide" else "Show") }
     }
 }
 
-private const val MAX_PASSWORD_LENGTH = 128
-
-/** In-app keyboard for passwords, with BIP39 completions (the recommended passphrase is BIP39 words). */
+/**
+ * In-app keyboard for passwords, with BIP39 completions (the recommended passphrase is BIP39 words).
+ * It only sends key presses to the view model, which edits the password buffer in place.
+ */
 @Composable
-private fun PasswordKeyboard(value: String, onChange: (String) -> Unit) {
-    val last = value.substringAfterLast(' ')
-    val suggestions = if (last.isNotEmpty() && last.all { it in 'a'..'z' }) {
-        Bip39.suggest(last, 6).filter { it != last }
-    } else {
-        emptyList()
-    }
+private fun PasswordKeyboard(vm: SeedTagViewModel, field: PwField) {
     // Fixed height, so the keyboard doesn't jump when the suggestions appear or disappear.
     Row(
         Modifier.fillMaxWidth().height(48.dp).horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        suggestions.forEach { w ->
-            SuggestionChip(onClick = { onChange(value.dropLast(last.length) + w) }, label = { Text(w) })
+        vm.passwordSuggestions(field).forEach { w ->
+            SuggestionChip(onClick = { vm.completePasswordWord(field, w) }, label = { Text(w) })
         }
     }
     TextKeyboard(
-        onChar = { c -> if (value.length < MAX_PASSWORD_LENGTH) onChange(value + c) },
-        onBackspace = { if (value.isNotEmpty()) onChange(value.dropLast(1)) },
+        onChar = { c -> vm.typePassword(field, c) },
+        onBackspace = { vm.backspacePassword(field) },
     )
 }
 

@@ -212,8 +212,18 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
 - **Password characters.** The app's keyboard has letters, digits, all ASCII symbols and common Latin accented letters
   (č, ć, đ, š, ž, é, ö, ß …). A password with any other character, such as Cyrillic or emoji, set with an earlier version
   or with `seedtag.py`, can't be typed in the app: decrypt that tag with `seedtag.py`.
-- JVM/Compose limitations: the typed password and the decrypted word list exist briefly as immutable `String`s, which can't be zeroed.
-  Byte and char arrays (entropy, keys, password bytes) are zeroed after use. State is dropped when the app is backgrounded.
+- **What's wiped from memory.** Passwords are kept in one char array that's edited in place and zeroed after use, never
+  as text. Entropy, password bytes and the derived key are zeroed too. Seed words, typed or restored, point at the app's
+  built-in word list instead of being copied. On the JVM some things can't be wiped:
+  - the password as text while **Show** is on, the generated passphrase while it's on screen, and a password with
+    non-ASCII characters for a moment while it's normalised;
+  - the few letters of the word being typed on the keypad;
+  - copies of the AES key inside Android's crypto code. SeedTag keeps Android's AES on purpose: it's
+    hardware-accelerated and resistant to timing attacks, unlike a pure-Java AES whose key could be wiped;
+  - text Compose has already drawn on screen.
+
+  Everything is dropped when the app is backgrounded. What's left in memory until it's overwritten can only be read
+  with root access or a debugger.
 - The Ultralight C's own 3DES access protection isn't used, and isn't needed: the payload is encrypted.
 
 ## Tests

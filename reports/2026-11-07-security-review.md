@@ -22,7 +22,8 @@ signing key living in a dev container that an AI agent can run commands in.
 | 7 | Build supply chain unverified | Open |
 | 8 | Task hijacking and overlays | **Fixed**: task affinity in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`. Android 8–11 can't hide overlays; the README warns. |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
-| 10–14 | Low: unzeroed key copies, skimming, passphrase look-alike, whitespace, fingerprint | Open |
+| 10 | Secret copies that aren't zeroed | **Fixed** for passwords (zeroable in-place buffer, no `String`s; branch `fix/zeroable-secrets`); the AES key copies are **documented** in the README and kept on purpose (platform AES is hardware-accelerated and constant-time) |
+| 11–14 | Low: skimming, passphrase look-alike, whitespace, fingerprint | Open |
 
 ## What's done well
 
@@ -134,7 +135,7 @@ signing key living in a dev container that an AI agent can run commands in.
 9. **Autofill** — *resolved by `51afe6a`*. Compose 1.7 doesn't offer text fields to autofill services, but
    1.8+ does. Setting `importantForAutofill = NO_EXCLUDE_DESCENDANTS` on the window would have prevented a
    password-manager "save password?" prompt after a future update.
-10. **Some secret copies aren't zeroed.**
+10. **Some secret copies aren't zeroed** — *fixed for passwords; AES key copies documented and kept on purpose*.
     - `SecretKeySpec` copies the AES key (`SeedBox.kt:49`, `:73`), and that copy is never cleared.
     - The passphrase generator and password normalisation both create `String`s.
     - The README's "keys are zeroed" is therefore only partly true.

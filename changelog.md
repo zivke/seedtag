@@ -4,6 +4,15 @@ All notable user-visible changes to SeedTag. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are the
 `versionName` in `app/build.gradle.kts`.
 
+## [Unreleased]
+
+### Fixed
+- Passwords are no longer kept in memory as text. They live in one buffer
+  that the app's keyboard edits in place and that's zeroed after use, so
+  typing no longer leaves a copy of the password behind for every key, and
+  the strength check no longer copies it either. Only **Show** (and the
+  generated passphrase on screen) puts it on screen as text.
+
 ## [0.2.0] - 2026-11-07
 
 ### Changed

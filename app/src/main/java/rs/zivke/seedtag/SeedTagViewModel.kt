@@ -5,6 +5,7 @@ package rs.zivke.seedtag
 
 import android.nfc.Tag
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -15,12 +16,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.Passphrase
+import rs.zivke.seedtag.core.SecretChars
 import rs.zivke.seedtag.core.SeedBox
 import rs.zivke.seedtag.core.SeedTagException
 import java.util.concurrent.atomic.AtomicReference
 
 enum class Screen(val title: String) { Backup("Back up"), Verify("Verify"), Restore("Restore") }
 enum class BackupStep { Length, Words, Password, Done }
+/** The three password fields: the new password and its repeat (Back up), and Verify / Restore. */
+enum class PwField { Password, Repeat, Read }
 
 sealed interface MnemonicStatus {
     data class Incomplete(val count: Int) : MnemonicStatus
@@ -60,8 +64,6 @@ class SeedTagViewModel : ViewModel() {
     /** Number of words chosen before typing; one of Bip39.validWordCounts. */
     var wordCount by mutableStateOf(24)
         private set
-    var password by mutableStateOf("")
-    var passwordRepeat by mutableStateOf("")
     var generatedPassphrase by mutableStateOf(false)
         private set
     var backupFingerprint by mutableStateOf<String?>(null)
@@ -70,8 +72,60 @@ class SeedTagViewModel : ViewModel() {
     /** Tag text (Base64 blob, no secret) last written or decrypted: the only tag Lock will touch. */
     private var lockTarget: String? = null
 
+    // ---- passwords ------------------------------------------------------------
+    // Zeroable char buffers, edited in place by the app's keyboard: never Strings, which would
+    // leave a copy on the heap for every key typed.
+    private val password = SecretChars()
+    private val passwordRepeat = SecretChars()
+    private val readPassword = SecretChars()
+    /** Bumped on every password change, so Compose redraws what depends on the buffers. */
+    private var passwordEdits by mutableIntStateOf(0)
+
+    private fun buffer(f: PwField) = when (f) {
+        PwField.Password -> password
+        PwField.Repeat -> passwordRepeat
+        PwField.Read -> readPassword
+    }
+
+    fun passwordLength(f: PwField): Int { passwordEdits; return buffer(f).length }
+
+    /** The password as text, only while the user has asked to see it. */
+    fun revealPassword(f: PwField): String { passwordEdits; return buffer(f).reveal() }
+
+    fun typePassword(f: PwField, c: Char) { if (buffer(f).append(c)) passwordChanged(f) }
+
+    fun backspacePassword(f: PwField) { buffer(f).removeLast(); passwordChanged(f) }
+
+    /** Replaces the word being typed with [word] (a tapped BIP39 suggestion). */
+    fun completePasswordWord(f: PwField, word: String) {
+        val b = buffer(f)
+        if (Bip39.isWord(word) && b.replaceFrom(b.lastTokenStart(), word)) passwordChanged(f)
+    }
+
+    /** BIP39 completions of the word being typed, if it's lower-case letters only. */
+    fun passwordSuggestions(f: PwField): List<String> {
+        passwordEdits
+        val b = buffer(f)
+        val start = b.lastTokenStart()
+        return b.use { chars, n ->
+            if (start == n || (start until n).any { chars[it] !in 'a'..'z' }) emptyList()
+            else Bip39.suggest(chars, start, n, 6).filter { it.length != n - start } // not the word already typed
+        }
+    }
+
+    val passwordsMatch: Boolean get() { passwordEdits; return password.contentEquals(passwordRepeat) }
+
+    private fun passwordChanged(f: PwField) {
+        passwordEdits++
+        if (f != PwField.Read) generatedPassphrase = false
+    }
+
+    private fun clearPasswords(vararg fields: PwField) {
+        fields.forEach { buffer(it).clear() }
+        passwordEdits++
+    }
+
     // ---- verify / restore -----------------------------------------------------
-    var readPassword by mutableStateOf("")
     var verifyResult by mutableStateOf<VerifyResult?>(null)
         private set
     var restoredWords by mutableStateOf<List<String>?>(null)
@@ -137,29 +191,28 @@ class SeedTagViewModel : ViewModel() {
         if (mnemonicStatus is MnemonicStatus.Valid) { prefix = ""; step = BackupStep.Password }
     }
 
-    fun backToWords() { step = BackupStep.Words; password = ""; passwordRepeat = ""; generatedPassphrase = false }
+    fun backToWords() { step = BackupStep.Words; clearPasswords(PwField.Password, PwField.Repeat); generatedPassphrase = false }
 
     fun generatePassphrase() {
         val p = Passphrase.generate(exclude = words.toSet())
-        password = String(p); passwordRepeat = password
+        password.set(p); passwordRepeat.set(p)
         p.fill(' ')
+        passwordEdits++
         generatedPassphrase = true
     }
 
-    fun onPasswordEdited() { generatedPassphrase = false }
-
     val passwordBits: Int
-        get() = password.toCharArray().let { val b = Passphrase.estimateBits(it, words.toSet()); it.fill(' '); b }
+        get() { passwordEdits; return password.use { c, n -> Passphrase.estimateBits(c, n, words.toSet()) } }
 
     /** Words of the seed in the password: whoever sees the password learns part of the seed. */
     val passwordSharesSeedWords: Boolean
-        get() = password.toCharArray().let { val b = Passphrase.sharesWords(it, words.toSet()); it.fill(' '); b }
+        get() { passwordEdits; return password.use { c, n -> Passphrase.sharesWords(c, n, words.toSet()) } }
 
     // ================================================================ flows ===
 
     fun encryptAndWrite() {
         if (password.isEmpty()) return showError("Enter a password.")
-        if (password != passwordRepeat) return showError("The passwords don't match.")
+        if (!password.contentEquals(passwordRepeat)) return showError("The passwords don't match.")
         val bits = passwordBits
         val shares = passwordSharesSeedWords
         if (bits < Passphrase.MIN_BITS || shares) {
@@ -172,12 +225,12 @@ class SeedTagViewModel : ViewModel() {
     /** "Write anyway" in the weak-password dialog. */
     fun confirmWeakPassword() {
         dialog = null
-        if (password.isNotEmpty() && password == passwordRepeat) encrypt()
+        if (!password.isEmpty() && password.contentEquals(passwordRepeat)) encrypt()
     }
 
     private fun encrypt() {
         val snapshot = words.toList()
-        val pw = password.toCharArray()
+        val pw = password.copy()
         val wipesAtStart = wipes
         viewModelScope.launch {
             busy = "Encrypting and checking… (Argon2id runs twice, a few seconds)"
@@ -305,7 +358,7 @@ class SeedTagViewModel : ViewModel() {
     }
 
     private fun decrypt(text: String, reveal: Boolean) {
-        val pw = readPassword.toCharArray()
+        val pw = readPassword.copy()
         val wipesAtStart = wipes
         viewModelScope.launch {
             busy = "Decrypting… (deriving key with Argon2id, a few seconds)"
@@ -320,7 +373,7 @@ class SeedTagViewModel : ViewModel() {
                 verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp })
                 lockTarget = text
                 if (reveal) restoredWords = words
-                readPassword = ""
+                clearPasswords(PwField.Read)
             } catch (e: SeedTagException) {
                 showError(e.message ?: "Decryption failed.")
             } finally {
@@ -333,7 +386,7 @@ class SeedTagViewModel : ViewModel() {
     // ============================================================== hygiene ===
 
     private fun wipeBackup() {
-        words.clear(); prefix = ""; password = ""; passwordRepeat = ""; hideWords = true; wordCount = 24
+        words.clear(); prefix = ""; clearPasswords(PwField.Password, PwField.Repeat); hideWords = true; wordCount = 24
         generatedPassphrase = false; pendingText = null
     }
 
@@ -343,7 +396,7 @@ class SeedTagViewModel : ViewModel() {
         cancelScan()
         if (step != BackupStep.Done) step = BackupStep.Length
         wipeBackup()
-        readPassword = ""; restoredWords = null
+        clearPasswords(PwField.Read); restoredWords = null
         if (dialog is Dialog.ConfirmOverwrite || dialog is Dialog.ConfirmWeakPassword) dialog = null
     }
 
