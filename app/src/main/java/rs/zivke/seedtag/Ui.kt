@@ -317,7 +317,8 @@ private fun PasswordStep(vm: SeedTagViewModel) {
             Text("3 · Choose the encryption password", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Anyone who finds the tag can try passwords offline, so this password is the only thing protecting your seed. " +
-                    "A generated 7-word passphrase (≈77 bits) is strongly recommended. Write it down and store it apart from the tag.",
+                    "A generated 7-word passphrase (≈77 bits) is strongly recommended. Write it down, label it \"SeedTag password\" " +
+                    "and store it apart from the tag.",
                 style = MaterialTheme.typography.bodySmall,
             )
             OutlinedButton(onClick = vm::generatePassphrase, modifier = Modifier.fillMaxWidth()) {
@@ -326,8 +327,13 @@ private fun PasswordStep(vm: SeedTagViewModel) {
             if (vm.generatedPassphrase) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
                     Column(Modifier.padding(12.dp)) {
-                        Text("Write this down now:", style = MaterialTheme.typography.labelMedium)
+                        Text("Write this down now, labelled \"SeedTag password\":", style = MaterialTheme.typography.labelMedium)
                         Text(vm.revealPassword(PwField.Password), fontFamily = FontFamily.Monospace, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            "It's made of the same kind of words as a seed phrase, but it isn't one. Label it so that " +
+                                "nobody, you or your heirs, mistakes one for the other, and keep it apart from the tag and the seed.",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
                     }
                 }
             }

@@ -54,7 +54,9 @@ SeedTag hide other apps' overlays.)
 1. **Back up**: choose how many words your phrase has (12, 15, 18, 21 or 24), enter them with the in-app keypad
    (tap a suggestion to accept each word), then set a password.
    Words already entered are hidden by default; turn off **Hide entered words** to check them.
-   **Generate 7-word passphrase** is recommended (≈77 bits). Write it down. Tap *Encrypt & write*, then hold the tag to the phone.
+   **Generate 7-word passphrase** is recommended (≈77 bits). Write it down and label it *SeedTag password*: it's made of
+   the same BIP39 words as a seed phrase, so an unlabelled copy is easy to mistake for one, by you or by your heirs. Tap
+   *Encrypt & write*, then hold the tag to the phone.
    The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
    A password estimated below 60 bits, or one that uses words of the seed, needs a confirmation before writing.
    If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted

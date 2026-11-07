@@ -23,7 +23,8 @@ signing key living in a dev container that an AI agent can run commands in.
 | 8 | Task hijacking and overlays | **Fixed**: task affinity in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`. Android 8–11 can't hide overlays; the README warns. |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
 | 10 | Secret copies that aren't zeroed | **Fixed** for passwords (zeroable in-place buffer, no `String`s; branch `fix/zeroable-secrets`); the AES key copies are **documented** in the README and kept on purpose (platform AES is hardware-accelerated and constant-time) |
-| 11–12 | Low: skimming, passphrase look-alike | Open |
+| 11 | Low: skimming and destruction | Open |
+| 12 | The passphrase looks like a seed | **Fixed**: the app and README tell users to label it "SeedTag password" |
 | 13 | Whitespace and case must match exactly | **Fixed**: wrong passwords are retried with spaces collapsed, then lower-cased, in the app and `seedtag.py` |
 | 14 | Fingerprint as a guess checker for a mostly known seed | **Documented** in the README (informational, no code change) |
 
@@ -146,7 +147,7 @@ signing key living in a dev container that an AI agent can run commands in.
 11. **Skimming and destruction.** An unlocked tag can be erased, or overwritten and locked, by any phone. A
     locked tag can still be read from a few centimetres. Recommend locking it, and keeping it in an
     RF-shielding sleeve.
-12. **The passphrase looks like a seed.** It uses the same word list, so a written-down passphrase can be
+12. **The passphrase looks like a seed** — *fixed: the app and README say to label it*. It uses the same word list, so a written-down passphrase can be
     mistaken for a seed. Tell users to label it "SeedTag password".
 13. **Whitespace and case must match exactly** — *fixed: retried with spaces collapsed, then lower-cased*. An extra space or a capitalised first word gives "wrong
     password", which users may read as a lost backup. On a failed decrypt, the app could retry with

@@ -14,6 +14,9 @@ All notable user-visible changes to SeedTag. The format follows
   few seconds, only when the password didn't match.
 
 ### Changed
+- The generated passphrase comes with a reminder to label it "SeedTag
+  password": it's made of the same words as a seed phrase, so an unlabelled
+  copy is easy to mistake for one.
 - README: what the fingerprint does and doesn't reveal, and not to keep it
   next to a partly readable copy of the seed.
 
