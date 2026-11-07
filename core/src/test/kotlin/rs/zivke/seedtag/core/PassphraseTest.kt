@@ -52,6 +52,15 @@ class PassphraseTest {
     }
 
     @Test
+    fun lengthLimitsTheCheck() {
+        // Only password[0 until length] counts: the rest of a buffer is ignored.
+        val buf = "zoo abandon ability able legal winner".toCharArray()
+        assertEquals(44, Passphrase.estimateBits(buf, 24))
+        assertFalse(Passphrase.sharesWords(buf, 24, seed))
+        assertTrue(Passphrase.sharesWords(buf, buf.size, seed))
+    }
+
+    @Test
     fun sharesWords() {
         assertTrue(Passphrase.sharesWords("my Legal password".toCharArray(), seed))
         assertFalse(Passphrase.sharesWords("zoo abandon ability able".toCharArray(), seed))

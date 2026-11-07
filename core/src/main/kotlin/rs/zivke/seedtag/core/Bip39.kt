@@ -31,6 +31,58 @@ object Bip39 {
 
     fun isWord(word: String): Boolean = word in index
 
+    /** Position of [word] in the list, or -1. */
+    fun indexOf(word: String): Int = index[word] ?: -1
+
+    /**
+     * Position of the word spelled by `chars[from until to]` (lower-cased first if [lowercase]),
+     * or -1. Works on the char array directly, so no String copy of a password is made.
+     */
+    fun indexOf(chars: CharArray, from: Int, to: Int, lowercase: Boolean = false): Int {
+        var lo = 0
+        var hi = wordlist.size - 1
+        while (lo <= hi) {
+            val mid = (lo + hi) ushr 1
+            val c = compare(wordlist[mid], chars, from, to, lowercase)
+            when {
+                c == 0 -> return mid
+                c < 0 -> lo = mid + 1
+                else -> hi = mid - 1
+            }
+        }
+        return -1
+    }
+
+    /** Like [suggest], for the lower-case prefix `chars[from until to]`, without a String copy of it. */
+    fun suggest(chars: CharArray, from: Int, to: Int, limit: Int = 8): List<String> {
+        if (from >= to) return emptyList()
+        var lo = 0
+        var hi = wordlist.size
+        while (lo < hi) {
+            val mid = (lo + hi) ushr 1
+            if (compare(wordlist[mid], chars, from, to, false) < 0) lo = mid + 1 else hi = mid
+        }
+        val n = to - from
+        val out = ArrayList<String>(limit)
+        var i = lo
+        while (i < wordlist.size && out.size < limit) {
+            val w = wordlist[i]
+            if (w.length < n || (0 until n).any { k -> w[k] != chars[from + k] }) break
+            out += w; i++
+        }
+        return out
+    }
+
+    /** String order of [word] against the char slice, as String.compareTo would give. */
+    private fun compare(word: String, chars: CharArray, from: Int, to: Int, lowercase: Boolean): Int {
+        val n = to - from
+        for (k in 0 until minOf(word.length, n)) {
+            val c = chars[from + k].let { if (lowercase) it.lowercaseChar() else it }
+            if (word[k] != c) return word[k] - c
+        }
+        return word.length - n
+    }
+
     /** Up to [limit] words starting with [prefix] (lower-case), in list order. */
     fun suggest(prefix: String, limit: Int = 8): List<String> {
         if (prefix.isEmpty()) return emptyList()

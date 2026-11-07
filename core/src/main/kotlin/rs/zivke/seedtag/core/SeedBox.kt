@@ -102,8 +102,13 @@ object SeedBox {
         }
     }
 
-    /** NFKD-normalise, then UTF-8 encode. (Normalizer forces one transient String – unavoidable on the JVM.) */
+    /**
+     * NFKD-normalise, then UTF-8 encode. ASCII is unchanged by NFKD and is one byte per char, so it
+     * is copied straight across. Anything else goes through Normalizer, which makes one transient
+     * String (unavoidable on the JVM).
+     */
     internal fun passwordBytes(password: CharArray): ByteArray {
+        if (password.all { it.code < 0x80 }) return ByteArray(password.size) { password[it].code.toByte() }
         val normalized = Normalizer.normalize(CharBuffer.wrap(password), Normalizer.Form.NFKD)
         val bb: ByteBuffer = Charsets.UTF_8.newEncoder().encode(CharBuffer.wrap(normalized))
         val out = ByteArray(bb.remaining())
