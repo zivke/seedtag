@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import rs.zivke.seedtag.core.Bip39
+import rs.zivke.seedtag.core.Passphrase
 
 // ============================================================== theme ===
 
@@ -311,6 +312,13 @@ private fun PasswordStep(vm: SeedTagViewModel) {
                     else -> "Strong (≈$bits bits)" to MaterialTheme.colorScheme.primary
                 }
                 Text(msg, color = color, style = MaterialTheme.typography.bodySmall)
+                if (vm.passwordSharesSeedWords) {
+                    Text(
+                        "Uses words from your seed phrase: anyone who sees the password learns part of the seed.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
             if (vm.passwordRepeat.isNotEmpty() && vm.password != vm.passwordRepeat) {
                 Text("Passwords don't match", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
@@ -633,6 +641,29 @@ private fun Dialogs(vm: SeedTagViewModel) {
                 TextButton(onClick = vm::confirmOverwrite) { Text("Overwrite", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
+        )
+        is Dialog.ConfirmWeakPassword -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            title = { Text("Weak password") },
+            text = {
+                val parts = buildList {
+                    if (d.sharesSeedWords) {
+                        add("The password uses words from the seed phrase itself. Anyone who sees the password learns part of your seed.")
+                    }
+                    if (d.bits < Passphrase.MIN_BITS) {
+                        add(
+                            "This password is estimated at only about ${d.bits} bits. Anyone who gets the tag can try " +
+                                "passwords offline, without limit, and a password this weak may be guessed.",
+                        )
+                    }
+                    add("A generated 7-word passphrase is about 77 bits.")
+                }
+                Text(parts.joinToString("\n\n"))
+            },
+            confirmButton = {
+                TextButton(onClick = vm::confirmWeakPassword) { Text("Write anyway", color = MaterialTheme.colorScheme.error) }
+            },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Change password") } },
         )
         Dialog.ConfirmLock -> AlertDialog(
             onDismissRequest = { vm.dialog = null },

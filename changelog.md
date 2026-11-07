@@ -26,6 +26,11 @@ All notable user-visible changes to SeedTag. The format follows
   exactly that many words are entered and the checksum is valid.
 - **Hide entered words**, on by default: words already entered are shown as
   dots, only the word being typed is visible. Leaving the app turns it back on.
+- A password estimated below 60 bits, or one that uses words of the seed
+  phrase, needs a confirmation before the tag is written. The estimate now
+  counts repeated words once, gives words from the seed no credit, and treats
+  repeats and runs (`aaa`, `123`) as weak. Generated passphrases never repeat
+  a word or use one from the seed.
 - Verify and Restore compare the fingerprint with the backup just written
   and say whether it's the same seed, with a warning if it isn't.
 

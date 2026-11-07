@@ -16,6 +16,7 @@ signing key living in a dev container that an AI agent can run commands in.
 | 3 | Password goes through the system keyboard | **Fixed** in `51afe6a` (in-app keyboard, no text fields, `FLAG_ALT_FOCUSABLE_IM`) |
 | 4 | A revealed password can be copied to the clipboard | **Fixed** in `51afe6a` (no text fields left) |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
+| 2 | Weak passwords accepted and rated strong | **Fixed**: "Rate passwords honestly and confirm weak ones" (confirmation below 60 bits) |
 | all others | | Open |
 
 ## What's done well
@@ -52,7 +53,7 @@ signing key living in a dev container that an AI agent can run commands in.
 - **Fix:** sign releases outside the dev container (a separate offline machine is best). Otherwise, at
   least stop mounting the key by default and give each project its own volume.
 
-### 2. The app accepts any password, and its strength meter can be badly fooled
+### 2. The app accepts any password, and its strength meter can be badly fooled — *fixed*
 
 `core/src/main/kotlin/rs/zivke/seedtag/core/Passphrase.kt:20`
 

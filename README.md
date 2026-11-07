@@ -52,6 +52,7 @@ requests any permission other than NFC**, so a library can't quietly add network
    Words already entered are hidden by default; turn off **Hide entered words** to check them.
    **Generate 7-word passphrase** is recommended (≈77 bits). Write it down. Tap *Encrypt & write*, then hold the tag to the phone.
    The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
+   A password estimated below 60 bits, or one that uses words of the seed, needs a confirmation before writing.
    If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted
    first and then needs a second tap so the app can read it back.
 2. **Verify**: type the password from your written copy and scan. You get ✓ plus a fingerprint, and the words stay hidden.

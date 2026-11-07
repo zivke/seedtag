@@ -37,6 +37,8 @@ sealed interface Dialog {
     data class Info(val title: String, val message: String) : Dialog
     data class ConfirmOverwrite(val looksLikeSeedTag: Boolean) : Dialog
     data object ConfirmLock : Dialog
+    /** The password is below [Passphrase.MIN_BITS] or reuses words of the seed. */
+    data class ConfirmWeakPassword(val bits: Int, val sharesSeedWords: Boolean) : Dialog
 }
 
 private enum class Purpose { BackupWrite, Verify, Restore, Lock }
@@ -138,7 +140,7 @@ class SeedTagViewModel : ViewModel() {
     fun backToWords() { step = BackupStep.Words; password = ""; passwordRepeat = ""; generatedPassphrase = false }
 
     fun generatePassphrase() {
-        val p = Passphrase.generate()
+        val p = Passphrase.generate(exclude = words.toSet())
         password = String(p); passwordRepeat = password
         p.fill(' ')
         generatedPassphrase = true
@@ -146,13 +148,34 @@ class SeedTagViewModel : ViewModel() {
 
     fun onPasswordEdited() { generatedPassphrase = false }
 
-    val passwordBits: Int get() = password.toCharArray().let { val b = Passphrase.estimateBits(it); it.fill(' '); b }
+    val passwordBits: Int
+        get() = password.toCharArray().let { val b = Passphrase.estimateBits(it, words.toSet()); it.fill(' '); b }
+
+    /** Words of the seed in the password: whoever sees the password learns part of the seed. */
+    val passwordSharesSeedWords: Boolean
+        get() = password.toCharArray().let { val b = Passphrase.sharesWords(it, words.toSet()); it.fill(' '); b }
 
     // ================================================================ flows ===
 
     fun encryptAndWrite() {
         if (password.isEmpty()) return showError("Enter a password.")
         if (password != passwordRepeat) return showError("The passwords don't match.")
+        val bits = passwordBits
+        val shares = passwordSharesSeedWords
+        if (bits < Passphrase.MIN_BITS || shares) {
+            dialog = Dialog.ConfirmWeakPassword(bits, shares)
+            return
+        }
+        encrypt()
+    }
+
+    /** "Write anyway" in the weak-password dialog. */
+    fun confirmWeakPassword() {
+        dialog = null
+        if (password.isNotEmpty() && password == passwordRepeat) encrypt()
+    }
+
+    private fun encrypt() {
         val snapshot = words.toList()
         val pw = password.toCharArray()
         val wipesAtStart = wipes
@@ -304,7 +327,7 @@ class SeedTagViewModel : ViewModel() {
         if (step != BackupStep.Done) step = BackupStep.Length
         wipeBackup()
         readPassword = ""; restoredWords = null
-        if (dialog is Dialog.ConfirmOverwrite) dialog = null
+        if (dialog is Dialog.ConfirmOverwrite || dialog is Dialog.ConfirmWeakPassword) dialog = null
     }
 
     private fun showError(msg: String) { dialog = Dialog.Error(msg) }
