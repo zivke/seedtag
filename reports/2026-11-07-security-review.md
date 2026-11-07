@@ -23,7 +23,7 @@ signing key living in a dev container that an AI agent can run commands in.
 | 8 | Task hijacking and overlays | **Fixed**: task affinity in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`. Android 8–11 can't hide overlays; the README warns. |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
 | 10 | Secret copies that aren't zeroed | **Fixed** for passwords (zeroable in-place buffer, no `String`s; branch `fix/zeroable-secrets`); the AES key copies are **documented** in the README and kept on purpose (platform AES is hardware-accelerated and constant-time) |
-| 11 | Low: skimming and destruction | Open |
+| 11 | Skimming, destruction and lockout of a "read-only" tag (raised from Low to Medium) | Open; options analysed in [the tag write-protection report](2026-11-07-tag-write-protection.md) |
 | 12 | The passphrase looks like a seed | **Fixed**: the app and README tell users to label it "SeedTag password" |
 | 13 | Whitespace and case must match exactly | **Fixed**: wrong passwords are retried with spaces collapsed, then lower-cased, in the app and `seedtag.py` |
 | 14 | Fingerprint as a guess checker for a mostly known seed | **Documented** in the README (informational, no code change) |
@@ -129,6 +129,49 @@ signing key living in a dev container that an AI agent can run commands in.
   - Pin the image digest and verify the tools zip.
   - Publish each release APK's SHA-256 next to the certificate digest.
 
+### 11. Skimming, destruction, and lockout of a "read-only" tag — *raised from Low; open*
+
+`app/src/main/java/rs/zivke/seedtag/TagIo.kt` (`lock()`)
+
+Originally rated Low as plain skimming and erasing. A deeper look found that **Make tag read-only**
+doesn't stop someone locking the owner out of the tag.
+
+- **Skimming:**
+  - **Range:** a phone reads at 1–4 cm. A home-built skimmer has read this type of tag at about
+    25 cm, and a phone talking to the tag can be overheard from about 1 m.
+  - **What leaks:** the ciphertext, the chip's fixed UID, and the fact that it's a SeedTag (one
+    104-character Base64 string starting with `AQ`). The password is never transmitted. With a strong
+    password this is low risk, but it can mark the owner as a target.
+- **Erasing:** any phone with an NFC app can erase or overwrite an unlocked tag, or write junk to it and
+  lock it.
+- **Lockout of a locked tag:** `Ndef.makeReadOnly()` freezes the data pages but not the NXP-specific
+  settings: the password or key, and the read-protection switch.
+  - **NTAG21x:** CFGLCK is never set, so the settings stay writable. Anyone can set PWD, PROT=1 and
+    AUTH0, and from then on no phone can read the tag.
+  - **Ultralight C:** it depends on formatting.
+    - Without a Lock Control TLV, Android writes `FF 0F` to page 0x28. That freezes the AUTH0, AUTH1
+      and key lock bits *open* for good, so anyone can set a 3DES key with read protection.
+    - With NXP's TLV, Android writes `FF FF`, and the tag is safe.
+  - Nothing leaks, but the backup is lost. The attack takes seconds with a phone and no special
+    hardware, and the app says the tag is protected when it's only half protected. That's an
+    availability risk, so the rating is now **Medium**.
+- **Physical destruction:** heat, cracking the chip or antenna, or an RF pulse (an "RFID zapper").
+  Separate copies are the only answer.
+- **Fix options** (pros and cons in [the tag write-protection report](2026-11-07-tag-write-protection.md)):
+  - After locking, read the lock and settings bytes back and warn if the settings are still open.
+    This is harmless and a good first step.
+  - **Proper lock:** before `makeReadOnly()`, freeze the settings too.
+    - Ultralight C: set lock byte 3 bits 4–7 while AUTH0 = 30h.
+    - NTAG: set CFGLCK while AUTH0 = FFh.
+  - **Write password instead of read-only:** a reusable tag with reads left open.
+    - Ultralight C: a 3DES key derived from the backup password, with AUTH1 = 1 and AUTH0 = 03h.
+    - Not recommended on NTAG, whose 32-bit password is sent in plain text.
+  - **Rescue for Ultralight C tags already locked with `FF 0F`:** set a write key yourself, before an
+    attacker does.
+  - **Docs:** correct the README's claim that locking protects the tag, and recommend a metal box or
+    shielding sleeve, not carrying the tag around.
+  - Every one of these writes to the tag irreversibly, so it needs testing with spare tags on a device.
+
 ## Low
 
 8. **Hijacking the app's task (StrandHogg)** — *fixed: `taskAffinity=""` in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`*. Devices running Android 8–9, which `minSdk` 26 allows, let
@@ -144,9 +187,7 @@ signing key living in a dev container that an AI agent can run commands in.
     - The README's "keys are zeroed" is therefore only partly true.
     - **Fix:** note it in the README, or use Bouncy Castle's lower-level cipher API, whose key array can be
       wiped.
-11. **Skimming and destruction.** An unlocked tag can be erased, or overwritten and locked, by any phone. A
-    locked tag can still be read from a few centimetres. Recommend locking it, and keeping it in an
-    RF-shielding sleeve.
+11. **Skimming and destruction** — *raised to Medium; see #11 under Medium*.
 12. **The passphrase looks like a seed** — *fixed: the app and README say to label it*. It uses the same word list, so a written-down passphrase can be
     mistaken for a seed. Tell users to label it "SeedTag password".
 13. **Whitespace and case must match exactly** — *fixed: retried with spaces collapsed, then lower-cased*. An extra space or a capitalised first word gives "wrong
@@ -162,4 +203,6 @@ signing key living in a dev container that an AI agent can run commands in.
 1. Move release signing out of the container (#1).
 2. ~~Small fixes on `main`: #2, #6, #8.~~ Done.
 3. #5 needs device testing (the risk is already documented in the README).
-4. #7 is build work. It adds no new dependencies to the app, but it changes the devcontainer.
+4. #11: first the read-back check and the README correction, then the proper lock or write key on a
+   separate branch, tested with spare tags.
+5. #7 is build work. It adds no new dependencies to the app, but it changes the devcontainer.
