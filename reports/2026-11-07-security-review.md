@@ -23,7 +23,8 @@ signing key living in a dev container that an AI agent can run commands in.
 | 8 | Task hijacking and overlays | **Fixed**: task affinity in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`. Android 8–11 can't hide overlays; the README warns. |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
 | 10 | Secret copies that aren't zeroed | **Fixed** for passwords (zeroable in-place buffer, no `String`s; branch `fix/zeroable-secrets`); the AES key copies are **documented** in the README and kept on purpose (platform AES is hardware-accelerated and constant-time) |
-| 11–14 | Low: skimming, passphrase look-alike, whitespace, fingerprint | Open |
+| 11–13 | Low: skimming, passphrase look-alike, whitespace | Open |
+| 14 | Fingerprint as a guess checker for a mostly known seed | **Documented** in the README (informational, no code change) |
 
 ## What's done well
 
@@ -150,7 +151,7 @@ signing key living in a dev container that an AI agent can run commands in.
     password", which users may read as a lost backup. On a failed decrypt, the app could retry with
     collapsed spaces and lower case. That only tries a different password, so the v1 format doesn't
     change.
-14. **Fingerprint (informational).** It's an unsalted 32-bit hash of the seed. That's fine as a check
+14. **Fingerprint (informational)** — *documented in the README*. It's an unsalted 32-bit hash of the seed. That's fine as a check
     value. If someone knew most of the words, it would help them test guesses, but public wallet addresses
     already do that better.
 

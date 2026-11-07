@@ -6,6 +6,10 @@ All notable user-visible changes to SeedTag. The format follows
 
 ## [Unreleased]
 
+### Changed
+- README: what the fingerprint does and doesn't reveal, and not to keep it
+  next to a partly readable copy of the seed.
+
 ### Fixed
 - Passwords are no longer kept in memory as text. They live in one buffer
   that the app's keyboard edits in place and that's zeroed after use, so

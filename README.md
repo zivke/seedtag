@@ -162,7 +162,14 @@ tag   = one NDEF Text record, lang "en", standard Base64 of blob (104 chars for 
 ```
 
 The *fingerprint* is the first 4 bytes of `SHA-256("seedtag-fp" ‖ entropy)`. It isn't secret, and it lets you confirm two
-backups or a recovery match without showing the words.
+backups or a recovery match without showing the words. The same seed always gives the same fingerprint, whatever the tag
+or password.
+
+It can't be turned back into the seed, and it doesn't help anyone guess the tag's password. It only helps someone who
+already knows *most* of the seed: with two words of a 24-word phrase missing, the BIP39 checksum leaves about 16,000
+candidates, and the fingerprint picks out the right one in under a second. For a wallet that has been used, its public
+addresses already let them do that, more slowly. So writing the fingerprint on the tag's label is fine, but don't keep it
+next to a partly readable copy of the seed.
 
 ## Recovering on a computer
 
