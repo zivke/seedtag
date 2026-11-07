@@ -13,13 +13,16 @@ signing key living in a dev container that an AI agent can run commands in.
 
 | # | Finding | Status |
 |---|---|---|
+| 1 | Release signing key reachable from the dev container | Open |
+| 2 | Weak passwords accepted and rated strong | **Fixed** in `a21d200` (honest estimate, confirmation below 60 bits or with seed words) |
 | 3 | Password goes through the system keyboard | **Fixed** in `51afe6a` (in-app keyboard, no text fields, `FLAG_ALT_FOCUSABLE_IM`) |
 | 4 | A revealed password can be copied to the clipboard | **Fixed** in `51afe6a` (no text fields left) |
+| 5 | Accessibility services can read the screen | **Documented** in the README warnings (`776588e`); the technical fix is open |
+| 6 | No decrypt check before writing | **Fixed** in `9d90fc0` |
+| 7 | Build supply chain unverified | Open |
+| 8 | Task hijacking and overlays | **Fixed**: task affinity in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`. Android 8–11 can't hide overlays; the README warns. |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
-| 2 | Weak passwords accepted and rated strong | **Fixed**: "Rate passwords honestly and confirm weak ones" (confirmation below 60 bits) |
-| 6 | No decrypt check before writing | **Fixed**: "Decrypt the backup once before writing it" |
-| 8 | Task hijacking (StrandHogg) | **Fixed**: "Keep other apps out of SeedTag's task" (`taskAffinity=""`); overlays: **fixed**: "Hide other apps' overlays and ignore taps through them" (Android 8–11 can't hide overlays; README warns) |
-| all others | | Open |
+| 10–14 | Low: unzeroed key copies, skimming, passphrase look-alike, whitespace, fingerprint | Open |
 
 ## What's done well
 
@@ -55,7 +58,7 @@ signing key living in a dev container that an AI agent can run commands in.
 - **Fix:** sign releases outside the dev container (a separate offline machine is best). Otherwise, at
   least stop mounting the key by default and give each project its own volume.
 
-### 2. The app accepts any password, and its strength meter can be badly fooled — *fixed*
+### 2. The app accepts any password, and its strength meter can be badly fooled — *fixed in `a21d200`*
 
 `core/src/main/kotlin/rs/zivke/seedtag/core/Passphrase.kt:20`
 
@@ -90,7 +93,7 @@ signing key living in a dev container that an AI agent can run commands in.
   sync to the cloud. This was inferred from Compose's text-field code, not tried on a phone.
 - **Fix:** give `SecretField` a no-op text toolbar (`LocalTextToolbar`).
 
-### 5. Accessibility services can read the restored words and your keypad taps
+### 5. Accessibility services can read the restored words and your keypad taps — *documented in the README (`776588e`), fix open*
 
 `FLAG_SECURE` doesn't stop them, and abusing accessibility is how most Android banking malware works.
 
@@ -98,7 +101,7 @@ signing key living in a dev container that an AI agent can run commands in.
   every accessibility service not flagged as an accessibility tool. This needs checking on a device, since
   Compose's support for it isn't certain. Also document the risk.
 
-### 6. The app doesn't decrypt the blob before writing it — *fixed*
+### 6. The app doesn't decrypt the blob before writing it — *fixed in `9d90fc0`*
 
 `app/src/main/java/rs/zivke/seedtag/SeedTagViewModel.kt:150`
 
@@ -124,7 +127,7 @@ signing key living in a dev container that an AI agent can run commands in.
 
 ## Low
 
-8. **Hijacking the app's task (StrandHogg)** — *fixed with `taskAffinity=""`, and overlays are hidden (Android 12+) and obscured taps ignored (all versions)*. Devices running Android 8–9, which `minSdk` 26 allows, let
+8. **Hijacking the app's task (StrandHogg)** — *fixed: `taskAffinity=""` in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`*. Devices running Android 8–9, which `minSdk` 26 allows, let
    another app slip a fake screen into SeedTag's task to phish the seed. The fix is a single attribute,
    `android:taskAffinity=""`. Blocking screen overlays (`HIDE_OVERLAY_WINDOWS`) would need that permission
    added to `check-apk.sh`'s allow list.
@@ -154,5 +157,5 @@ signing key living in a dev container that an AI agent can run commands in.
 
 1. Move release signing out of the container (#1).
 2. ~~Small fixes on `main`: #2, #6, #8.~~ Done.
-3. #5 needs device testing.
+3. #5 needs device testing (the risk is already documented in the README).
 4. #7 is build work. It adds no new dependencies to the app, but it changes the devcontainer.
