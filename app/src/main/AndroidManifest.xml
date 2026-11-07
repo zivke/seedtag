@@ -20,9 +20,12 @@
         android:theme="@style/Theme.SeedTag"
         tools:targetApi="31">
 
+        <!-- taskAffinity "": no other app can put its activities into SeedTag's task
+             (task hijacking / StrandHogg, which Android 8 and 9 are open to). -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:taskAffinity=""
             android:launchMode="singleTop"
             android:screenOrientation="portrait"
             android:windowSoftInputMode="stateAlwaysHidden"

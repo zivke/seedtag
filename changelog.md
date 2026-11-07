@@ -39,6 +39,8 @@ All notable user-visible changes to SeedTag. The format follows
   second key derivation, and writes nothing if that fails. A fault on the
   phone can no longer produce a tag that can't be decrypted. Encrypting takes
   about twice as long.
+- Another app can no longer slip its own screen into SeedTag's task (task
+  hijacking, possible on Android 8 and 9) to pose as SeedTag.
 - A tag that moved away too soon could read as empty. Before writing, the app
   now reads the tag twice and checks what Android read at discovery, so a
   failed read can't skip the overwrite confirmation. It also never formats a
