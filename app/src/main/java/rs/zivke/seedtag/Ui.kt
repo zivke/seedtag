@@ -66,6 +66,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.Passphrase
+import rs.zivke.seedtag.core.PasswordFix
 
 // ============================================================== theme ===
 
@@ -444,6 +445,7 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
                     Column(Modifier.padding(12.dp)) {
                         Text("✓ Decrypted: ${result.wordCount}-word seed, checksum OK", fontWeight = FontWeight.SemiBold)
                         Text("Fingerprint: ${result.fingerprint}", fontFamily = FontFamily.Monospace)
+                        passwordFixNote(result.passwordFix)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                         when (result.matchesBackup) {
                             true -> Text("✓ Matches the backup you just wrote", fontWeight = FontWeight.SemiBold)
                             false -> Text(
@@ -477,6 +479,17 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Scan tag") }
     }
+}
+
+/** Says what had to be ignored in the typed password, so the user can fix their written copy. */
+private fun passwordFixNote(fix: PasswordFix): String? {
+    val ignored = when (fix) {
+        PasswordFix.None -> return null
+        PasswordFix.Spaces -> "extra spaces"
+        PasswordFix.Case -> "capital letters"
+        PasswordFix.SpacesAndCase -> "extra spaces and capital letters"
+    }
+    return "The password only matched with $ignored ignored. Check that your written copy shows it exactly as it was set."
 }
 
 /**

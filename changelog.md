@@ -6,6 +6,13 @@ All notable user-visible changes to SeedTag. The format follows
 
 ## [Unreleased]
 
+### Added
+- Verify, Restore and `seedtag.py` forgive the most common typing mistakes:
+  if the password is wrong, it's tried again without extra spaces (leading,
+  trailing or doubled), then also in lower case. If that's what matched, the
+  app says so, so you can correct your written copy. Each retry takes another
+  few seconds, only when the password didn't match.
+
 ### Changed
 - README: what the fingerprint does and doesn't reveal, and not to keep it
   next to a partly readable copy of the seed.

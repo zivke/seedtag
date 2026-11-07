@@ -16,6 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.Passphrase
+import rs.zivke.seedtag.core.PasswordFix
 import rs.zivke.seedtag.core.SecretChars
 import rs.zivke.seedtag.core.SeedBox
 import rs.zivke.seedtag.core.SeedTagException
@@ -33,8 +34,16 @@ sealed interface MnemonicStatus {
 }
 
 data class ScanPrompt(val title: String, val error: String? = null)
-/** [matchesBackup]: compared with the backup written in this session, null if there was none. */
-data class VerifyResult(val wordCount: Int, val fingerprint: String, val matchesBackup: Boolean? = null)
+/**
+ * [matchesBackup]: compared with the backup written in this session, null if there was none.
+ * [passwordFix]: what had to be ignored in the typed password before it matched.
+ */
+data class VerifyResult(
+    val wordCount: Int,
+    val fingerprint: String,
+    val matchesBackup: Boolean? = null,
+    val passwordFix: PasswordFix = PasswordFix.None,
+)
 
 sealed interface Dialog {
     data class Error(val message: String) : Dialog
@@ -361,16 +370,17 @@ class SeedTagViewModel : ViewModel() {
         val pw = readPassword.copy()
         val wipesAtStart = wipes
         viewModelScope.launch {
-            busy = "Decrypting… (deriving key with Argon2id, a few seconds)"
+            busy = "Decrypting… (Argon2id, a few seconds; longer if the password needs a second try)"
             try {
-                val (words, fp) = withContext(Dispatchers.Default) {
-                    val entropy = SeedBox.open(SeedBox.fromBase64(text), pw)
+                val (words, fp, fix) = withContext(Dispatchers.Default) {
+                    // A wrong password is retried without extra spaces, then lower-cased.
+                    val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)
                     try {
-                        Bip39.entropyToWords(entropy) to SeedBox.fingerprint(entropy)
-                    } finally { entropy.fill(0) }
+                        Triple(Bip39.entropyToWords(opened.entropy), SeedBox.fingerprint(opened.entropy), opened.fix)
+                    } finally { opened.entropy.fill(0) }
                 }
                 if (wipes != wipesAtStart) return@launch
-                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp })
+                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, fix)
                 lockTarget = text
                 if (reveal) restoredWords = words
                 clearPasswords(PwField.Read)

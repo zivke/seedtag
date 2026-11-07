@@ -23,7 +23,8 @@ signing key living in a dev container that an AI agent can run commands in.
 | 8 | Task hijacking and overlays | **Fixed**: task affinity in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`. Android 8–11 can't hide overlays; the README warns. |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
 | 10 | Secret copies that aren't zeroed | **Fixed** for passwords (zeroable in-place buffer, no `String`s; branch `fix/zeroable-secrets`); the AES key copies are **documented** in the README and kept on purpose (platform AES is hardware-accelerated and constant-time) |
-| 11–13 | Low: skimming, passphrase look-alike, whitespace | Open |
+| 11–12 | Low: skimming, passphrase look-alike | Open |
+| 13 | Whitespace and case must match exactly | **Fixed**: wrong passwords are retried with spaces collapsed, then lower-cased, in the app and `seedtag.py` |
 | 14 | Fingerprint as a guess checker for a mostly known seed | **Documented** in the README (informational, no code change) |
 
 ## What's done well
@@ -147,7 +148,7 @@ signing key living in a dev container that an AI agent can run commands in.
     RF-shielding sleeve.
 12. **The passphrase looks like a seed.** It uses the same word list, so a written-down passphrase can be
     mistaken for a seed. Tell users to label it "SeedTag password".
-13. **Whitespace and case must match exactly.** An extra space or a capitalised first word gives "wrong
+13. **Whitespace and case must match exactly** — *fixed: retried with spaces collapsed, then lower-cased*. An extra space or a capitalised first word gives "wrong
     password", which users may read as a lost backup. On a failed decrypt, the app could retry with
     collapsed spaces and lower case. That only tries a different password, so the v1 format doesn't
     change.

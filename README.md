@@ -61,6 +61,8 @@ SeedTag hide other apps' overlays.)
    first and then needs a second tap so the app can read it back.
 2. **Verify**: type the password from your written copy and scan. You get ✓ plus a fingerprint, and the words stay hidden.
    Right after a backup, it also says whether the tag holds the same seed you just wrote.
+   If the password is wrong, the app tries it again without extra spaces, then in lower case, and tells you if that
+   worked, so you can correct your written copy.
 3. Optionally recover once with `seedtag.py` on an offline computer.
 4. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
 5. **Restore**: same as Verify, but the words are shown.
@@ -181,6 +183,9 @@ python3 seedtag.py verify  <BASE64>   # OK + fingerprint, no words
 python3 seedtag.py decrypt <BASE64>   # prints the words
 python3 seedtag.py encrypt            # create a tag string on the computer instead
 ```
+
+Like the app, `decrypt` and `verify` retry a wrong password without extra spaces, then in lower case, and say so if
+that's what matched.
 
 To get the Base64 string off the tag without this app, read it with any NFC reader app (e.g. NFC Tools).
 It's ciphertext, so that's safe.

@@ -51,6 +51,10 @@ Two Gradle modules plus the Python tool:
   - `Bip39.kt`: wordlist (resource `bip39-english.txt`, the official list,
     SHA-256 `2f5eed53…dbda`), words ↔ entropy, checksum, `suggest(prefix)`.
   - `SeedBox.kt`: the blob format (below), `seal` / `open`, Base64, `fingerprint`.
+    `openForgiving` retries a wrong password with spaces collapsed, then
+    lower-cased (`passwordVariants`); `seedtag.py` has the same rules, checked
+    against `password-variants.tsv`. Only the typed password changes, never
+    the format.
   - `Passphrase.kt`: 7-word generator from the BIP39 list, rough strength estimate.
   - `SecretChars.kt`: zeroable, in-place password buffer.
   - `NdefText.kt`: Text-record payload decode (encode is `NdefRecord.createTextRecord`).
