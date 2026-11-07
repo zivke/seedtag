@@ -109,11 +109,17 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   Add a test when BIP39 or crypto behaviour changes, in Kotlin and Python.
 - No new dependencies without asking. Bouncy Castle is the only crypto library.
 - Four-space indent for Kotlin, XML, shell and Python (`.editorconfig`).
-- For any user-visible change: bump `versionCode` and `versionName` in
-  `app/build.gradle.kts`, add an entry to `changelog.md` (Keep a Changelog) and
-  update `README.md` if behaviour or setup changed.
-- Versions are semver: `versionName` is `MAJOR.MINOR.PATCH`, the changelog
-  heading matches, and a release is an annotated tag `vX.Y.Z`.
+- For any user-visible change: add an entry under `## [Unreleased]` in
+  `changelog.md` (Keep a Changelog) and update `README.md` if behaviour or
+  setup changed. Don't touch `versionCode` / `versionName` and don't invent a
+  version heading: unreleased work is never filed under a version number.
+- Versions are semver (`MAJOR.MINOR.PATCH`), chosen only when releasing, from
+  what's under `[Unreleased]`: incompatible changes (e.g. older versions can't
+  read new tags, a feature removed) bump MAJOR (MINOR while still 0.x); any
+  `Added` entry bumps MINOR; only fixes bump PATCH.
+- Releasing (only when asked): rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`,
+  bump `versionCode` by 1 and set `versionName` to `X.Y.Z` in
+  `app/build.gradle.kts`, commit, then create the annotated tag `vX.Y.Z`.
 - Branching: small fixes and changes go on the current branch; new features
   and bigger or more significant changes get a separate branch.
 - Never commit `*.p12` / `*.jks` / `*.keystore`, `.env` or an APK (`.gitignore`
