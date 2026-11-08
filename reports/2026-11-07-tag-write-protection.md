@@ -227,6 +227,76 @@ Some cons apply to all of these approaches:
   Only testing the real tags shows that.
 - Everything here has to be tested on a phone with spare tags. Unit tests and a build can't cover it.
 
+## Can the write password damage the tag?
+
+Software can't physically destroy the chip. With the safeguards below, the backup can't become
+unreadable either: the realistic worst case is a tag that can no longer be *rewritten*, which is
+where a read-only tag ends up anyway.
+
+### Why the backup stays readable
+
+The write password only protects **writing** (AUTH1 = 1 on Ultralight C, PROT = 0 on NTAG). Every
+phone, NFC app and `seedtag.py` can still read the tag, as now.
+
+The one way to make the backup unreadable would be a bug that sets the opposite value, so reads are
+protected too.
+
+- **Safeguard:** after setting the password, read the tag again *without* the key, on a fresh
+  connection. If that fails, remove the protection straight away (AUTH0 back to "off", using the key
+  just set) and report an error.
+
+### What could go wrong, and the answer to each
+
+1. **The tag is pulled away during setup.** Most writes are a page (4 bytes) at a time, and only the
+   lock bytes are protected against interrupted writes. An interrupted page write can leave that
+   page with garbage in it.
+   - **Ultralight C:** keep the write order above. Protection is either still off, or on with a key
+     the app already knows, so it can always finish or undo the setup.
+   - **NTAG:** the same idea. The password is a single page, written and tested while protection is
+     still off; AUTH0 comes last.
+2. **The tag is pulled away while changing the key.** On Ultralight C the key takes four page
+   writes, so an interrupted change can leave a mix of old and new pages. The app knows both keys, so
+   it can try the possible mixes and recover (see "Changing the write password"). A lost or torn key
+   only ever affects writing, never reading.
+3. **Failed-attempt limit (NTAG only).** If AUTHLIM is set and the attempts get used up, by a bug or
+   an attacker, the tag refuses every password forever. It can never be written again, but it still
+   reads fine.
+   - Ultralight C has no such limit.
+   - On NTAG it's a choice between a limit (anyone can use up the attempts and block future writes)
+     and no limit (the 32-bit password can be guessed over the air). The backup stays readable either
+     way.
+4. **Permanent bits set by mistake.** The lock bits can only ever be set, never cleared, and one of
+   them freezes the key forever.
+   - **Safeguard:** in password mode the app never touches the lock bytes.
+5. **Fake or "compatible" chips.** A clone might ignore AUTH1 and protect reads too, or implement
+   authentication badly.
+   - **Safeguard:** the read-back check above catches the read case. Test new tags with a throwaway
+     phrase first, as the README already says.
+6. **The key comes from the password.**
+   - Forgetting the password makes the tag non-rewritable, but that backup is useless without the
+     password anyway.
+   - A later app version that derived the key differently couldn't rewrite older tags. The
+     derivation needs a version and fixed test vectors, like the blob format.
+7. **Interrupted data writes.** Pulling the tag away while the backup itself is being written can
+   corrupt it until it's written again. That risk exists today too; the password doesn't change it.
+
+### Compared with today
+
+- **Read-only (current):** the tag can never be written again, and anyone can still lock the owner
+  out (#11).
+- **Write password:**
+  - Only the key can write; nobody else can lock the owner out.
+  - The worst outcome of a bug is "can't be rewritten", the read-only result anyway.
+  - A torn page in the backup data is the one way to lose readability, and it exists today too.
+- **Write wear:** setting the password adds a handful of page writes, negligible against the
+  write endurance in the chips' datasheets.
+
+### Before relying on it
+
+- Test on spare tags, including deliberately pulling the tag away mid-setup, to check that recovery
+  works.
+- Add a "remove protection" option that undoes it with the key.
+
 ## Recommendation
 
 - **Ultralight C:** make write protection, with a key derived from the password, the default instead of
