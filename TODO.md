@@ -6,9 +6,8 @@
   by anything that runs commands in it, and the `android-keys` volume is shared by every Android project.
   Sign on a separate offline machine, or at least stop mounting the key by default and give each
   project its own volume.
-- [ ] **#5 (Medium): block accessibility services on Android 14+.** Set
-  `View.setAccessibilityDataSensitive(YES)` on the root view and check on a device that Compose honours
-  it. The risk is already documented in the README.
+- [x] **#5 (Medium): block accessibility services on Android 14+.** `setAccessibilityDataSensitive(YES)`
+  on the window and dialogs, plus a banner naming apps with accessibility access on every version.
 - [ ] **#7 (Medium): verify the build supply chain.**
   - Add Gradle dependency verification and `distributionSha256Sum`.
   - Pin the Docker image digest and checksum the Android tools zip.

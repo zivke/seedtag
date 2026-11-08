@@ -3,13 +3,17 @@
 
 package rs.zivke.seedtag
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
+import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.nfc.NfcAdapter
 import android.os.Bundle
 import android.provider.Settings
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -30,6 +34,10 @@ class MainActivity : ComponentActivity() {
     private val overlayDetected = mutableStateOf(false)
     /** The current gesture is being dropped because an overlay covered it. */
     private var droppingGesture = false
+    /** Names of the enabled accessibility services that aren't part of the system. */
+    private val accessibilityApps = mutableStateOf<List<String>>(emptyList())
+    /** The list the user tapped Hide on; the banner comes back if it changes. */
+    private val accessibilityHidden = mutableStateOf<List<String>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,13 +54,23 @@ class MainActivity : ComponentActivity() {
         adapter = NfcAdapter.getDefaultAdapter(this)
         setContent {
             SeedTagTheme {
+                val apps = accessibilityApps.value
                 SeedTagApp(
                     vm = vm,
                     nfcState = nfcState.value,
                     overlayDetected = overlayDetected.value,
                     openNfcSettings = { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) },
+                    accessibilityApps = if (apps == accessibilityHidden.value) emptyList() else apps,
+                    openAccessibilitySettings = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
+                    hideAccessibilityBanner = { accessibilityHidden.value = apps },
                 )
             }
+        }
+        // Android 14+: only accessibility *tools* (screen readers such as TalkBack) can see this
+        // window's content or act on it; any other accessibility service gets nothing. Children
+        // inherit it from the decor view. Dialogs set it themselves (GuardDialogWindow in Ui.kt).
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            window.decorView.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
         }
     }
 
@@ -64,6 +82,7 @@ class MainActivity : ComponentActivity() {
             !a.isEnabled -> NfcState.Disabled
             else -> NfcState.Ready
         }
+        accessibilityApps.value = enabledAccessibilityApps()
         // Reader mode for the whole time we're in the foreground: tags go to us only,
         // never to other apps (e.g. NFC Tools or the system tag viewer).
         a?.enableReaderMode(
@@ -97,6 +116,21 @@ class MainActivity : ComponentActivity() {
             }
         }
         return if (droppingGesture) true else super.dispatchTouchEvent(ev)
+    }
+
+    /**
+     * Enabled accessibility services, other than preinstalled system ones: they can read the
+     * screen and see every tap (on Android 14+ only if they declare themselves accessibility
+     * tools). Needs no permission. Checked on every resume, e.g. after a visit to Settings.
+     */
+    private fun enabledAccessibilityApps(): List<String> {
+        val am = getSystemService(AccessibilityManager::class.java) ?: return emptyList()
+        return am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
+            .mapNotNull { it.resolveInfo?.serviceInfo }
+            .filter { it.applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM == 0 }
+            .map { s -> runCatching { s.applicationInfo.loadLabel(packageManager).toString() }.getOrDefault(s.packageName) }
+            .distinct()
+            .sorted()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {

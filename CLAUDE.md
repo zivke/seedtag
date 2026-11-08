@@ -72,8 +72,11 @@ Two Gradle modules plus the Python tool:
     foreground (no other app sees the tag), `vm.wipeAll()` in `onStop`.
     Overlay defence: `setHideOverlayWindows` (Android 12+) and
     `dispatchTouchEvent` drops touches flagged `FLAG_WINDOW_IS_OBSCURED`
-    (all versions, with a banner). Dialogs are separate windows and use
-    `GuardDialogWindow()` in `Ui.kt`.
+    (all versions, with a banner). Accessibility: Android 14+ marks the window
+    `setAccessibilityDataSensitive(YES)` (only accessibility tools see it), and
+    every version shows a banner naming non-system apps with accessibility
+    access. Dialogs are separate windows and use `GuardDialogWindow()` in `Ui.kt`
+    for all of this.
   - `SeedTagViewModel.kt`: all UI state and flows. Argon2 runs on
     `Dispatchers.Default`. The pending tag operation is an `AtomicReference`
     because the reader callback runs on a binder thread. A failed tag operation

@@ -17,7 +17,7 @@ signing key living in a dev container that an AI agent can run commands in.
 | 2 | Weak passwords accepted and rated strong | **Fixed** in `a21d200` (honest estimate, confirmation below 60 bits or with seed words) |
 | 3 | Password goes through the system keyboard | **Fixed** in `51afe6a` (in-app keyboard, no text fields, `FLAG_ALT_FOCUSABLE_IM`) |
 | 4 | A revealed password can be copied to the clipboard | **Fixed** in `51afe6a` (no text fields left) |
-| 5 | Accessibility services can read the screen | **Documented** in the README warnings (`776588e`); the technical fix is open |
+| 5 | Accessibility services can read the screen | **Fixed**: Android 14+ hides the app's windows from services that aren't accessibility tools (`setAccessibilityDataSensitive`); every version shows a banner naming installed apps with accessibility access. Documented in the README. |
 | 6 | No decrypt check before writing | **Fixed** in `9d90fc0` |
 | 7 | Build supply chain unverified | Open |
 | 8 | Task hijacking and overlays | **Fixed**: task affinity in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`. Android 8–11 can't hide overlays; the README warns. |
@@ -97,7 +97,7 @@ signing key living in a dev container that an AI agent can run commands in.
   sync to the cloud. This was inferred from Compose's text-field code, not tried on a phone.
 - **Fix:** give `SecretField` a no-op text toolbar (`LocalTextToolbar`).
 
-### 5. Accessibility services can read the restored words and your keypad taps — *documented in the README (`776588e`), fix open*
+### 5. Accessibility services can read the restored words and your keypad taps — *fixed on Android 14+, banner on all versions*
 
 `FLAG_SECURE` doesn't stop them, and abusing accessibility is how most Android banking malware works.
 

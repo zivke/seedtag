@@ -42,6 +42,12 @@ All notable user-visible changes to SeedTag. The format follows
   README: SeedTag comes without any warranty, its developer isn't responsible
   for any loss or damage, and users must make sure themselves that the phone
   has no malware, since the app can't cover every possible attack.
+- Protection from accessibility services, which can read the screen and see
+  every tap. On Android 14 and later, SeedTag hides its screen and dialogs
+  from every accessibility service that isn't an accessibility tool; screen
+  readers such as TalkBack keep working. On every version, a red banner names
+  the installed apps with accessibility access, with a shortcut to Settings ›
+  Accessibility.
 
 ### Changed
 - The generated passphrase comes with a reminder to label it "SeedTag

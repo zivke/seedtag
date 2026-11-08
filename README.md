@@ -254,8 +254,12 @@ SeedTag can only protect you from what happens inside its own window, and only f
   filters and chat bubbles trigger it too: turn them off while using SeedTag. If you can't tell which app it is,
   don't enter your seed.
 - **Accessibility services.** A service with accessibility access can read everything on screen, including the
-  restored words and every key you tap. Neither overlay hiding nor screenshot blocking stops it. Open
-  *Settings › Accessibility* and remove any service you didn't knowingly install.
+  restored words and every key you tap, and can tap for you. Neither overlay hiding nor screenshot blocking stops
+  it. On **Android 14 and later**, SeedTag hides its screen from every accessibility service that isn't an
+  *accessibility tool* (screen readers such as TalkBack keep working), but a malicious app installed from outside
+  Google Play can claim to be one. On **Android 8–13 it can't hide anything.** On every version, SeedTag shows a red
+  banner naming the installed apps that have accessibility access (preinstalled system services aren't listed).
+  Open *Settings › Accessibility* and turn off any you don't recognise or don't need before entering your seed.
 - **Fake SeedTag apps.** Nothing inside SeedTag can protect you from a different app that looks like it. Install
   only an APK you built yourself or got from a source you trust, and check its signing certificate with
   `apksigner verify --print-certs seedtag.apk`.

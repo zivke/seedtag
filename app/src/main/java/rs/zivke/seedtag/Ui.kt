@@ -5,6 +5,7 @@ package rs.zivke.seedtag
 
 import android.os.Build
 import android.view.HapticFeedbackConstants
+import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -102,7 +103,15 @@ private val Haptic.constant: Int
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SeedTagApp(vm: SeedTagViewModel, nfcState: NfcState, overlayDetected: Boolean, openNfcSettings: () -> Unit) {
+fun SeedTagApp(
+    vm: SeedTagViewModel,
+    nfcState: NfcState,
+    overlayDetected: Boolean,
+    openNfcSettings: () -> Unit,
+    accessibilityApps: List<String> = emptyList(),
+    openAccessibilitySettings: () -> Unit = {},
+    hideAccessibilityBanner: () -> Unit = {},
+) {
     val view = LocalView.current
     LaunchedEffect(vm) { vm.haptics.collect { view.performHapticFeedback(it.constant) } }
     val page = vm.page
@@ -130,6 +139,9 @@ fun SeedTagApp(vm: SeedTagViewModel, nfcState: NfcState, overlayDetected: Boolea
             }
             NfcBanner(nfcState, openNfcSettings)
             if (overlayDetected) OverlayBanner()
+            if (accessibilityApps.isNotEmpty()) {
+                AccessibilityBanner(accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
+            }
             when (page) {
                 Page.Antenna -> AntennaPage(vm)
                 Page.About -> AboutPage()
@@ -170,6 +182,28 @@ private fun OverlayBanner() {
             "then tap again. If you don't know which app it is, don't enter your seed.",
         Modifier.padding(12.dp),
     )
+}
+
+/** Apps with accessibility access can read the screen and see every tap, seed words included. */
+@Composable
+private fun AccessibilityBanner(apps: List<String>, openSettings: () -> Unit, hide: () -> Unit) {
+    val names = apps.joinToString(", ")
+    val text = "$names ${if (apps.size == 1) "has" else "have"} accessibility access: such apps can read the screen " +
+        "and see what you tap. If you don't recognise " + (if (apps.size == 1) "it" else "one") + " or don't need it, " +
+        "turn it off in Settings › Accessibility before entering your seed." +
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            " SeedTag hides its screen from apps that aren't accessibility tools, but a malicious app can claim to be one."
+        } else {
+            " On this Android version SeedTag can't hide its screen from them."
+        }
+    Column(Modifier.padding(12.dp)) {
+        WarningCard("Apps that can read your screen", text)
+        Row {
+            TextButton(onClick = openSettings) { Text("Open settings") }
+            Spacer(Modifier.weight(1f))
+            TextButton(onClick = hide) { Text("Hide") }
+        }
+    }
 }
 
 /**
@@ -237,7 +271,8 @@ private fun WarningTitle(text: String) {
 
 /**
  * Dialogs are windows of their own, so the activity's guards don't cover them: drop touches that
- * come through another app's overlay, and hide overlays on Android 12+.
+ * come through another app's overlay, hide overlays on Android 12+, and on Android 14+ keep
+ * accessibility services that aren't accessibility tools out, as MainActivity does.
  */
 @Composable
 private fun GuardDialogWindow() {
@@ -246,6 +281,9 @@ private fun GuardDialogWindow() {
         view.rootView.filterTouchesWhenObscured = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             (view.parent as? DialogWindowProvider)?.window?.setHideOverlayWindows(true)
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            view.rootView.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
         }
         onDispose {}
     }
@@ -925,6 +963,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
             properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
             confirmButton = {},
             text = {
+                GuardDialogWindow()
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CircularProgressIndicator(Modifier.size(28.dp))
                     Spacer(Modifier.width(16.dp))
@@ -941,6 +980,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
             properties = DialogProperties(dismissOnClickOutside = false),
             title = { Text("Ready to scan") },
             text = {
+                GuardDialogWindow()
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(16.dp))
@@ -969,13 +1009,19 @@ private fun Dialogs(vm: SeedTagViewModel) {
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },
             title = { WarningTitle("Error") },
-            text = { Text(d.message) },
+            text = {
+                GuardDialogWindow()
+                Text(d.message)
+            },
             confirmButton = { TextButton(onClick = { vm.dialog = null }) { Text("OK") } },
         )
         is Dialog.Info -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             title = { Text(d.title) },
-            text = { Text(d.message) },
+            text = {
+                GuardDialogWindow()
+                Text(d.message)
+            },
             confirmButton = { TextButton(onClick = { vm.dialog = null }) { Text("OK") } },
         )
         is Dialog.ConfirmOverwrite -> AlertDialog(
