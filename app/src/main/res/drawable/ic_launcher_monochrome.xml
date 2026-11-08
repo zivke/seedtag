@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- SeedTag themed-icon layer (Android 13+): line version, single color, tinted by the system. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.92"
+        android:scaleY="0.92"
+        android:translateY="2">
+
+        <!-- Fob outline -->
+        <path
+            android:pathData="M47.94,34.5A7,7 0,0 1,60.06 34.5L71.32,54A20,20 0,1 1,36.68 54Z"
+            android:strokeColor="#FF000000"
+            android:strokeWidth="2"
+            android:strokeLineJoin="round" />
+
+        <!-- Ring hole -->
+        <path
+            android:pathData="M50.5,38a3.5,3.5 0,1 0,7 0a3.5,3.5 0,1 0,-7 0"
+            android:strokeColor="#FF000000"
+            android:strokeWidth="1.6" />
+
+        <!-- Ring, front half -->
+        <group>
+            <clip-path android:pathData="M16.4,51.7L91.6,24.3L77.9,-13.3L2.7,14.1Z" />
+            <group android:rotation="-20" android:pivotX="60.58" android:pivotY="35.61">
+                <path
+                    android:pathData="M53.58,35.61a7,4.7 0,1 0,14 0a7,4.7 0,1 0,-14 0"
+                    android:strokeColor="#FF000000"
+                    android:strokeWidth="1.8" />
+            </group>
+        </group>
+
+        <!-- Ring, back half where it shows outside the fob -->
+        <group>
+            <clip-path android:pathData="M60.68,35.57L98.3,21.9L110,80L80.7,70.2Z" />
+            <group android:rotation="-20" android:pivotX="60.58" android:pivotY="35.61">
+                <path
+                    android:pathData="M53.58,35.61a7,4.7 0,1 0,14 0a7,4.7 0,1 0,-14 0"
+                    android:strokeColor="#FF000000"
+                    android:strokeWidth="1.8" />
+            </group>
+        </group>
+
+        <!-- Inset circle -->
+        <path
+            android:pathData="M37,64a17,17 0,1 0,34 0a17,17 0,1 0,-34 0"
+            android:strokeColor="#FF000000"
+            android:strokeWidth="1.4" />
+
+        <!-- Bitcoin mark -->
+        <group
+            android:pivotX="54"
+            android:pivotY="54"
+            android:rotation="14"
+            android:scaleX="0.78"
+            android:scaleY="0.78"
+            android:translateX="0.56"
+            android:translateY="10.15">
+            <path
+                android:pathData="M48,45V63M48,45H55A4.5,4.5 0,0 1,55 54H48M48,54H56A4.5,4.5 0,0 1,56 63H48M50.5,41.5V45M54.5,41.5V45M50.5,63V66.5M54.5,63V66.5"
+                android:strokeColor="#FF000000"
+                android:strokeWidth="2.3"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round" />
+        </group>
+    </group>
+</vector>

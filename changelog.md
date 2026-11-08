@@ -60,6 +60,9 @@ All notable user-visible changes to SeedTag. The format follows
   and keyboard. **Verify another tag** and **Restore another tag** start again
   with an empty password, and each tab only shows its own result. The password
   field stays in view above the keyboard while typing.
+- New app icon: a key-fob NFC tag with a ₿ on a dark background, plus a
+  single-colour version for themed icons on Android 13+. The app's window
+  background matches the new icon's.
 
 ### Fixed
 - Passwords are no longer kept in memory as text. They live in one buffer

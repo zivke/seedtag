@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="18 18 72 72" width="512" height="512">
+  <defs>
+    <clipPath id="ringFront" clipPathUnits="userSpaceOnUse">
+      <polygon points="16.4,51.7 91.6,24.3 77.9,-13.3 2.7,14.1"/>
+    </clipPath>
+  </defs>
+  <rect x="18" y="18" width="72" height="72" fill="#121418"/>
+  <g transform="translate(54 56) scale(0.92) translate(-54 -54)">
+    <ellipse cx="60.58" cy="35.61" rx="7" ry="4.7" transform="rotate(-20 60.58 35.61)" fill="none" stroke="#8C929C" stroke-width="1.8"/>
+    <path d="M47.94 34.5A7 7 0 0 1 60.06 34.5L71.32 54A20 20 0 1 1 36.68 54ZM57.5 38A3.5 3.5 0 1 0 50.5 38A3.5 3.5 0 1 0 57.5 38Z" fill="#2D50D0" fill-rule="evenodd"/>
+    <ellipse cx="60.58" cy="35.61" rx="7" ry="4.7" transform="rotate(-20 60.58 35.61)" clip-path="url(#ringFront)" fill="none" stroke="#E3E6EB" stroke-width="1.8"/>
+    <circle cx="54" cy="64" r="17" fill="none" stroke="#1C1E22" stroke-width="1.4"/>
+    <g transform="translate(0.56 10.15) rotate(14 54 54) translate(54 54) scale(0.78) translate(-54 -54)" fill="none" stroke="#F2A900" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M48 45V63M48 45H55A4.5 4.5 0 0 1 55 54H48M48 54H56A4.5 4.5 0 0 1 56 63H48M50.5 41.5V45M54.5 41.5V45M50.5 63V66.5M54.5 63V66.5"/>
+    </g>
+  </g>
+</svg>

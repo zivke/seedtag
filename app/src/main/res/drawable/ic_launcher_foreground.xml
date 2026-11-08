@@ -1,14 +1,63 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Padlock over NFC waves -->
+<!-- SeedTag launcher foreground: teardrop door fob on a steel ring, ₿ in an inset circle. 108dp adaptive canvas. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp" android:height="108dp"
-    android:viewportWidth="108" android:viewportHeight="108">
-    <path android:fillColor="#00000000" android:strokeColor="#F2B84B" android:strokeWidth="4"
-        android:strokeLineCap="round"
-        android:pathData="M44,50 L44,43 A10,10 0 0 1 64,43 L64,50" />
-    <path android:fillColor="#F2B84B"
-        android:pathData="M38,50 h32 a3,3 0 0 1 3,3 v18 a3,3 0 0 1 -3,3 h-32 a3,3 0 0 1 -3,-3 v-18 a3,3 0 0 1 3,-3z" />
-    <path android:fillColor="#00000000" android:strokeColor="#1B1F24" android:strokeWidth="3"
-        android:strokeLineCap="round"
-        android:pathData="M47,58 a8,8 0 0 1 0,8 M53,55 a13,13 0 0 1 0,14 M59,52 a18,18 0 0 1 0,20" />
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:scaleX="0.92"
+        android:scaleY="0.92"
+        android:translateY="2">
+
+        <!-- Ring, back half (hidden behind the fob) -->
+        <group android:rotation="-20" android:pivotX="60.58" android:pivotY="35.61">
+            <path
+                android:pathData="M53.58,35.61a7,4.7 0,1 0,14 0a7,4.7 0,1 0,-14 0"
+                android:strokeColor="#8C929C"
+                android:strokeWidth="1.8" />
+        </group>
+
+        <!-- Fob with ring hole -->
+        <path
+            android:fillColor="#2D50D0"
+            android:fillType="evenOdd"
+            android:pathData="M47.94,34.5A7,7 0,0 1,60.06 34.5L71.32,54A20,20 0,1 1,36.68 54Z M57.5,38A3.5,3.5 0,1 0,50.5 38A3.5,3.5 0,1 0,57.5 38Z" />
+
+        <!-- Ring, front half (passes in front of the fob) -->
+        <group>
+            <clip-path android:pathData="M16.4,51.7L91.6,24.3L77.9,-13.3L2.7,14.1Z" />
+            <group android:rotation="-20" android:pivotX="60.58" android:pivotY="35.61">
+                <path
+                    android:pathData="M53.58,35.61a7,4.7 0,1 0,14 0a7,4.7 0,1 0,-14 0"
+                    android:strokeColor="#E3E6EB"
+                    android:strokeWidth="1.8" />
+            </group>
+        </group>
+
+        <!-- Inset circle -->
+        <path
+            android:pathData="M37,64a17,17 0,1 0,34 0a17,17 0,1 0,-34 0"
+            android:strokeColor="#1C1E22"
+            android:strokeWidth="1.4" />
+
+        <!-- Bitcoin mark -->
+        <group
+            android:pivotX="54"
+            android:pivotY="54"
+            android:rotation="14"
+            android:scaleX="0.78"
+            android:scaleY="0.78"
+            android:translateX="0.56"
+            android:translateY="10.15">
+            <path
+                android:pathData="M48,45V63M48,45H55A4.5,4.5 0,0 1,55 54H48M48,54H56A4.5,4.5 0,0 1,56 63H48M50.5,41.5V45M54.5,41.5V45M50.5,63V66.5M54.5,63V66.5"
+                android:strokeColor="#F2A900"
+                android:strokeWidth="2.3"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round" />
+        </group>
+    </group>
 </vector>

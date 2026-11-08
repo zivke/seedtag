@@ -17,6 +17,7 @@ plus a single-file Python tool to recover it on any computer.
 core/          pure Kotlin/JVM: BIP39, SeedBox (crypto), tests
 app/           Android app (Jetpack Compose), NFC reader mode
 tools/         seedtag.py (desktop encrypt / decrypt / verify), its tests, check-apk.sh
+art/           app icon source (SVG) and the 512 px store icon
 .devcontainer/ JDK, Android SDK, adb and Claude Code in a container
 ```
 
