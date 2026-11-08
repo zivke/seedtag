@@ -35,11 +35,11 @@
   "mounts": [
     // Per-project — sign in once per devcontainer
     "source=claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume",
-    // Deliberately NOT ${devcontainerId}: the signing keys and the adb identity
-    // are yours, not this project's, and are shared by every Android project.
-    // See .devcontainer/README.md before the first release build.
-    "source=android-keys,target=/home/vscode/.android-keys,type=volume",
-    // adb's own key pair, so the device stays authorised across rebuilds
+    // No signing keys in here, on purpose: release APKs are signed outside the
+    // container (tools/sign-release.sh). See .devcontainer/README.md.
+    // adb's own key pair (and the debug key), so the device stays authorised
+    // across rebuilds. Deliberately NOT ${devcontainerId}: the adb identity is
+    // yours and shared by every Android project.
     "source=android-adb,target=/home/vscode/.android,type=volume",
     // Gradle distribution + dependency cache. Shared too: it only holds public
     // artifacts, and re-downloading AGP/Compose on every rebuild is slow.
@@ -52,8 +52,6 @@
 
   "containerEnv": {
     "CLAUDE_CONFIG_DIR": "/home/vscode/.claude",
-    // The signing key (KEYSTORE, KEY_PASS) is set in .env, not here: a value
-    // here would override .env.
     // Address of the device for `make connect`, e.g. 192.168.1.50
     "DEVICE_IP": "${localEnv:SEEDTAG_DEVICE_IP}",
     // Auto-update channel for the native install: latest (default) or stable.

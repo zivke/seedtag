@@ -2,8 +2,7 @@
 set -euo pipefail
 
 # Named volumes mount root-owned the first time.
-sudo chown -R vscode:vscode /home/vscode/.claude /home/vscode/.android \
-                            /home/vscode/.android-keys /home/vscode/.gradle
+sudo chown -R vscode:vscode /home/vscode/.claude /home/vscode/.android /home/vscode/.gradle
 
 # --- Claude Code -------------------------------------------------------------
 # Native install, no Node.js: the launcher at ~/.local/bin/claude symlinks into
@@ -22,38 +21,16 @@ fi
 claude --version || true
 
 # --- signing key -------------------------------------------------------------
-# `make build` (release) signs with the key that KEYSTORE in .env names and
-# refuses to build without it: Android will not install an APK over one signed
-# with a different key, so a key is never generated here. `make debug` works
-# without it (Android's debug key).
+# Deliberately not here. `make build` makes an unsigned release APK, signed on
+# the machine that holds the key with tools/sign-release.sh, so nothing in this
+# container can read the key. Warn if an old setup still names it.
 ENV_FILE="$(dirname "$0")/../.env"
-if [ -z "${KEYSTORE:-}" ] && [ -f "$ENV_FILE" ]; then
-  KEYSTORE="$(sed -n 's/^KEYSTORE=//p' "$ENV_FILE" | tail -n 1 | tr -d '\r' | sed "s/^[\"']//; s/[\"']\$//")"
-fi
-chmod 700 "$HOME/.android-keys"
-if [ -z "${KEYSTORE:-}" ]; then
+if [ -f "$ENV_FILE" ] && grep -qE '^(KEYSTORE|KEY_PASS|KEY_ALIAS)=' "$ENV_FILE"; then
   cat <<'WARN'
 
-!! No KEYSTORE in .env yet, so `make build` (release) will fail; `make debug`
-!! works. Create .env in the repository root with the key's path and password:
-!!
-!!   KEYSTORE=/home/vscode/.android-keys/<your-key>.jks
-!!   KEY_PASS=<password>
-
-WARN
-elif [ -f "$KEYSTORE" ]; then
-  chmod 600 "$KEYSTORE"
-  echo ">> Signing key: $KEYSTORE"
-else
-  cat <<'WARN'
-
-!! The signing key named in .env is not in the android-keys volume yet, so
-!! `make build` will fail. Copy your key into it:
-!!
-!!   docker run --rm -v android-keys:/k -v "$HOME/<dir-with-your-key>":/src:ro \
-!!     alpine sh -c 'cp /src/<your-key>.jks /k/ && chown 1000:1000 /k/<your-key>.jks'
-!!
-!! Then back that key up somewhere durable.
+!! .env still sets KEYSTORE / KEY_PASS / KEY_ALIAS. Release signing no longer
+!! happens in the container: remove those lines (and the key from the
+!! android-keys volume, once it's backed up elsewhere).
 
 WARN
 fi
@@ -74,9 +51,9 @@ cat <<'EOF'
 >> Next:
      make test                           # crypto core (JVM) + seedtag.py vectors
      make debug                          # seedtag-debug.apk, no key needed
-     make build                          # signed release seedtag.apk (needs .env)
+     make build                          # unsigned release seedtag-unsigned.apk
      make connect DEVICE_IP=<device ip>  # adb over the network, once per session
-     make run                            # install on the device and open the app
+     make run-debug                      # install the debug APK and open the app
 
    Then: claude   (browser OAuth, once per devcontainer)
 EOF

@@ -2,7 +2,7 @@
 
 ## Security (open items from [the security review](reports/2026-11-07-security-review.md))
 
-- [ ] **#1 (High): move release signing out of the dev container.** The key and `KEY_PASS` can be reached
+- [x] **#1 (High): move release signing out of the dev container.** The key and `KEY_PASS` can be reached
   by anything that runs commands in it, and the `android-keys` volume is shared by every Android project.
   Sign on a separate offline machine, or at least stop mounting the key by default and give each
   project its own volume.

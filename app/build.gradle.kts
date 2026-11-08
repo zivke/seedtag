@@ -1,44 +1,13 @@
-import java.security.KeyStore
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
-// ---- release signing key ------------------------------------------------------
-// KEYSTORE (JKS or PKCS12 path), KEY_PASS and optional KEY_ALIAS, from the
-// environment or else from .env – same rules as luxtheme's build.sh: plain
-// NAME=value lines, taken literally, one pair of quotes removed, first wins.
-// The key is never generated here: an APK signed with another key won't install
-// over the app. Debug builds use Android's debug key and don't need any of this.
-fun signingValue(name: String): String? {
-    System.getenv(name)?.takeIf { it.isNotEmpty() }?.let { return it }
-    val env = rootProject.file(".env")
-    if (!env.isFile) return null
-    val raw = env.readLines().map { it.trimEnd('\r') }
-        .firstOrNull { it.startsWith("$name=") }?.substringAfter('=') ?: return null
-    val quoted = raw.length >= 2 && raw.first() == raw.last() && (raw.first() == '"' || raw.first() == '\'')
-    return (if (quoted) raw.substring(1, raw.length - 1) else raw).takeIf { it.isNotEmpty() }
-}
-
-val keystorePath = signingValue("KEYSTORE")
-val keyPass = signingValue("KEY_PASS")
-val keystoreFile = keystorePath?.let { file(it) }?.takeIf { it.isFile }
-// Opening the store checks the password and tells JKS from PKCS12.
-// Bound to locals: script-level vals don't smart-cast.
-val keystore: KeyStore? = keystoreFile?.let { f ->
-    keyPass?.let { p -> runCatching { KeyStore.getInstance(f, p.toCharArray()) }.getOrNull() }
-}
-val releaseKeyAlias: String? = signingValue("KEY_ALIAS") ?: keystore?.aliases()?.toList()?.singleOrNull()
-
-val releaseSigningProblem: String? = when {
-    keystorePath == null || keyPass == null -> "Set KEYSTORE and KEY_PASS in .env (see .devcontainer/README.md)."
-    keystoreFile == null -> "Missing signing key: $keystorePath"
-    keystore == null -> "Can't open $keystorePath: wrong KEY_PASS?"
-    releaseKeyAlias == null -> "The keystore holds more than one key: set KEY_ALIAS in .env."
-    else -> null
-}
+// ---- release signing -------------------------------------------------------
+// The release APK is built unsigned (app-release-unsigned.apk) and signed outside
+// the dev container with tools/sign-release.sh, so the signing key never enters
+// the container. Debug builds use Android's debug key.
 
 android {
     namespace = "rs.zivke.seedtag"
@@ -52,21 +21,9 @@ android {
         versionName = "0.2.0"
     }
 
-    signingConfigs {
-        if (releaseSigningProblem == null) {
-            create("release") {
-                storeFile = keystoreFile
-                storePassword = keyPass
-                storeType = keystore!!.type
-                keyAlias = releaseKeyAlias
-                keyPassword = keyPass // key password must equal the store password
-            }
-        }
-    }
-
     buildTypes {
         release {
-            signingConfig = signingConfigs.findByName("release")
+            // No signingConfig on purpose: see the top of this file.
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -89,14 +46,6 @@ android {
     dependenciesInfo {
         includeInApk = false
         includeInBundle = false
-    }
-}
-
-// Fail a release build up front (before R8) instead of producing an unsigned APK.
-tasks.configureEach {
-    if (name == "preReleaseBuild" && releaseSigningProblem != null) {
-        val problem = releaseSigningProblem
-        doFirst { throw GradleException(problem) }
     }
 }
 

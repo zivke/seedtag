@@ -13,7 +13,7 @@ signing key living in a dev container that an AI agent can run commands in.
 
 | # | Finding | Status |
 |---|---|---|
-| 1 | Release signing key reachable from the dev container | Open |
+| 1 | Release signing key reachable from the dev container | **Fixed**: release APKs are built unsigned and signed outside the container with `tools/sign-release.sh`; the `android-keys` volume is no longer mounted. Takes effect once the container is rebuilt and `.env` no longer holds the key's password. |
 | 2 | Weak passwords accepted and rated strong | **Fixed** in `a21d200` (honest estimate, confirmation below 60 bits or with seed words) |
 | 3 | Password goes through the system keyboard | **Fixed** in `51afe6a` (in-app keyboard, no text fields, `FLAG_ALT_FOCUSABLE_IM`) |
 | 4 | A revealed password can be copied to the clipboard | **Fixed** in `51afe6a` (no text fields left) |
@@ -49,7 +49,7 @@ signing key living in a dev container that an AI agent can run commands in.
 
 ## High
 
-### 1. The release signing key can be reached by an AI agent with shell and network access
+### 1. The release signing key can be reached by an AI agent with shell and network access — *fixed: signing moved outside the container*
 
 - **The setup:** the key and `KEY_PASS` sit in the same container where Claude Code runs with `Bash(*)`
   allowed (`.claude/settings.json:4`).
@@ -200,7 +200,7 @@ doesn't stop someone locking the owner out of the tag.
 
 ## Suggested order
 
-1. Move release signing out of the container (#1).
+1. ~~Move release signing out of the container (#1).~~ Done.
 2. ~~Small fixes on `main`: #2, #6, #8.~~ Done.
 3. #5 needs device testing (the risk is already documented in the README).
 4. #11: first the read-back check and the README correction, then the proper lock or write key on a

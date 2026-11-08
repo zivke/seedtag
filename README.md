@@ -24,31 +24,56 @@ art/           app icon source (SVG) and the 512 px store icon
 ## Build & install
 
 The easiest route is the devcontainer: open the folder in VS Code and *Reopen in Container*.
-See [.devcontainer/README.md](.devcontainer/README.md) for the signing key and connecting the phone.
+See [.devcontainer/README.md](.devcontainer/README.md) for connecting the phone.
 Outside it you need JDK 17+, the Android SDK (`ANDROID_HOME`), Python 3 with `cryptography`, and a phone
 with NFC running Android 8+.
 
 ```bash
 make test                         # crypto core (JUnit) + seedtag.py, same test vectors
 make debug                        # seedtag-debug.apk, Android debug key
-make build                        # seedtag.apk, release, signed with the key in .env
+make build                        # seedtag-unsigned.apk: release (R8), not signed
+make build-test                   # the release build signed with the debug key, for testing
 make connect DEVICE_IP=<phone ip> # adb over Wi-Fi
 make run-debug                    # install the debug APK and open it
 make help                         # all targets
 ```
 
-Release signing reads `.env` (gitignored):
-
-```sh
-KEYSTORE=/home/vscode/.android-keys/<your-key>.jks
-KEY_PASS=<password>
-# KEY_ALIAS=<alias>   only if the keystore holds more than one key
-```
-
-Both builds end with `tools/check-apk.sh`. It verifies the signature and **fails the build if the APK
-requests any permission other than NFC and `HIDE_OVERLAY_WINDOWS`**, so a library can't quietly add network access.
+Every build ends with `tools/check-apk.sh`. It verifies the signature, prints the APK's SHA-256, and **fails the
+build if the APK requests any permission other than NFC and `HIDE_OVERLAY_WINDOWS`**, so a library can't quietly
+add network access.
 (`HIDE_OVERLAY_WINDOWS` is granted at install without a prompt and gives no access to anything: it only lets
 SeedTag hide other apps' overlays.)
+
+### Signing a release
+
+The release key is kept out of the dev container, so nothing that runs there (build scripts, dependencies, an AI
+agent) can read it and sign a fake update. Sign on the machine that holds the key, ideally an offline one with
+only the Android build-tools (`apksigner`, `aapt2`) installed:
+
+```sh
+make build                                    # in the container: seedtag-unsigned.apk
+tools/sign-release.sh /path/to/your-key.jks   # on the signing machine: asks for the password, writes seedtag.apk
+make run                                      # back in the container: install seedtag.apk and open it
+```
+
+`sign-release.sh` checks the permissions, signs, and deletes the result unless it carries the release certificate:
+
+```
+SHA-256 29370bf9dc6a272f18b3fbac01837c262bcec4035de162dad4fc5175291ae82c   (tools/release-cert.sha256)
+```
+
+That's also the digest to compare when you install an APK from elsewhere
+(`apksigner verify --print-certs seedtag.apk`).
+
+Two caveats:
+
+- The container can write to the repository, scripts included. Before running `sign-release.sh` with your key,
+  check it hasn't changed unexpectedly: `git log -p -- tools/sign-release.sh tools/check-apk.sh`.
+- Signing outside protects the key, not the build. If the container were compromised, the unsigned APK could
+  already be tampered with. For full assurance, also build on the signing machine from the release tag and
+  compare the two unsigned APKs.
+
+Keep a backup of the key: without it no update can ever be installed over the app.
 
 ## Using it
 

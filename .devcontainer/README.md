@@ -3,34 +3,17 @@
 VS Code devcontainer for SeedTag: JDK, Android SDK, Gradle cache, adb, Python
 for `seedtag.py` and Claude Code, none of it installed on the host.
 
-## Before the first release build: your signing key
+## Release signing happens outside the container
 
-Android only installs an update over an existing app if both are signed with
-the same key. `make build` signs the release APK with the key that `KEYSTORE`
-in `.env` names, kept in the `android-keys` volume (`~/.android-keys`), and
-stops with an error if it is missing. `make debug` doesn't need it.
+The release signing key never enters this container: anything that runs here
+(build scripts, dependencies, Claude Code) could otherwise read it and sign a
+fake update. `make build` produces an **unsigned** `seedtag-unsigned.apk`; you
+sign it on the machine that holds the key with `tools/sign-release.sh` (see
+the README, "Signing a release"). `make debug` and `make build-test` use
+Android's debug key, which lives in the `android-adb` volume.
 
-Seed the volume with your key (the same volume luxtheme uses, so if it's
-already there, skip this):
-
-```
-docker volume create android-keys
-docker run --rm -v android-keys:/k -v "$HOME/<dir-with-your-key>":/src:ro \
-  alpine sh -c 'cp /src/<your-key>.jks /k/ && chown 1000:1000 /k/<your-key>.jks'
-```
-
-Then create `.env` in the repository root (it is in `.gitignore`):
-
-```sh
-KEYSTORE=/home/vscode/.android-keys/<your-key>.jks
-KEY_PASS=<password>
-```
-
-`KEY_ALIAS` can be left out when the keystore holds a single key. The key
-password must be the same as the keystore password.
-
-Debug and release builds are signed with different keys, so switching between
-them on the device needs `make uninstall` first.
+Debug-key and release-key builds can't be installed over each other, so
+switching between them on the device needs `make uninstall` first.
 
 ## What is in the image
 
@@ -84,13 +67,12 @@ and run `adb kill-server` on the host so the host's adb releases the device.
 | Volume                            | Mount             | Holds                                |
 |-----------------------------------|-------------------|--------------------------------------|
 | `claude-config-${devcontainerId}` | `~/.claude`       | Claude Code auth, settings, sessions |
-| `android-keys`                    | `~/.android-keys` | APK signing keys                     |
-| `android-adb`                     | `~/.android`      | adb key pair (device authorisation)  |
+| `android-adb`                     | `~/.android`      | adb key pair, Android debug key      |
 | `gradle-cache`                    | `~/.gradle`       | Gradle distribution and dependencies |
 
-`android-*` and `gradle-cache` use fixed names on purpose. The signing keys and
-the adb identity are yours, so every Android project of yours shares them, and
-the Gradle cache only holds public artifacts. Claude's volume is
+`android-adb` and `gradle-cache` use fixed names on purpose. The adb identity is
+yours, so every Android project of yours shares it, and the Gradle cache only
+holds public artifacts. There's deliberately no volume with signing keys. Claude's volume is
 `${devcontainerId}`-scoped, so sessions stay per project.
 
 ## Claude Code
@@ -105,8 +87,9 @@ the Gradle cache only holds public artifacts. Claude's volume is
   update` in `postStartCommand` on every container start, and a fresh install on
   rebuild. `CLAUDE_CHANNEL` (`latest` or `stable`) sets the auto-update channel.
   `claude doctor` shows the last update attempt. Don't set `DISABLE_AUTOUPDATER`.
-- **Permissions** are in `.claude/settings.json`: `Bash(*)` allowed, with the
-  signing keys, `.env` and `git push` denied. The container is the real boundary.
+- **Permissions** are in `.claude/settings.json`: `Bash(*)` allowed, with
+  key files, `.env` and `git push` denied. The container is the real boundary,
+  which is why the release key isn't in it.
 
 ## Troubleshooting
 

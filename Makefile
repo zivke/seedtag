@@ -1,14 +1,19 @@
 # SeedTag build helpers.
 #
 # In the devcontainer the Android SDK (ANDROID_HOME), Gradle cache and adb are
-# already set up; the release signing key is named in .env. See
-# .devcontainer/README.md. Outside it, set ANDROID_HOME (or local.properties).
+# already set up. The release key is not: `make build` makes an unsigned APK,
+# signed outside the container with tools/sign-release.sh (see README.md).
+# Outside the container, set ANDROID_HOME (or local.properties).
 # Override any variable on the command line, e.g. `make run DEVICE=192.168.1.50:5555`.
 
 PACKAGE   ?= rs.zivke.seedtag
 ACTIVITY  ?= .MainActivity
-APK       ?= seedtag.apk
-DEBUG_APK ?= seedtag-debug.apk
+APK          ?= seedtag.apk
+UNSIGNED_APK ?= seedtag-unsigned.apk
+TEST_APK     ?= seedtag-release-test.apk
+DEBUG_APK    ?= seedtag-debug.apk
+# Android's debug key (created by the first debug build), for build-test.
+DEBUG_KS     ?= $(HOME)/.android/debug.keystore
 ADB_PORT  ?= 5555
 # Address for `make connect`. Set SEEDTAG_DEVICE_IP on the host to preset it.
 DEVICE_IP ?=
@@ -20,16 +25,24 @@ GRADLE    := ./gradlew --console=plain
 OUT       := app/build/outputs/apk
 
 .DEFAULT_GOAL := build
-.PHONY: build debug test test-core test-py check connect install install-debug \
-        run run-debug stop uninstall logcat clean help
+.PHONY: build build-test debug test test-core test-py check connect install install-test \
+        install-debug run run-test run-debug stop uninstall logcat clean help
 
-## build: signed release seedtag.apk (needs KEYSTORE + KEY_PASS in .env)
+## build: unsigned release seedtag-unsigned.apk (R8 on); sign it outside the container with tools/sign-release.sh
 build:
 	$(GRADLE) :app:assembleRelease
-	cp $(OUT)/release/app-release.apk $(APK)
-	tools/check-apk.sh $(APK)
+	cp $(OUT)/release/app-release-unsigned.apk $(UNSIGNED_APK)
+	tools/check-apk.sh --unsigned $(UNSIGNED_APK)
 
-## debug: seedtag-debug.apk signed with the debug key (no .env needed)
+## build-test: the release build signed with the debug key (seedtag-release-test.apk), to try R8 output on the phone
+build-test: build
+	@test -f $(DEBUG_KS) || $(MAKE) debug
+	apksigner sign --ks $(DEBUG_KS) --ks-pass pass:android --ks-key-alias androiddebugkey \
+		--out $(TEST_APK) $(UNSIGNED_APK)
+	rm -f $(TEST_APK).idsig
+	tools/check-apk.sh $(TEST_APK)
+
+## debug: seedtag-debug.apk signed with the debug key
 debug:
 	$(GRADLE) :app:assembleDebug
 	cp $(OUT)/debug/app-debug.apk $(DEBUG_APK)
@@ -58,16 +71,26 @@ connect:
 	adb connect $(DEVICE_IP):$(ADB_PORT)
 	adb devices
 
-## install: build, then install the release APK on the device
-install: build
+## install: install seedtag.apk, signed outside the container with tools/sign-release.sh
+install:
+	@test -f $(APK) || { echo ">> $(APK) is missing: make build, then sign it outside the container with tools/sign-release.sh"; exit 1; }
+	tools/check-apk.sh $(APK)
 	$(ADB) install -r $(APK)
+
+## install-test: build and install seedtag-release-test.apk
+install-test: build-test
+	$(ADB) install -r $(TEST_APK)
 
 ## install-debug: build and install the debug APK
 install-debug: debug
 	$(ADB) install -r $(DEBUG_APK)
 
-## run: install the release APK, then open the app
+## run: install the signed release APK, then open the app
 run: install
+	$(ADB) shell am start -n $(PACKAGE)/$(ACTIVITY)
+
+## run-test: install the debug-key-signed release build, then open the app
+run-test: install-test
 	$(ADB) shell am start -n $(PACKAGE)/$(ACTIVITY)
 
 ## run-debug: install the debug APK, then open the app
@@ -78,7 +101,7 @@ run-debug: install-debug
 stop:
 	$(ADB) shell am force-stop $(PACKAGE)
 
-## uninstall: remove the app from the device (needed when switching debug <-> release)
+## uninstall: remove the app from the device (needed when switching between the release key and the debug key)
 uninstall:
 	$(ADB) uninstall $(PACKAGE)
 
@@ -91,7 +114,7 @@ logcat:
 ## clean: remove build output
 clean:
 	$(GRADLE) clean
-	rm -f $(APK) $(DEBUG_APK)
+	rm -f $(APK) $(UNSIGNED_APK) $(TEST_APK) $(DEBUG_APK)
 
 ## help: list targets
 help:

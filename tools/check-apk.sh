@@ -2,31 +2,43 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 zivke85
 # Checks a built APK: valid signature, and no permission except NFC and HIDE_OVERLAY_WINDOWS.
+# Prints the signing certificate and the APK's SHA-256.
 #
 #   tools/check-apk.sh seedtag.apk
+#   tools/check-apk.sh --unsigned seedtag-unsigned.apk   # permissions only
 #
 # The no-network guarantee is the app's main security property, and a library
 # update can quietly add a permission through manifest merging. This fails the
 # build if that happens.
 set -eu
 
-APK="$1"
+UNSIGNED=0
+if [ "${1:-}" = "--unsigned" ]; then UNSIGNED=1; shift; fi
+APK="${1:?usage: tools/check-apk.sh [--unsigned] <apk>}"
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
 if [ -z "$SDK" ] && [ -f local.properties ]; then
     SDK="$(sed -n 's/^sdk.dir=//p' local.properties)"
 fi
 BUILD_TOOLS="${BUILD_TOOLS:-$(ls -d "$SDK"/build-tools/*/ 2>/dev/null | sort -V | tail -n 1)}"
 BUILD_TOOLS="${BUILD_TOOLS%/}"
-AAPT2="$BUILD_TOOLS/aapt2"
-APKSIGNER="$BUILD_TOOLS/apksigner"
-for f in "$AAPT2" "$APKSIGNER"; do
-    if [ ! -x "$f" ]; then
-        echo "Missing: $f (set ANDROID_HOME)" >&2
+# Outside the dev container (e.g. on the signing machine) the tools may only be on PATH.
+tool() {
+    if [ -x "$BUILD_TOOLS/$1" ]; then echo "$BUILD_TOOLS/$1"
+    elif command -v "$1" >/dev/null 2>&1; then command -v "$1"
+    else echo "Missing: $1 (set ANDROID_HOME, or put the Android build-tools on PATH)" >&2; exit 1
+    fi
+}
+AAPT2="$(tool aapt2)"
+APKSIGNER="$(tool apksigner)"
+
+if [ "$UNSIGNED" = 1 ]; then
+    if "$APKSIGNER" verify "$APK" >/dev/null 2>&1; then
+        echo "!! $APK is signed, but --unsigned was given" >&2
         exit 1
     fi
-done
-
-"$APKSIGNER" verify --print-certs "$APK" | grep -E 'Signer #1 certificate (DN|SHA-256)'
+else
+    "$APKSIGNER" verify --print-certs "$APK" | grep -E 'Signer #1 certificate (DN|SHA-256)'
+fi
 
 # androidx.core declares and uses <applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION,
 # a signature permission private to this app. HIDE_OVERLAY_WINDOWS lets SeedTag hide other apps'
@@ -43,5 +55,7 @@ if [ -n "$extra" ]; then
     echo "$extra" | sed 's/^/!!   /' >&2
     exit 1
 fi
-echo ">> $APK: signed, permissions OK (NFC and HIDE_OVERLAY_WINDOWS only, no network)"
+if [ "$UNSIGNED" = 1 ]; then state="unsigned"; else state="signed"; fi
+echo ">> $APK: $state, permissions OK (NFC and HIDE_OVERLAY_WINDOWS only, no network)"
+echo ">> SHA-256: $(sha256sum "$APK" | cut -d' ' -f1)"
 ls -l "$APK"

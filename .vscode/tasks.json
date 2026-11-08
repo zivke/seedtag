@@ -15,7 +15,7 @@
     },
     {
       "label": "debug build",
-      "detail": "make debug (debug key, no .env needed)",
+      "detail": "make debug (Android debug key)",
       "type": "shell",
       "command": "make debug",
       "group": { "kind": "build", "isDefault": true },
@@ -23,7 +23,7 @@
     },
     {
       "label": "release build",
-      "detail": "make build (signed with the key in .env)",
+      "detail": "make build (unsigned; sign outside the container with tools/sign-release.sh)",
       "type": "shell",
       "command": "make build",
       "group": "build",

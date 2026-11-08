@@ -63,6 +63,12 @@ All notable user-visible changes to SeedTag. The format follows
 - New app icon: a key-fob NFC tag with a ₿ on a dark background, plus a
   single-colour version for themed icons on Android 13+. The app's window
   background matches the new icon's.
+- Building: the release signing key no longer lives in the dev container.
+  `make build` makes an unsigned `seedtag-unsigned.apk`, which `tools/sign-
+  release.sh` signs on the machine that holds the key, refusing any
+  certificate but the release one. `make build-test` signs the release build
+  with the debug key for testing, and every build prints the APK's SHA-256.
+  The README has the steps and the release certificate's SHA-256.
 
 ### Fixed
 - Passwords are no longer kept in memory as text. They live in one buffer

@@ -23,20 +23,27 @@ decrypt exactly what the app writes, so a backup survives the app.
 
 ## Build & run
 
-JDK, Android SDK, Gradle cache, adb and the signing key are already set up in
-the devcontainer; `.env` (gitignored) names the key (`KEYSTORE`) and holds
-`KEY_PASS`. Never install, regenerate or read the key. Everything goes through
-the `Makefile` (`make help` lists targets).
+JDK, Android SDK, Gradle cache and adb are already set up in the devcontainer.
+The release signing key is deliberately **not** in it: release APKs are built
+unsigned and the user signs them on another machine with `tools/sign-release.sh`.
+Never install, regenerate or read a signing key, and don't bring one into the
+container. Everything goes through the `Makefile` (`make help` lists targets).
 
 - `make test`: `:core:test` (JUnit, plain JVM) and `tools/test_seedtag.py`
   against the same vector files. No device, no Android classes.
-- `make debug`: `seedtag-debug.apk`, debug key, no `.env` needed.
-- `make build`: signed release `seedtag.apk` (R8 on). Fails before R8 if the
-  key in `.env` is missing or can't be opened.
-- Both builds finish with `tools/check-apk.sh`, which verifies the signature
-  and **fails if the APK requests any permission except NFC and
-  `HIDE_OVERLAY_WINDOWS`** (Android 12+ overlay hiding; no access to anything).
-- `make connect DEVICE_IP=… [ADB_PORT=…]`, `make run` / `make run-debug`,
+- `make debug`: `seedtag-debug.apk`, Android debug key.
+- `make build`: unsigned release `seedtag-unsigned.apk` (R8 on).
+  `make build-test`: the same, signed with the debug key
+  (`seedtag-release-test.apk`), to try the R8 output on the phone.
+- Every build finishes with `tools/check-apk.sh`, which verifies the signature
+  (skipped with `--unsigned`), prints the APK's SHA-256 and **fails if the APK
+  requests any permission except NFC and `HIDE_OVERLAY_WINDOWS`** (Android 12+
+  overlay hiding; no access to anything).
+- `tools/sign-release.sh <keystore>` runs outside the container: signs
+  `seedtag-unsigned.apk` into `seedtag.apk` and refuses any certificate but the
+  one in `tools/release-cert.sha256`. `make install` / `make run` install that
+  signed `seedtag.apk`; they never build or sign.
+- `make connect DEVICE_IP=… [ADB_PORT=…]`, `make run-test` / `make run-debug`,
   `make logcat`, `make stop`, `make uninstall`, `make clean`, `make check` (+ lint).
 
 There is no emulator and no instrumented tests: NFC needs a real phone and a
@@ -132,7 +139,8 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   `Added` entry bumps MINOR; only fixes bump PATCH.
 - Releasing (only when asked): rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`,
   bump `versionCode` by 1 and set `versionName` to `X.Y.Z` in
-  `app/build.gradle.kts`, commit, then create the annotated tag `vX.Y.Z`.
+  `app/build.gradle.kts`, commit, then create the annotated tag `vX.Y.Z` and
+  run `make build`. The user signs `seedtag-unsigned.apk` outside the container.
 - Branching: small fixes and changes go on the current branch; new features
   and bigger or more significant changes get a separate branch.
 - Never commit `*.p12` / `*.jks` / `*.keystore`, `.env` or an APK (`.gitignore`
