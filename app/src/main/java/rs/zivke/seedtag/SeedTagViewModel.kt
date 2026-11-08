@@ -12,6 +12,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import rs.zivke.seedtag.core.Bip39
@@ -53,6 +55,9 @@ sealed interface Dialog {
     /** The password is below [Passphrase.MIN_BITS] or reuses words of the seed. */
     data class ConfirmWeakPassword(val bits: Int, val sharesSeedWords: Boolean) : Dialog
 }
+
+/** Vibration for things that happen without a tap: a tag was handled, something succeeded or failed. */
+enum class Haptic { Tick, Success, Failure }
 
 private enum class Purpose { BackupWrite, Verify, Restore, Lock }
 /** [id] tells a result for the current scan from one that arrives after Cancel or a new scan. */
@@ -146,6 +151,10 @@ class SeedTagViewModel : ViewModel() {
     var scanPrompt by mutableStateOf<ScanPrompt?>(null)
         private set
     var dialog by mutableStateOf<Dialog?>(null)
+
+    private val _haptics = MutableSharedFlow<Haptic>(extraBufferCapacity = 8)
+    /** Played by the UI; emitted on the main thread. */
+    val haptics: SharedFlow<Haptic> = _haptics
 
     /** Read from the NFC binder thread, hence atomic rather than Compose state. */
     private val pending = AtomicReference<Pending?>(null)
@@ -335,6 +344,7 @@ class SeedTagViewModel : ViewModel() {
         when (r) {
             is TagResult.Failed -> {
                 if (stale) return
+                _haptics.tryEmit(Haptic.Failure)
                 // stay armed so the user can simply tap again
                 pending.set(p)
                 scanPrompt = scanPrompt?.copy(error = r.message) ?: ScanPrompt("Hold the tag to the phone", r.message)
@@ -342,25 +352,30 @@ class SeedTagViewModel : ViewModel() {
             is TagResult.NotEmpty -> {
                 if (stale) return
                 scanPrompt = null
+                _haptics.tryEmit(Haptic.Failure)
                 val looksLike = r.existing?.let { runCatching { SeedBox.fromBase64(it).let { b -> b.isNotEmpty() && b[0].toInt() == SeedBox.VERSION } }.getOrNull() } == true
                 dialog = Dialog.ConfirmOverwrite(looksLike)
             }
             is TagResult.WrittenUnchecked -> {
+                _haptics.tryEmit(Haptic.Tick)
                 arm(TagRequest.CheckWritten(r.text), Purpose.BackupWrite, "Written. Hold the tag to the phone once more to check it")
             }
             is TagResult.Written -> {
                 scanPrompt = null
+                _haptics.tryEmit(Haptic.Success)
                 wipeBackup()
                 lockTarget = r.text
                 step = BackupStep.Done
             }
             is TagResult.Locked -> {
                 scanPrompt = null
+                _haptics.tryEmit(Haptic.Success)
                 dialog = Dialog.Info("Tag locked", "The tag is now permanently read-only.")
             }
             is TagResult.Read -> {
                 if (stale) return
                 scanPrompt = null
+                _haptics.tryEmit(Haptic.Tick)
                 decrypt(r.text, reveal = p.purpose == Purpose.Restore)
             }
         }
@@ -384,6 +399,7 @@ class SeedTagViewModel : ViewModel() {
                 lockTarget = text
                 if (reveal) restoredWords = words
                 clearPasswords(PwField.Read)
+                _haptics.tryEmit(Haptic.Success)
             } catch (e: SeedTagException) {
                 showError(e.message ?: "Decryption failed.")
             } finally {
@@ -410,5 +426,8 @@ class SeedTagViewModel : ViewModel() {
         if (dialog is Dialog.ConfirmOverwrite || dialog is Dialog.ConfirmWeakPassword) dialog = null
     }
 
-    private fun showError(msg: String) { dialog = Dialog.Error(msg) }
+    private fun showError(msg: String) {
+        dialog = Dialog.Error(msg)
+        _haptics.tryEmit(Haptic.Failure)
+    }
 }

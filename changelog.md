@@ -20,6 +20,11 @@ All notable user-visible changes to SeedTag. The format follows
 - Back up, Verify and Restore say up front to have the NFC tag ready, and how
   to hold it: flat against the back of the phone, over its NFC spot, still
   until the app is done. The scan window repeats it.
+- Haptic feedback: every key on the app's keypad and keyboard gives a light
+  tap, and the phone vibrates when a tag is handled: a confirmation when a
+  backup is written and checked, a tag decrypts or gets locked, and a
+  "rejected" buzz when a tag can't be read or a step fails. It follows the
+  phone's touch-feedback setting and needs no extra permission.
 
 ### Changed
 - The generated passphrase comes with a reminder to label it "SeedTag

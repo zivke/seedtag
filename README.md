@@ -56,7 +56,8 @@ tag, can't be undone.
 
 **Have the NFC tag ready before you start.** When the app asks for it, hold the tag flat against the back of the
 phone, over its NFC spot (usually near the middle or the top), and keep it still until the app says it's done.
-A thick or metal case can block it.
+A thick or metal case can block it. The phone vibrates when the tag has been handled: a short confirmation when it
+worked, a "rejected" buzz when something went wrong (it follows the phone's touch-feedback setting).
 
 1. **Back up**: choose how many words your phrase has (12, 15, 18, 21 or 24), enter them with the in-app keypad
    (tap a suggestion to accept each word), then set a password.

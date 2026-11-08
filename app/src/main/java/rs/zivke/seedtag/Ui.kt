@@ -4,6 +4,7 @@
 package rs.zivke.seedtag
 
 import android.os.Build
+import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -88,9 +89,21 @@ fun SeedTagTheme(content: @Composable () -> Unit) {
 
 // ================================================================ app ===
 
+/** CONFIRM and REJECT are Android 11+; older versions get a plain long-press buzz. */
+private val Haptic.constant: Int
+    get() = when (this) {
+        Haptic.Tick -> HapticFeedbackConstants.KEYBOARD_TAP
+        Haptic.Success ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.LONG_PRESS
+        Haptic.Failure ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
+    }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SeedTagApp(vm: SeedTagViewModel, nfcState: NfcState, overlayDetected: Boolean, openNfcSettings: () -> Unit) {
+    val view = LocalView.current
+    LaunchedEffect(vm) { vm.haptics.collect { view.performHapticFeedback(it.constant) } }
     Scaffold(
         topBar = { TopAppBar(title = { Text("SeedTag") }) },
     ) { pad ->
@@ -364,11 +377,15 @@ private fun Keypad(onLetter: (Char) -> Unit, onBackspace: () -> Unit) {
 private fun Key(label: String, modifier: Modifier, active: Boolean = false, onClick: () -> Unit) {
     val bg = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
     val fg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+    val view = LocalView.current
     Box(
         modifier
             .height(44.dp)
             .background(bg, RoundedCornerShape(6.dp))
-            .clickable(onClick = onClick),
+            .clickable {
+                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                onClick()
+            },
         contentAlignment = Alignment.Center,
     ) {
         Text(label, fontSize = 18.sp, color = fg, maxLines = 1)
