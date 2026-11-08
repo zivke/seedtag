@@ -114,7 +114,7 @@ fun SeedTagApp(vm: SeedTagViewModel, nfcState: NfcState, overlayDetected: Boolea
                 navigationIcon = { if (page != null) TextButton(onClick = { vm.page = null }) { Text("‹ Back") } },
                 actions = {
                     if (page == null) {
-                        Page.entries.forEach { p -> TextButton(onClick = { vm.page = p }) { Text(p.title) } }
+                        Page.entries.forEach { p -> TextButton(onClick = { vm.page = p }) { Text(p.button) } }
                     }
                 },
             )
@@ -131,6 +131,7 @@ fun SeedTagApp(vm: SeedTagViewModel, nfcState: NfcState, overlayDetected: Boolea
             NfcBanner(nfcState, openNfcSettings)
             if (overlayDetected) OverlayBanner()
             when (page) {
+                Page.Antenna -> AntennaPage(vm)
                 Page.About -> AboutPage()
                 null -> when (vm.tab) {
                     Screen.Backup -> BackupScreen(vm)
@@ -218,7 +219,8 @@ private fun PrepareTagInfo(writing: Boolean) {
         "Have your NFC tag ready",
         (if (writing) "You'll need the tag at the end, after the password. " else "You'll need the tag after typing the password. ") +
             "When the app asks, hold it flat against the back of the phone, over the phone's NFC spot (usually near " +
-            "the middle or the top), and keep it still until the app says it's done. A thick or metal case can block it.",
+            "the middle or the top), and keep it still until the app says it's done. A thick or metal case can block it. " +
+            "Not sure where the spot is? Tap NFC spot at the top first.",
     )
 }
 
@@ -787,6 +789,65 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit) {
             Key("space", Modifier.weight(5f)) { onChar(' ') }
             Key("⌫", Modifier.weight(1.5f), onClick = onBackspace)
         }
+    }
+}
+
+// ======================================================= find NFC spot ===
+
+@Composable
+private fun AntennaPage(vm: SeedTagViewModel) {
+    DisposableEffect(vm) {
+        vm.startProbe()
+        onDispose { vm.stopProbe() }
+    }
+    ScreenColumn {
+        Text("Find your phone's NFC spot", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Every phone reads tags at one small spot on its back. Find it now, so you know where to hold the tag " +
+                "when the app asks.\n\n" +
+                "Take your NFC tag, or any contactless card, and slide it slowly over the back of the phone. When the " +
+                "phone vibrates and the box below says Tag detected, you've found the spot. Nothing is written to the tag, " +
+                "and its contents aren't read.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        val p = vm.probe
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (p != null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
+            ),
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (p == null) {
+                    Text("Waiting for a tag…", style = MaterialTheme.typography.titleMedium)
+                } else {
+                    Text(
+                        "✓ Tag detected" + if (p.count > 1) " (${p.count} times)" else "",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text("That's the spot. Lift the tag away and back to try again.", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        when {
+                            p.ndef && p.writable == false -> "This tag is read-only: SeedTag can read it but not write to it."
+                            p.ndef -> "This tag can hold NDEF data" + (p.ndefSize?.let { " ($it bytes)" } ?: "") + ": SeedTag can use it."
+                            p.formatable -> "This tag is blank: SeedTag will format it on the first write."
+                            else -> "This isn't an NDEF tag: SeedTag can't use it, but it's fine for finding the spot."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+        InfoCard(
+            "Tips",
+            "• The spot is usually in the upper half of the back, near the camera, or in the middle. On some phones " +
+                "it's at the very top edge.\n" +
+                "• Hold the tag flat against the phone, not edge-on, and keep it still for a moment.\n" +
+                "• Thick or metal cases, magnetic mounts, ring holders and card wallets can block it: take them off.\n" +
+                "• Small tags and rings have small antennas and must sit right on the spot.\n" +
+                "• If nothing happens anywhere, check that NFC is turned on.",
+        )
     }
 }
 

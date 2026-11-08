@@ -36,7 +36,7 @@
   - add "Verify another tag" and "Restore another tag" options;
   - etc.
 - [x] Add an About page.
-- [ ] Add a separate option that helps users find their phone's NFC antenna beforehand.
+- [x] Add a separate option that helps users find their phone's NFC antenna beforehand.
 - [ ] Add a disclaimer, in the app and the README:
   - The app comes without any guarantees, and the developer is not responsible for any damage.
   - Users must make sure for themselves that no malware is already installed on their phone. The app

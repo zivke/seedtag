@@ -32,6 +32,12 @@ All notable user-visible changes to SeedTag. The format follows
 - An **About** page, from the top bar: the version, privacy (offline, no
   network permission, nothing stored), the protections on the phone, the
   encryption and `seedtag.py`, and the licence.
+- **NFC spot** in the top bar opens a finder for the phone's NFC antenna:
+  slide a tag or any contactless card over the back of the phone until it
+  vibrates and says *Tag detected*. It also says whether SeedTag can use that
+  tag (NDEF and its size, blank, or read-only), with tips on where the spot
+  usually is and what blocks it. Nothing is written to the tag and its
+  contents aren't read.
 
 ### Changed
 - The generated passphrase comes with a reminder to label it "SeedTag

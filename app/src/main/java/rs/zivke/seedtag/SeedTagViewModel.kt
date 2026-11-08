@@ -22,11 +22,17 @@ import rs.zivke.seedtag.core.PasswordFix
 import rs.zivke.seedtag.core.SecretChars
 import rs.zivke.seedtag.core.SeedBox
 import rs.zivke.seedtag.core.SeedTagException
+import android.nfc.tech.Ndef
+import android.nfc.tech.NdefFormatable
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 enum class Screen(val title: String) { Backup("Back up"), Verify("Verify"), Restore("Restore") }
-/** Pages opened from the top bar, shown instead of the tabs. */
-enum class Page(val title: String) { About("About") }
+/** Pages opened from the top bar ([button]), shown instead of the tabs. */
+enum class Page(val title: String, val button: String) { Antenna("Find NFC spot", "NFC spot"), About("About", "About") }
+
+/** What the NFC-spot finder saw, from the tag's discovery info only: nothing is read from its memory. */
+data class ProbeResult(val count: Int, val ndef: Boolean, val formatable: Boolean, val ndefSize: Int?, val writable: Boolean?)
 enum class BackupStep { Length, Words, Password, Done }
 /** The three password fields: the new password and its repeat (Back up), and Verify / Restore. */
 enum class PwField { Password, Repeat, Read }
@@ -164,6 +170,14 @@ class SeedTagViewModel : ViewModel() {
 
     /** Read from the NFC binder thread, hence atomic rather than Compose state. */
     private val pending = AtomicReference<Pending?>(null)
+    /** The NFC-spot finder is open: tags that arrive with no scan pending are only counted. */
+    private val probing = AtomicBoolean(false)
+    var probe by mutableStateOf<ProbeResult?>(null)
+        private set
+
+    fun startProbe() { probe = null; probing.set(true) }
+    fun stopProbe() { probing.set(false); probe = null }
+
     /** Bumped on every arm and cancel. Main thread only. */
     private var scanId = 0L
     /** Bumped by wipeAll(): Argon2 work that finishes after it is thrown away. */
@@ -343,9 +357,26 @@ class SeedTagViewModel : ViewModel() {
 
     /** Called on the NFC reader thread. Blocking I/O is fine here. */
     fun onTagDiscovered(tag: Tag) {
-        val p = pending.getAndSet(null) ?: return
+        val p = pending.getAndSet(null)
+        if (p == null) {
+            if (probing.get()) probed(tag)
+            return
+        }
         val result = TagIo.perform(tag, p.request)
         viewModelScope.launch { handle(p, result) }
+    }
+
+    /** Only the info Android hands over with the tag (no I/O): its type, NDEF size and lock state. */
+    private fun probed(tag: Tag) {
+        val ndef = Ndef.get(tag)
+        val formatable = NdefFormatable.get(tag) != null
+        val size = ndef?.maxSize
+        val writable = ndef?.isWritable
+        viewModelScope.launch {
+            if (!probing.get()) return@launch
+            probe = ProbeResult((probe?.count ?: 0) + 1, ndef != null, formatable, size, writable)
+            _haptics.tryEmit(Haptic.Success)
+        }
     }
 
     private fun handle(p: Pending, r: TagResult) {
