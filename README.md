@@ -54,6 +54,10 @@ SeedTag hide other apps' overlays.)
 **Read every instruction on screen carefully before you tap.** Some steps, such as overwriting or locking a
 tag, can't be undone.
 
+**Have the NFC tag ready before you start.** When the app asks for it, hold the tag flat against the back of the
+phone, over its NFC spot (usually near the middle or the top), and keep it still until the app says it's done.
+A thick or metal case can block it.
+
 1. **Back up**: choose how many words your phrase has (12, 15, 18, 21 or 24), enter them with the in-app keypad
    (tap a suggestion to accept each word), then set a password.
    Words already entered are hidden by default; turn off **Hide entered words** to check them.

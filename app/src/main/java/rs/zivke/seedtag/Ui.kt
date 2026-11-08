@@ -166,6 +166,31 @@ private fun WarningCard(title: String, text: String, modifier: Modifier = Modifi
     }
 }
 
+/** Plain guidance that matters before a step, quieter than a warning. */
+@Composable
+private fun InfoCard(title: String, text: String, modifier: Modifier = Modifier) {
+    Card(
+        modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+            Text(text, style = MaterialTheme.typography.bodyMedium)
+        }
+    }
+}
+
+/** Where the tag goes, said before any procedure asks for it. */
+@Composable
+private fun PrepareTagInfo(writing: Boolean) {
+    InfoCard(
+        "Have your NFC tag ready",
+        (if (writing) "You'll need the tag at the end, after the password. " else "You'll need the tag after typing the password. ") +
+            "When the app asks, hold it flat against the back of the phone, over the phone's NFC spot (usually near " +
+            "the middle or the top), and keep it still until the app says it's done. A thick or metal case can block it.",
+    )
+}
+
 /** Icon and title for dialogs that confirm something risky or permanent. */
 @Composable
 private fun WarningIcon() {
@@ -228,6 +253,7 @@ private fun ReadCarefullyWarning() {
 private fun LengthStep(vm: SeedTagViewModel) {
     ScreenColumn {
         ReadCarefullyWarning()
+        PrepareTagInfo(writing = true)
         Text("1 · How many words is your recovery phrase?", style = MaterialTheme.typography.titleMedium)
         Text(
             "Pick the length written on your backup. The keypad then stops at that many words.",
@@ -484,7 +510,10 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
                 if (reveal) "Restore: decrypt and show the words" else "Verify: check the tag without showing the words",
                 style = MaterialTheme.typography.titleMedium,
             )
-            if (vm.verifyResult == null) ReadCarefullyWarning()
+            if (vm.verifyResult == null) {
+                ReadCarefullyWarning()
+                PrepareTagInfo(writing = false)
+            }
             if (reveal) {
                 WarningCard(
                     "Only do this in private",
@@ -707,7 +736,13 @@ private fun Dialogs(vm: SeedTagViewModel) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     CircularProgressIndicator()
                     Spacer(Modifier.height(16.dp))
-                    Text(p.title, textAlign = TextAlign.Center)
+                    Text(p.title, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Hold it flat against the back of the phone and keep it still until this window closes.",
+                        textAlign = TextAlign.Center,
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
                     p.error?.let {
                         Spacer(Modifier.height(12.dp))
                         Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)

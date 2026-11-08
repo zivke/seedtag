@@ -17,6 +17,9 @@ All notable user-visible changes to SeedTag. The format follows
   `seedtag.py` or the developer.
 - Back up, Verify and Restore start with a warning to read every instruction
   on screen carefully, since some steps can't be undone.
+- Back up, Verify and Restore say up front to have the NFC tag ready, and how
+  to hold it: flat against the back of the phone, over its NFC spot, still
+  until the app is done. The scan window repeats it.
 
 ### Changed
 - The generated passphrase comes with a reminder to label it "SeedTag

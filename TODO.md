@@ -27,7 +27,7 @@
 - [x] Make the on-screen warnings more prominent.
 - [x] Warn that if the encryption password is lost, there's no way to restore the seed phrase.
 - [x] Warn users to read the on-screen instructions carefully.
-- [ ] Explain that users need to have their NFC tag ready beforehand, and to hold it against the back of
+- [x] Explain that users need to have their NFC tag ready beforehand, and to hold it against the back of
   the phone when the app asks.
 - [ ] Add haptic feedback.
 - [ ] Explain the verification procedure in more detail on screen.
