@@ -51,6 +51,9 @@ SeedTag hide other apps' overlays.)
 
 ## Using it
 
+**Read every instruction on screen carefully before you tap.** Some steps, such as overwriting or locking a
+tag, can't be undone.
+
 1. **Back up**: choose how many words your phrase has (12, 15, 18, 21 or 24), enter them with the in-app keypad
    (tap a suggestion to accept each word), then set a password.
    Words already entered are hidden by default; turn off **Hide entered words** to check them.

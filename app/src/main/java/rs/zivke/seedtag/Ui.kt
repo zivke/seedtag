@@ -214,9 +214,20 @@ private fun BackupScreen(vm: SeedTagViewModel) {
     }
 }
 
+/** Shown at the start of every procedure (Back up, Verify, Restore). */
+@Composable
+private fun ReadCarefullyWarning() {
+    WarningCard(
+        "Read every instruction carefully",
+        "Each screen says exactly what to do. Read all of it before you tap: some steps, such as overwriting or " +
+            "locking a tag, can't be undone.",
+    )
+}
+
 @Composable
 private fun LengthStep(vm: SeedTagViewModel) {
     ScreenColumn {
+        ReadCarefullyWarning()
         Text("1 · How many words is your recovery phrase?", style = MaterialTheme.typography.titleMedium)
         Text(
             "Pick the length written on your backup. The keypad then stops at that many words.",
@@ -473,6 +484,7 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
                 if (reveal) "Restore: decrypt and show the words" else "Verify: check the tag without showing the words",
                 style = MaterialTheme.typography.titleMedium,
             )
+            if (vm.verifyResult == null) ReadCarefullyWarning()
             if (reveal) {
                 WarningCard(
                     "Only do this in private",

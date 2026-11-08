@@ -15,6 +15,8 @@ All notable user-visible changes to SeedTag. The format follows
 - A warning when choosing the password, and in the README: if the password is
   lost, the seed can't be restored from the tag by anyone, not by the app,
   `seedtag.py` or the developer.
+- Back up, Verify and Restore start with a warning to read every instruction
+  on screen carefully, since some steps can't be undone.
 
 ### Changed
 - The generated passphrase comes with a reminder to label it "SeedTag
