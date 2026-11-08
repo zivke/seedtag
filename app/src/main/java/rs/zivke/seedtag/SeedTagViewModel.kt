@@ -25,6 +25,8 @@ import rs.zivke.seedtag.core.SeedTagException
 import java.util.concurrent.atomic.AtomicReference
 
 enum class Screen(val title: String) { Backup("Back up"), Verify("Verify"), Restore("Restore") }
+/** Pages opened from the top bar, shown instead of the tabs. */
+enum class Page(val title: String) { About("About") }
 enum class BackupStep { Length, Words, Password, Done }
 /** The three password fields: the new password and its repeat (Back up), and Verify / Restore. */
 enum class PwField { Password, Repeat, Read }
@@ -68,6 +70,8 @@ private data class Pending(val request: TagRequest, val purpose: Purpose, val id
 class SeedTagViewModel : ViewModel() {
 
     var tab by mutableStateOf(Screen.Backup)
+    /** An open top-bar page, or null for the tabs. */
+    var page by mutableStateOf<Page?>(null)
 
     // ---- back up --------------------------------------------------------------
     val words = mutableStateListOf<String>()

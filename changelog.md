@@ -29,6 +29,9 @@ All notable user-visible changes to SeedTag. The format follows
   the written copy rather than from memory, when to do it (after every backup,
   before locking, then about once a year), and afterwards what the result and
   the fingerprint mean.
+- An **About** page, from the top bar: the version, privacy (offline, no
+  network permission, nothing stored), the protections on the phone, the
+  encryption and `seedtag.py`, and the licence.
 
 ### Changed
 - The generated passphrase comes with a reminder to label it "SeedTag

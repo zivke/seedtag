@@ -5,6 +5,7 @@ package rs.zivke.seedtag
 
 import android.os.Build
 import android.view.HapticFeedbackConstants
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -104,21 +105,38 @@ private val Haptic.constant: Int
 fun SeedTagApp(vm: SeedTagViewModel, nfcState: NfcState, overlayDetected: Boolean, openNfcSettings: () -> Unit) {
     val view = LocalView.current
     LaunchedEffect(vm) { vm.haptics.collect { view.performHapticFeedback(it.constant) } }
+    val page = vm.page
+    BackHandler(enabled = page != null) { vm.page = null }
     Scaffold(
-        topBar = { TopAppBar(title = { Text("SeedTag") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text(page?.title ?: "SeedTag") },
+                navigationIcon = { if (page != null) TextButton(onClick = { vm.page = null }) { Text("‹ Back") } },
+                actions = {
+                    if (page == null) {
+                        Page.entries.forEach { p -> TextButton(onClick = { vm.page = p }) { Text(p.title) } }
+                    }
+                },
+            )
+        },
     ) { pad ->
         Column(Modifier.padding(pad).fillMaxSize()) {
-            TabRow(selectedTabIndex = vm.tab.ordinal) {
-                Screen.entries.forEach { t ->
-                    Tab(selected = vm.tab == t, onClick = { vm.tab = t }, text = { Text(t.title) })
+            if (page == null) {
+                TabRow(selectedTabIndex = vm.tab.ordinal) {
+                    Screen.entries.forEach { t ->
+                        Tab(selected = vm.tab == t, onClick = { vm.tab = t }, text = { Text(t.title) })
+                    }
                 }
             }
             NfcBanner(nfcState, openNfcSettings)
             if (overlayDetected) OverlayBanner()
-            when (vm.tab) {
-                Screen.Backup -> BackupScreen(vm)
-                Screen.Verify -> ReadScreen(vm, reveal = false)
-                Screen.Restore -> ReadScreen(vm, reveal = true)
+            when (page) {
+                Page.About -> AboutPage()
+                null -> when (vm.tab) {
+                    Screen.Backup -> BackupScreen(vm)
+                    Screen.Verify -> ReadScreen(vm, reveal = false)
+                    Screen.Restore -> ReadScreen(vm, reveal = true)
+                }
             }
         }
     }
@@ -769,6 +787,56 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit) {
             Key("space", Modifier.weight(5f)) { onChar(' ') }
             Key("⌫", Modifier.weight(1.5f), onClick = onBackspace)
         }
+    }
+}
+
+// =============================================================== about ===
+
+@Composable
+private fun AboutPage() {
+    val ctx = LocalContext.current
+    val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() }
+    ScreenColumn {
+        Text("SeedTag", style = MaterialTheme.typography.headlineSmall)
+        Text("Version ${version ?: "unknown"}", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Stores a password-encrypted BIP39 seed phrase on an NFC tag, and reads it back: Back up writes it, " +
+                "Verify checks it without showing the words, Restore shows them.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        AboutSection(
+            "Privacy",
+            "SeedTag works entirely offline. It has no internet permission, so it can't send anything anywhere, " +
+                "and no analytics or crash reporting. Its only permissions are NFC and hiding other apps' overlays. " +
+                "It stores nothing on the phone: everything typed or decrypted is wiped when you leave the app.",
+        )
+        AboutSection(
+            "Protection on the phone",
+            "Seed words and passwords are typed on the app's own keyboards, never the system one. Screenshots and " +
+                "screen recording are blocked, other apps' overlays are hidden (Android 12+), and taps that come " +
+                "through another app's window are ignored.",
+        )
+        AboutSection(
+            "Encryption",
+            "Argon2id (64 MiB, 3 passes) turns the password into a key, and AES-256-GCM encrypts the seed's raw " +
+                "entropy. The format is documented and versioned. seedtag.py, a single-file Python tool, encrypts " +
+                "and decrypts the same format on any computer, so a backup doesn't depend on this app.",
+        )
+        AboutSection(
+            "Licence",
+            "Free and open source under the GNU General Public License, version 3 or later: you may use, share and " +
+                "change it, but anything you distribute that's based on it must be released under the same licence, " +
+                "with its source. seedtag.py is under the BSD Zero Clause licence, so anyone can always use it to " +
+                "recover a tag. © 2026 zivke85.",
+        )
+    }
+}
+
+@Composable
+private fun AboutSection(title: String, text: String) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 

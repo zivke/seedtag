@@ -86,6 +86,9 @@ again from an empty password.
 
 Leaving the app (home button, Recents, screen off) wipes everything typed or decrypted.
 
+**About** in the top bar shows the version, what the app does with your data (nothing leaves the phone), the
+encryption used and the licence.
+
 ## Choosing a tag
 
 Any tag Android can read and write as NDEF works. The app uses the generic NDEF API and listens for NFC-A, -B, -F
