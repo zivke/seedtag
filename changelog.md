@@ -25,6 +25,10 @@ All notable user-visible changes to SeedTag. The format follows
   backup is written and checked, a tag decrypts or gets locked, and a
   "rejected" buzz when a tag can't be read or a step fails. It follows the
   phone's touch-feedback setting and needs no extra permission.
+- Verify explains itself on screen: what it checks, to type the password from
+  the written copy rather than from memory, when to do it (after every backup,
+  before locking, then about once a year), and afterwards what the result and
+  the fingerprint mean.
 
 ### Changed
 - The generated passphrase comes with a reminder to label it "SeedTag

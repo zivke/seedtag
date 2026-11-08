@@ -529,6 +529,7 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
             )
             if (vm.verifyResult == null) {
                 ReadCarefullyWarning()
+                if (!reveal) VerifyExplanation()
                 PrepareTagInfo(writing = false)
             }
             if (reveal) {
@@ -564,6 +565,7 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
                     }
                 }
                 if (!reveal) {
+                    VerifyResultExplanation(result)
                     LockButton(vm)
                 }
             }
@@ -585,6 +587,34 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Scan tag") }
     }
+}
+
+/** What Verify does and why, before the user starts. */
+@Composable
+private fun VerifyExplanation() {
+    InfoCard(
+        "What Verify does",
+        "It proves the tag can be read back, that your written password decrypts it, and that it holds a valid " +
+            "seed, without ever showing the words.\n\n" +
+            "1. Type the password from your written copy, not from memory. That checks the copy too.\n" +
+            "2. Tap Scan tag and hold the tag to the phone. The app reads it, decrypts it and checks the seed's checksum.\n" +
+            "3. You get ✓ and a fingerprint. Right after a backup, it also says whether the tag holds the seed you just wrote.\n\n" +
+            "Do it after every backup, before locking the tag, and again every now and then (say once a year) to make " +
+            "sure the tag still reads.",
+    )
+}
+
+/** What a successful Verify means, and what to do with the fingerprint. */
+@Composable
+private fun VerifyResultExplanation(result: VerifyResult) {
+    InfoCard(
+        "What this means",
+        "The tag reads correctly, and the password you typed decrypts it to a valid ${result.wordCount}-word seed. " +
+            "The fingerprint is the same for the same seed on any tag, with any password, and in seedtag.py; it isn't " +
+            "secret and doesn't reveal the words. Compare it with the one shown after the backup: if they match, " +
+            "this tag holds that seed.\n\n" +
+            "Once you're sure, you can make the tag read-only below. That's permanent.",
+    )
 }
 
 /** Says what had to be ignored in the typed password, so the user can fix their written copy. */

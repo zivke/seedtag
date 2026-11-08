@@ -30,7 +30,7 @@
 - [x] Explain that users need to have their NFC tag ready beforehand, and to hold it against the back of
   the phone when the app asks.
 - [x] Add haptic feedback.
-- [ ] Explain the verification procedure in more detail on screen.
+- [x] Explain the verification procedure in more detail on screen.
 - [ ] Make Verify and Restore multi-step procedures like Back up:
   - remove the password field once it has done its job;
   - add "Verify another tag" and "Restore another tag" options;

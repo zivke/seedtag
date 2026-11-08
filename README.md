@@ -69,8 +69,11 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    A password estimated below 60 bits, or one that uses words of the seed, needs a confirmation before writing.
    If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted
    first and then needs a second tap so the app can read it back.
-2. **Verify**: type the password from your written copy and scan. You get ✓ plus a fingerprint, and the words stay hidden.
-   Right after a backup, it also says whether the tag holds the same seed you just wrote.
+2. **Verify**: type the password from your written copy (not from memory, so the copy is checked too) and scan.
+   The app reads the tag, decrypts it and checks the seed's checksum. You get ✓ plus a fingerprint, and the words
+   stay hidden. Right after a backup, it also says whether the tag holds the same seed you just wrote; later,
+   compare the fingerprint with the one shown after the backup. Verify again every now and then (say once a year)
+   to make sure the tag still reads.
    If the password is wrong, the app tries it again without extra spaces, then in lower case, and tells you if that
    worked, so you can correct your written copy.
 3. Optionally recover once with `seedtag.py` on an offline computer.
