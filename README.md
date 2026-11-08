@@ -214,8 +214,8 @@ It's ciphertext, so that's safe.
 
 ## Warnings: other apps on the phone
 
-SeedTag can only protect you from what happens inside its own window. Other apps on the same phone can still get at
-your seed and password:
+SeedTag can only protect you from what happens inside its own window, and only from some attacks (see the
+[disclaimer](#disclaimer)). Other apps on the same phone can still get at your seed and password:
 
 - **Fake-screen overlays.** An app allowed to *Display over other apps* can draw a copy of SeedTag's keypad on top
   of it and record what you type. On **Android 12 and later**, SeedTag hides every such overlay while it's on
@@ -274,6 +274,15 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
 
 NFC itself has no automated tests: there's no emulator support. Test on a real phone with a real tag, using a
 throwaway mnemonic.
+
+## Disclaimer
+
+SeedTag comes **without any warranty**, and its developer isn't responsible for any loss or damage from using it,
+including a lost seed or lost funds. You use it at your own risk (see also the [licences](#license)).
+
+**Make sure yourself that there's no malware on the phone before you enter a seed.** SeedTag defends against some
+attacks by other apps (see the warnings above), but it can't cover every possible one: if the phone is compromised,
+so may be your seed. The app shows this before a seed is entered, and on its About page.
 
 ## License
 

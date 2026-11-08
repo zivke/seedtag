@@ -38,6 +38,10 @@ All notable user-visible changes to SeedTag. The format follows
   tag (NDEF and its size, blank, or read-only), with tips on where the spot
   usually is and what blocks it. Nothing is written to the tag and its
   contents aren't read.
+- A disclaimer before the seed is entered, on the About page and in the
+  README: SeedTag comes without any warranty, its developer isn't responsible
+  for any loss or damage, and users must make sure themselves that the phone
+  has no malware, since the app can't cover every possible attack.
 
 ### Changed
 - The generated passphrase comes with a reminder to label it "SeedTag

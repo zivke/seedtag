@@ -272,6 +272,18 @@ private fun BackupScreen(vm: SeedTagViewModel) {
     }
 }
 
+private const val DISCLAIMER =
+    "SeedTag comes without any warranty, and its developer isn't responsible for any loss or damage from using " +
+        "it, including a lost seed or lost funds. You use it at your own risk.\n\n" +
+        "Before you enter a seed, make sure yourself that there's no malware on this phone. SeedTag defends against " +
+        "some attacks by other apps, but it can't cover every possible one: if the phone is compromised, so may be your seed."
+
+/** Shown before the seed is typed, and on the About page. */
+@Composable
+private fun DisclaimerWarning() {
+    WarningCard("Use at your own risk", DISCLAIMER)
+}
+
 /** Shown at the start of every procedure (Back up, Verify, Restore). */
 @Composable
 private fun ReadCarefullyWarning() {
@@ -286,6 +298,7 @@ private fun ReadCarefullyWarning() {
 private fun LengthStep(vm: SeedTagViewModel) {
     ScreenColumn {
         ReadCarefullyWarning()
+        DisclaimerWarning()
         PrepareTagInfo(writing = true)
         Text("1 · How many words is your recovery phrase?", style = MaterialTheme.typography.titleMedium)
         Text(
@@ -883,6 +896,7 @@ private fun AboutPage() {
                 "entropy. The format is documented and versioned. seedtag.py, a single-file Python tool, encrypts " +
                 "and decrypts the same format on any computer, so a backup doesn't depend on this app.",
         )
+        DisclaimerWarning()
         AboutSection(
             "Licence",
             "Free and open source under the GNU General Public License, version 3 or later: you may use, share and " +
