@@ -71,6 +71,7 @@ import androidx.compose.ui.window.DialogWindowProvider
 import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
+import rs.zivke.seedtag.core.SeedBox
 
 // ============================================================== theme ===
 
@@ -251,7 +252,7 @@ private fun InfoCard(title: String, text: String, modifier: Modifier = Modifier)
 private fun PrepareTagInfo(writing: Boolean) {
     InfoCard(
         "Have your NFC tag ready",
-        (if (writing) "You'll need the tag at the end, after the password. " else "You'll need the tag after typing the password. ") +
+        (if (writing) "You'll need it now, to check it, and again at the end to write the backup. " else "You'll need the tag after typing the password. ") +
             "When the app asks, hold it flat against the back of the phone, over the phone's NFC spot (usually near " +
             "the middle or the top), and keep it still until the app says it's done. A thick or metal case can block it. " +
             "Not sure where the spot is? Tap NFC spot at the top first.",
@@ -303,6 +304,7 @@ private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) {
 @Composable
 private fun BackupScreen(vm: SeedTagViewModel) {
     when (vm.step) {
+        BackupStep.Tag -> TagStep(vm)
         BackupStep.Length -> LengthStep(vm)
         BackupStep.Words -> WordsStep(vm)
         BackupStep.Password -> PasswordStep(vm)
@@ -333,24 +335,97 @@ private fun ReadCarefullyWarning() {
 }
 
 @Composable
-private fun LengthStep(vm: SeedTagViewModel) {
+private fun TagStep(vm: SeedTagViewModel) {
     ScreenColumn {
         ReadCarefullyWarning()
         DisclaimerWarning()
         PrepareTagInfo(writing = true)
-        Text("1 · How many words is your recovery phrase?", style = MaterialTheme.typography.titleMedium)
+        Text("1 · Check the tag", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Before you type anything, hold the tag you'll use to the phone. SeedTag reads it (nothing is written) and " +
+                "tells you whether it works and how long a backup it can hold.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        val check = vm.tagCheck
+        if (check == null) {
+            Button(onClick = vm::scanToCheck, modifier = Modifier.fillMaxWidth()) { Text("Scan tag") }
+        } else {
+            TagCheckCard(check)
+            if (check.usable) {
+                Button(onClick = vm::continueAfterCheck, modifier = Modifier.fillMaxWidth()) { Text("Continue with this tag") }
+            }
+            OutlinedButton(onClick = vm::scanToCheck, modifier = Modifier.fillMaxWidth()) { Text("Check another tag") }
+        }
+    }
+}
+
+/** The result of the first Back up step: can this tag take a backup, and how many words. */
+@Composable
+private fun TagCheckCard(c: TagCheck) {
+    val lines = buildList {
+        when {
+            !c.supported -> add(
+                "✗ SeedTag can't use this tag: it doesn't support NDEF, the standard way of storing data on an NFC tag. " +
+                    "Use another tag (an NTAG215 or NTAG216, for example).",
+            )
+            !c.writable -> add("✗ This tag is read-only: nothing can be written to it. Use another tag.")
+            else -> {
+                add(if (c.ndef) "✓ Read without problems." else "✓ Blank tag. SeedTag formats it when writing, then asks for a second tap to read it back.")
+                c.capacity?.let { add((if (c.tooSmall) "✗ " else "✓ ") + capacityText(it, c.estimated)) }
+                    ?: add("? Its size couldn't be found out. It's checked again when the backup is written.")
+                if (c.tooSmall) add("Use a bigger tag (an NTAG215 or NTAG216, for example).")
+                when (c.content) {
+                    TagContent.Backup -> add("⚠ It already holds a SeedTag backup. Writing a new one replaces it; the app asks first.")
+                    TagContent.Other -> add("⚠ It already holds other data, which the backup would replace; the app asks first.")
+                    TagContent.Empty -> Unit
+                }
+            }
+        }
+    }
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (c.usable) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(if (c.usable) "This tag can be used" else "This tag can't be used", fontWeight = FontWeight.SemiBold)
+            lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        }
+    }
+}
+
+/** How much a tag holds, in words of backup. [estimated]: a blank tag's size, from its chip. */
+private fun capacityText(bytes: Int, estimated: Boolean): String {
+    val size = (if (estimated) "about " else "") + "$bytes bytes"
+    val max = SeedBox.maxWordsFor(bytes)
+    return when (max) {
+        null -> "$size: too small for any backup (12 words need ${SeedBox.ndefBytesFor(12)} bytes)."
+        24 -> "$size: room for a backup of any length (24 words need ${SeedBox.ndefBytesFor(24)} bytes)."
+        else -> "$size: room for a backup of up to $max words (24 words need ${SeedBox.ndefBytesFor(24)} bytes)."
+    }
+}
+
+@Composable
+private fun LengthStep(vm: SeedTagViewModel) {
+    ScreenColumn {
+        Text("2 · How many words is your recovery phrase?", style = MaterialTheme.typography.titleMedium)
         Text(
             "Pick the length written on your backup. The keypad then stops at that many words.",
             style = MaterialTheme.typography.bodySmall,
         )
         Bip39.validWordCounts.sorted().forEach { n ->
-            // Can't pick fewer words than are already entered (after Back from the keypad).
+            // Can't pick fewer words than are already entered (after Back from the keypad), nor more
+            // than the checked tag holds.
+            val fits = vm.fitsTag(n)
             OutlinedButton(
                 onClick = { vm.chooseLength(n) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = n >= vm.words.size,
-            ) { Text("$n words") }
+                enabled = n >= vm.words.size && fits,
+            ) { Text(if (fits) "$n words" else "$n words (too long for this tag)") }
         }
+        vm.tagCheck?.capacity?.let { Text("Tag: " + capacityText(it, vm.tagCheck?.estimated == true), style = MaterialTheme.typography.bodySmall) }
+        TextButton(onClick = vm::checkAnotherTag, modifier = Modifier.fillMaxWidth()) { Text("Use another tag") }
     }
 }
 
@@ -365,7 +440,7 @@ private fun WordsStep(vm: SeedTagViewModel) {
             Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("2 · Enter your ${vm.wordCount} recovery words", style = MaterialTheme.typography.titleMedium)
+            Text("3 · Enter your ${vm.wordCount} recovery words", style = MaterialTheme.typography.titleMedium)
             Text(
                 "Type with the keypad below and tap the matching word. The system keyboard and clipboard are never used.",
                 style = MaterialTheme.typography.bodySmall,
@@ -472,7 +547,7 @@ private fun PasswordStep(vm: SeedTagViewModel) {
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("3 · Choose the encryption password", style = MaterialTheme.typography.titleMedium)
+            Text("4 · Choose the encryption password", style = MaterialTheme.typography.titleMedium)
             WarningCard(
                 "This password is the only thing protecting your seed",
                 "Anyone who finds the tag can try passwords offline, without limit. A generated 7-word passphrase " +
@@ -881,8 +956,9 @@ private fun AntennaPage(vm: SeedTagViewModel) {
                     Text(
                         when {
                             p.ndef && p.writable == false -> "This tag is read-only: SeedTag can read it but not write to it."
-                            p.ndef -> "This tag can hold NDEF data" + (p.ndefSize?.let { " ($it bytes)" } ?: "") + ": SeedTag can use it."
-                            p.formatable -> "This tag is blank: SeedTag will format it on the first write."
+                            p.ndef && p.ndefSize != null -> "NDEF tag, " + capacityText(p.ndefSize, estimated = false)
+                            p.ndef -> "This tag can hold NDEF data: SeedTag can use it."
+                            p.formatable -> "This tag is blank. Back up checks its size first and formats it on the first write."
                             else -> "This isn't an NDEF tag: SeedTag can't use it, but it's fine for finding the spot."
                         },
                         style = MaterialTheme.typography.bodySmall,

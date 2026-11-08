@@ -7,7 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Android app **SeedTag** (`rs.zivke.seedtag`). It stores a password-encrypted
 BIP39 seed phrase on an NFC tag and reads it back:
 
-- **Back up**: the words are entered with the app's own keypad, checked
+- **Back up**: the tag is scanned first (size, read-only, blank, existing
+  data; nothing written), then the words are entered with the app's own keypad, checked
   (wordlist + checksum), turned into raw entropy, encrypted and written to the
   tag as one NDEF Text record. The blob is decrypted once before writing, and
   every write is read back and compared.
@@ -81,7 +82,7 @@ Two Gradle modules plus the Python tool:
     `Dispatchers.Default`. The pending tag operation is an `AtomicReference`
     because the reader callback runs on a binder thread. A failed tag operation
     stays armed so the user can just tap again.
-  - `TagIo.kt`: blocking NFC I/O (write + read-back, read, lock), returns a
+  - `TagIo.kt`: blocking NFC I/O (check, write + read-back, read, lock), returns a
     `TagResult`, never throws.
   - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
 - **`tools/seedtag.py`**: single file, wordlist embedded, `encrypt` /

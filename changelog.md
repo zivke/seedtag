@@ -7,6 +7,13 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- Back up starts by checking the tag, before anything is typed: hold it to the
+  phone and the app says whether it works, whether it's read-only, blank or
+  already holds data (a SeedTag backup or something else), and how long a
+  backup it has room for. Nothing is written. Word counts the tag can't hold
+  are greyed out, and **Use another tag** goes back to the check.
+- **NFC spot** says how long a backup a tag has room for (for example "137
+  bytes: room for a backup of any length"), or that it's too small for any.
 - Verify, Restore and `seedtag.py` forgive the most common typing mistakes:
   if the password is wrong, it's tried again without extra spaces (leading,
   trailing or doubled), then also in lower case. If that's what matched, the
@@ -83,6 +90,12 @@ All notable user-visible changes to SeedTag. The format follows
   `seedtag.apk.sha256` to publish with a release.
 
 ### Fixed
+- A blank tag's size is checked before it's formatted, from its chip's
+  memory (MIFARE Ultralight, Ultralight C, EV1 and AES, NTAG203 and
+  NTAG21x), so a backup that doesn't fit is refused with nothing written. If
+  formatting fails anyway, the error says the tag may be too small.
+- "Tag too small" now says how many bytes the backup needs and the tag has,
+  how many words the tag can hold, and to use a bigger tag.
 - Passwords are no longer kept in memory as text. They live in one buffer
   that the app's keyboard edits in place and that's zeroed after use, so
   typing no longer leaves a copy of the password behind for every key, and

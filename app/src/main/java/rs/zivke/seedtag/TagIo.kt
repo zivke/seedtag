@@ -12,10 +12,14 @@ import android.nfc.tech.MifareUltralight
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 import rs.zivke.seedtag.core.NdefText
+import rs.zivke.seedtag.core.SeedBox
 import java.io.IOException
+import java.util.concurrent.ConcurrentHashMap
 
 /** What the UI wants done with the next tag that touches the phone. */
 sealed interface TagRequest {
+    /** First Back up step: find out whether the tag can take a backup, and how big. Writes nothing. */
+    data object Check : TagRequest
     /** Write [text]; refuses to overwrite a non-empty tag unless [allowOverwrite]. */
     data class Write(val text: String, val allowOverwrite: Boolean = false) : TagRequest
     /** Read the tag back and compare with [expected] (second tap after formatting a blank tag). */
@@ -25,7 +29,29 @@ sealed interface TagRequest {
     data class Lock(val expected: String) : TagRequest
 }
 
+enum class TagContent { Empty, Backup, Other }
+
+/**
+ * What the first Back up step found. [supported]: the tag can hold NDEF at all. [ndef]: it's
+ * NDEF-formatted; if not, it's blank and gets formatted on the first write. [capacity]: bytes
+ * for the NDEF message, null if unknown; for a blank tag it's [estimated] from the chip's memory.
+ */
+data class TagCheck(
+    val supported: Boolean,
+    val ndef: Boolean,
+    val capacity: Int?,
+    val estimated: Boolean = false,
+    val writable: Boolean = true,
+    val content: TagContent = TagContent.Empty,
+) {
+    /** Longest backup that fits, null if none does or the size is unknown. */
+    val maxWords: Int? get() = capacity?.let(SeedBox::maxWordsFor)
+    val tooSmall: Boolean get() = capacity != null && maxWords == null
+    val usable: Boolean get() = supported && writable && !tooSmall
+}
+
 sealed interface TagResult {
+    data class Checked(val check: TagCheck) : TagResult
     /** [text] was written and read back. */
     data class Written(val text: String) : TagResult
     /** A blank tag was formatted with [text], but couldn't be read back on the same tap. */
@@ -44,6 +70,7 @@ object TagIo {
 
     fun perform(tag: Tag, request: TagRequest): TagResult = try {
         when (request) {
+            TagRequest.Check -> check(tag)
             is TagRequest.Write -> write(tag, request)
             is TagRequest.CheckWritten -> checkWritten(tag, request.expected)
             TagRequest.Read -> read(tag)
@@ -69,7 +96,19 @@ object TagIo {
                 ?: return TagResult.Failed("This tag doesn't support NDEF.")
             // Never format a tag that may already hold a backup.
             if (looksNdefFormatted(tag)) return TagResult.Failed(NOT_READ)
-            formatable.use { it.connect(); it.format(message) }
+            val needed = message.byteArrayLength
+            val capacity = blankCapacity(tag)
+            if (capacity != null && needed > capacity) return TagResult.Failed(tooSmall(req.text, needed, capacity, estimated = true))
+            try {
+                formatable.use { it.connect(); it.format(message) }
+            } catch (e: TagLostException) {
+                throw e
+            } catch (e: IOException) {
+                return TagResult.Failed(
+                    "Couldn't format this blank tag. Hold it still and tap again. If it keeps failing, the tag may be too " +
+                        "small (this backup needs $needed bytes) or not writable.",
+                )
+            }
             // This Tag object only knows the techs it had when discovered, so Ndef.get()
             // stays null after formatting: the read-back has to wait for the next tap.
             return TagResult.WrittenUnchecked(req.text)
@@ -78,7 +117,7 @@ object TagIo {
             it.connect()
             if (!it.isWritable) return TagResult.Failed("This tag is read-only.")
             if (message.byteArrayLength > it.maxSize) {
-                return TagResult.Failed("Tag too small: needs ${message.byteArrayLength} bytes, has ${it.maxSize}.")
+                return TagResult.Failed(tooSmall(req.text, message.byteArrayLength, it.maxSize, estimated = false))
             }
             if (!req.allowOverwrite) {
                 // Overwriting without asking is only OK if every read says the tag is empty.
@@ -95,6 +134,37 @@ object TagIo {
             if (firstText(back) != req.text) return TagResult.Failed("Read-back mismatch after writing. The tag may be faulty – don't use it.")
             return TagResult.Written(req.text)
         }
+    }
+
+    private fun check(tag: Tag): TagResult {
+        val ndef = Ndef.get(tag)
+        if (ndef != null) {
+            ndef.use {
+                it.connect()
+                val msg = readMessage(it)
+                val content = when {
+                    msg == null || msg.records.all { r -> r.tnf == NdefRecord.TNF_EMPTY } -> TagContent.Empty
+                    looksLikeBackup(runCatching { firstText(msg) }.getOrNull()) -> TagContent.Backup
+                    else -> TagContent.Other
+                }
+                return TagResult.Checked(TagCheck(true, ndef = true, capacity = it.maxSize, writable = it.isWritable, content = content))
+            }
+        }
+        if (NdefFormatable.get(tag) == null) return TagResult.Checked(TagCheck(supported = false, ndef = false, capacity = null))
+        if (looksNdefFormatted(tag)) return TagResult.Failed(NOT_READ)
+        val capacity = blankCapacity(tag)
+        return TagResult.Checked(TagCheck(true, ndef = false, capacity = capacity, estimated = capacity != null))
+    }
+
+    /** A SeedTag blob: Base64 that starts with a known version byte. */
+    fun looksLikeBackup(text: String?): Boolean =
+        text != null && runCatching { SeedBox.fromBase64(text) }.getOrNull()?.let { it.isNotEmpty() && it[0].toInt() == SeedBox.VERSION } == true
+
+    private fun tooSmall(text: String, needed: Int, has: Int, estimated: Boolean): String {
+        val words = (runCatching { SeedBox.fromBase64(text).size }.getOrDefault(0) - SeedBox.OVERHEAD) * 3 / 4
+        val fits = SeedBox.maxWordsFor(has)?.let { "It can hold a backup of up to $it words." } ?: "It's too small for any backup."
+        return "This tag is too small: the $words-word backup needs $needed bytes, and the tag has ${if (estimated) "about " else ""}" +
+            "$has. $fits Nothing was written. Cancel and use a bigger tag (an NTAG215 or NTAG216, for example), or hold another tag."
     }
 
     private fun checkWritten(tag: Tag, expected: String): TagResult {
@@ -155,6 +225,59 @@ object TagIo {
             it.connect()
             return (it.readPages(3)[0].toInt() and 0xFF) == 0xE1
         }
+    }
+
+    /** UIDs (not secret) of blank tags that didn't answer the size probe: they're formatted without one. */
+    private val unprobeable: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /** Memory a Type 2 chip has for data, by the page count that READ wraps around at. */
+    private val DATA_BYTES = mapOf(
+        16 to 48, // MIFARE Ultralight
+        20 to 48, // NTAG210, Ultralight EV1 MF0UL11
+        41 to 128, // NTAG212, Ultralight EV1 MF0UL21
+        42 to 144, // NTAG203
+        44 to 144, // Ultralight C (READ goes up to 2Bh)
+        45 to 144, // NTAG213
+        60 to 144, // Ultralight AES
+        135 to 504, // NTAG215
+        231 to 888, // NTAG216
+    )
+
+    /**
+     * NDEF bytes a blank Type 2 tag will have once formatted, or null if unknown. A blank tag has no
+     * capability container to say, so the size comes from where READ wraps back to page 0, probed
+     * from small to large so that a known chip is never asked for a page it doesn't have. 7 bytes
+     * are kept for the TLVs, as on a formatted tag (137 of the Ultralight C's 144). An unknown chip
+     * may refuse a probe, which ends the session: it's remembered and not probed again.
+     */
+    private fun blankCapacity(tag: Tag): Int? {
+        val ul = MifareUltralight.get(tag) ?: return null
+        val uid = tag.id.joinToString("") { "%02x".format(it) }
+        if (uid in unprobeable) return null
+        return try {
+            ul.use {
+                it.connect()
+                val pages = wrapPage(it)
+                if (pages == null) unprobeable += uid
+                pages?.let(DATA_BYTES::get)?.minus(7)
+            }
+        } catch (e: TagLostException) {
+            throw e
+        } catch (e: IOException) {
+            unprobeable += uid
+            null
+        }
+    }
+
+    private fun wrapPage(ul: MifareUltralight): Int? {
+        val head = ul.readPages(0)
+        if (head.size != 16) return null
+        for (p in intArrayOf(0x0D, 0x11, 0x27, 0x2A, 0x39, 0x84, 0xE4)) {
+            val r = ul.readPages(p)
+            if (r.size != 16) return null
+            for (k in 1..3) if ((0 until 4).all { r[4 * k + it] == head[it] }) return p + k
+        }
+        return null
     }
 
     private fun firstText(msg: NdefMessage?): String? =

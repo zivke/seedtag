@@ -105,12 +105,15 @@ tag, can't be undone.
 **Have the NFC tag ready before you start.** When the app asks for it, hold the tag flat against the back of the
 phone, over its NFC spot (usually near the middle or the top), and keep it still until the app says it's done.
 A thick or metal case can block it. Not sure where the spot is? **NFC spot** in the top bar opens a finder: slide a tag
-or any contactless card over the back of the phone until it vibrates and says *Tag detected*. It doesn't write to the
-tag or read its contents. The phone vibrates when the tag has been handled: a short confirmation when it
+or any contactless card over the back of the phone until it vibrates and says *Tag detected*, and for an NDEF tag
+how long a backup it has room for. It doesn't write to the tag or read its contents. The phone vibrates when the tag has been handled: a short confirmation when it
 worked, a "rejected" buzz when something went wrong (it follows the phone's touch-feedback setting).
 
-1. **Back up**: choose how many words your phrase has (12, 15, 18, 21 or 24), enter them with the in-app keypad
-   (tap a suggestion to accept each word), then set a password.
+1. **Back up**: first hold the tag you'll use to the phone. The app checks it (nothing is written): whether it
+   works, whether it's read-only, blank or already holds data, and how long a backup it has room for. A 24-word
+   backup needs 111 bytes of NDEF space, 12 words need 91. Then choose how many words your phrase has (12, 15, 18,
+   21 or 24; lengths the tag can't hold are greyed out), enter them with the in-app keypad (tap a suggestion to
+   accept each word), then set a password.
    Words already entered are hidden by default; turn off **Hide entered words** to check them.
    **Generate 7-word passphrase** is recommended (≈77 bits). Write it down and label it *SeedTag password*: it's made of
    the same BIP39 words as a seed phrase, so an unlabelled copy is easy to mistake for one, by you or by your heirs. Tap
@@ -142,7 +145,9 @@ encryption used and the licence.
 ## Choosing a tag
 
 Any tag Android can read and write as NDEF works. The app uses the generic NDEF API and listens for NFC-A, -B, -F
-and -V, and every write checks the size first. Tested hardware: MIFARE Ultralight C.
+and -V. Back up checks the tag's size before anything is typed, and every write checks it again. A blank (not yet
+NDEF-formatted) Type 2 tag has no size on it, so the app works it out from the chip's memory for MIFARE Ultralight,
+Ultralight C, EV1 and AES, NTAG203 and NTAG21x; for any other blank tag the size is only known once it's formatted. Tested hardware: MIFARE Ultralight C.
 
 **Space needed** (whole NDEF area, including the 3-byte TLV wrapper):
 

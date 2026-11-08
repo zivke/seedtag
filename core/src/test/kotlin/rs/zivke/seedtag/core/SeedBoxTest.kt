@@ -85,6 +85,22 @@ class SeedBoxTest {
     }
 
     @Test
+    fun backupSizes() {
+        for (v in vectors) {
+            val words = v.entropy.size * 3 / 4
+            assertEquals(NdefText.messageSize(v.b64), SeedBox.ndefBytesFor(words))
+        }
+        assertEquals(91, SeedBox.ndefBytesFor(12))
+        assertEquals(111, SeedBox.ndefBytesFor(24))
+        assertEquals(24, SeedBox.maxWordsFor(137))
+        assertEquals(24, SeedBox.maxWordsFor(111))
+        assertEquals(21, SeedBox.maxWordsFor(110))
+        assertEquals(12, SeedBox.maxWordsFor(91))
+        assertEquals(null, SeedBox.maxWordsFor(90))
+        assertEquals(null, SeedBox.maxWordsFor(46))
+    }
+
+    @Test
     fun ndefTextRoundTrip() {
         val t = vectors.first().b64
         assertEquals(t, NdefText.decodePayload(NdefText.encodePayload(t)))

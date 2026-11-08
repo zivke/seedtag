@@ -33,7 +33,8 @@ enum class Page(val title: String, val button: String) { Antenna("Find NFC spot"
 
 /** What the NFC-spot finder saw, from the tag's discovery info only: nothing is read from its memory. */
 data class ProbeResult(val count: Int, val ndef: Boolean, val formatable: Boolean, val ndefSize: Int?, val writable: Boolean?)
-enum class BackupStep { Length, Words, Password, Done }
+/** [Tag]: scan the tag first, to see whether it can take a backup, and how many words. */
+enum class BackupStep { Tag, Length, Words, Password, Done }
 /** The three password fields: the new password and its repeat (Back up), and Verify / Restore. */
 enum class PwField { Password, Repeat, Read }
 
@@ -69,7 +70,7 @@ sealed interface Dialog {
 /** Vibration for things that happen without a tap: a tag was handled, something succeeded or failed. */
 enum class Haptic { Tick, Success, Failure }
 
-private enum class Purpose { BackupWrite, Verify, Restore, Lock }
+private enum class Purpose { Check, BackupWrite, Verify, Restore, Lock }
 /** [id] tells a result for the current scan from one that arrives after Cancel or a new scan. */
 private data class Pending(val request: TagRequest, val purpose: Purpose, val id: Long)
 
@@ -85,7 +86,10 @@ class SeedTagViewModel : ViewModel() {
         private set
     /** Mask the words already entered (on by default, back on after wipeAll). */
     var hideWords by mutableStateOf(true)
-    var step by mutableStateOf(BackupStep.Length)
+    var step by mutableStateOf(BackupStep.Tag)
+        private set
+    /** What the first step found out about the tag (nothing secret). Kept until Back up starts over. */
+    var tagCheck by mutableStateOf<TagCheck?>(null)
         private set
     /** Number of words chosen before typing; one of Bip39.validWordCounts. */
     var wordCount by mutableStateOf(24)
@@ -218,8 +222,25 @@ class SeedTagViewModel : ViewModel() {
 
     fun clearWords() { words.clear(); prefix = "" }
 
+    /** Word counts the checked tag has room for (all of them if its size is unknown). */
+    fun fitsTag(n: Int): Boolean = tagCheck?.maxWords?.let { n <= it } ?: true
+
+    fun scanToCheck() {
+        tagCheck = null
+        arm(TagRequest.Check, Purpose.Check, "Hold the tag you'll use to the back of the phone")
+    }
+
+    fun continueAfterCheck() {
+        if (tagCheck?.usable == true) step = BackupStep.Length
+    }
+
+    /** "Check another tag" / "Change tag": back to the first step. */
+    fun checkAnotherTag() {
+        tagCheck = null; prefix = ""; step = BackupStep.Tag
+    }
+
     fun chooseLength(n: Int) {
-        if (n !in Bip39.validWordCounts || n < words.size) return
+        if (n !in Bip39.validWordCounts || n < words.size || !fitsTag(n)) return
         wordCount = n; step = BackupStep.Words
     }
 
@@ -292,7 +313,7 @@ class SeedTagViewModel : ViewModel() {
                 val (text, fp) = sealed
                 backupFingerprint = fp
                 pendingText = text
-                arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the tag to the back of the phone to write")
+                arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write")
             } catch (e: SeedTagException) {
                 showError(e.message ?: "Encryption failed.")
             } finally {
@@ -345,7 +366,7 @@ class SeedTagViewModel : ViewModel() {
     }
 
     fun startOver() {
-        wipeBackup(); step = BackupStep.Length; backupFingerprint = null; lockTarget = null
+        wipeBackup(); step = BackupStep.Tag; tagCheck = null; backupFingerprint = null; lockTarget = null
     }
 
     // ================================================================= NFC ===
@@ -384,6 +405,12 @@ class SeedTagViewModel : ViewModel() {
         // that only ask for more input. Writes and locks did happen, so those are still shown.
         val stale = p.id != scanId
         when (r) {
+            is TagResult.Checked -> {
+                if (stale) return
+                scanPrompt = null
+                tagCheck = r.check
+                _haptics.tryEmit(if (r.check.usable) Haptic.Success else Haptic.Failure)
+            }
             is TagResult.Failed -> {
                 if (stale) return
                 _haptics.tryEmit(Haptic.Failure)
@@ -395,8 +422,7 @@ class SeedTagViewModel : ViewModel() {
                 if (stale) return
                 scanPrompt = null
                 _haptics.tryEmit(Haptic.Failure)
-                val looksLike = r.existing?.let { runCatching { SeedBox.fromBase64(it).let { b -> b.isNotEmpty() && b[0].toInt() == SeedBox.VERSION } }.getOrNull() } == true
-                dialog = Dialog.ConfirmOverwrite(looksLike)
+                dialog = Dialog.ConfirmOverwrite(TagIo.looksLikeBackup(r.existing))
             }
             is TagResult.WrittenUnchecked -> {
                 _haptics.tryEmit(Haptic.Tick)
@@ -462,7 +488,7 @@ class SeedTagViewModel : ViewModel() {
     fun wipeAll() {
         wipes++
         cancelScan()
-        if (step != BackupStep.Done) step = BackupStep.Length
+        if (step != BackupStep.Done && step != BackupStep.Tag) step = BackupStep.Length
         wipeBackup()
         clearPasswords(PwField.Read); restoredWords = null
         if (dialog is Dialog.ConfirmOverwrite || dialog is Dialog.ConfirmWeakPassword) dialog = null

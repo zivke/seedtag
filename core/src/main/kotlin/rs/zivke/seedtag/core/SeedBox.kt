@@ -186,6 +186,16 @@ object SeedBox {
         return out
     }
 
+    /** Bytes the NDEF message of a [words]-word backup takes on a tag (91 for 12 words, 111 for 24). */
+    fun ndefBytesFor(words: Int): Int {
+        require(words in Bip39.validWordCounts) { "bad word count $words" }
+        val blob = OVERHEAD + words * 4 / 3
+        return NdefText.messageSize("A".repeat(4 * ((blob + 2) / 3)))
+    }
+
+    /** The longest backup (in words) that fits [capacity] NDEF bytes, or null if not even 12 words do. */
+    fun maxWordsFor(capacity: Int): Int? = Bip39.validWordCounts.filter { ndefBytesFor(it) <= capacity }.maxOrNull()
+
     fun toBase64(blob: ByteArray): String = Base64.getEncoder().encodeToString(blob)
 
     /** Accepts Base64 with arbitrary whitespace. */
