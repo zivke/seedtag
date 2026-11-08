@@ -19,6 +19,12 @@ All notable user-visible changes to SeedTag. The format follows
   copy is easy to mistake for one.
 - README: what the fingerprint does and doesn't reveal, and not to keep it
   next to a partly readable copy of the seed.
+- Warnings stand out from the rest of the screen: a red card with a red
+  border, ⚠ and a bold title (the password warning, seed words in the
+  password, private-only Restore, "not finished yet" after a backup, another
+  app covering SeedTag). Dialogs that confirm something risky or permanent
+  (overwrite, weak password, lock) and error messages have a ⚠ icon and a red
+  title.
 
 ### Fixed
 - Passwords are no longer kept in memory as text. They live in one buffer

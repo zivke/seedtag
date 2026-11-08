@@ -4,6 +4,7 @@
 package rs.zivke.seedtag
 
 import android.os.Build
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -131,17 +132,49 @@ private fun NfcBanner(state: NfcState, openNfcSettings: () -> Unit) {
 
 @Composable
 private fun OverlayBanner() {
+    WarningCard(
+        "Another app is covering SeedTag",
+        "Your taps are ignored while it does. Close it, or turn off apps such as screen dimmers or chat bubbles, " +
+            "then tap again. If you don't know which app it is, don't enter your seed.",
+        Modifier.padding(12.dp),
+    )
+}
+
+/**
+ * Every warning looks the same, and unlike anything else on screen: red card, red border, ⚠ and a
+ * bold title, so it isn't skimmed over like the explanatory text around it.
+ */
+@Composable
+private fun WarningCard(title: String, text: String, modifier: Modifier = Modifier) {
     Card(
-        Modifier.fillMaxWidth().padding(12.dp),
+        modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+        border = BorderStroke(2.dp, MaterialTheme.colorScheme.error),
     ) {
-        Text(
-            "Another app is drawing over SeedTag, so your taps are ignored. Close it, or turn off apps such as " +
-                "screen dimmers or chat bubbles, then tap again. If you don't know which app it is, don't enter your seed.",
-            Modifier.padding(12.dp),
-            color = MaterialTheme.colorScheme.onErrorContainer,
-        )
+        Row(Modifier.padding(12.dp)) {
+            Text("⚠", fontSize = 24.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(end = 12.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onErrorContainer,
+                )
+                Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+            }
+        }
     }
+}
+
+/** Icon and title for dialogs that confirm something risky or permanent. */
+@Composable
+private fun WarningIcon() {
+    Text("⚠", fontSize = 32.sp, color = MaterialTheme.colorScheme.error)
+}
+
+@Composable
+private fun WarningTitle(text: String) {
+    Text(text, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
 }
 
 /**
@@ -315,11 +348,10 @@ private fun PasswordStep(vm: SeedTagViewModel) {
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("3 · Choose the encryption password", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Anyone who finds the tag can try passwords offline, so this password is the only thing protecting your seed. " +
-                    "A generated 7-word passphrase (≈77 bits) is strongly recommended. Write it down, label it \"SeedTag password\" " +
-                    "and store it apart from the tag.",
-                style = MaterialTheme.typography.bodySmall,
+            WarningCard(
+                "This password is the only thing protecting your seed",
+                "Anyone who finds the tag can try passwords offline, without limit. A generated 7-word passphrase " +
+                    "(≈77 bits) is strongly recommended. Write it down, label it \"SeedTag password\" and store it apart from the tag.",
             )
             OutlinedButton(onClick = vm::generatePassphrase, modifier = Modifier.fillMaxWidth()) {
                 Text("Generate 7-word passphrase")
@@ -351,17 +383,16 @@ private fun PasswordStep(vm: SeedTagViewModel) {
                     bits < 70 -> "Fair (≈$bits bits) – consider a longer passphrase." to Color(0xFFC77700)
                     else -> "Strong (≈$bits bits)" to MaterialTheme.colorScheme.primary
                 }
-                Text(msg, color = color, style = MaterialTheme.typography.bodySmall)
+                Text(msg, color = color, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 if (vm.passwordSharesSeedWords) {
-                    Text(
-                        "Uses words from your seed phrase: anyone who sees the password learns part of the seed.",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
+                    WarningCard(
+                        "The password uses words from your seed",
+                        "Anyone who sees the password learns part of the seed. Choose different words.",
                     )
                 }
             }
             if (vm.passwordLength(PwField.Repeat) > 0 && !vm.passwordsMatch) {
-                Text("Passwords don't match", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                Text("Passwords don't match", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
             }
         }
 
@@ -390,6 +421,11 @@ private fun DoneStep(vm: SeedTagViewModel) {
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+        WarningCard(
+            "Not finished yet",
+            "Verify the tag with the password from your written copy before you rely on it or lock it. Keep another " +
+                "copy of the seed somewhere else: NFC chips can fail.",
+        )
         Text("Next steps", style = MaterialTheme.typography.titleSmall)
         Text(
             "1. Go to Verify and decrypt the tag by typing the password from your written copy.\n" +
@@ -433,9 +469,10 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
                 style = MaterialTheme.typography.titleMedium,
             )
             if (reveal) {
-                Text(
-                    "Only do this in private. The words are hidden again as soon as you leave the app.",
-                    style = MaterialTheme.typography.bodySmall,
+                WarningCard(
+                    "Only do this in private",
+                    "The words will be on screen. Make sure nobody, and no camera, can see it. They're hidden again as " +
+                        "soon as you leave the app.",
                 )
             }
             SecretDisplay("Password", vm, PwField.Read, revealDefault = false, active = typing) { typing = true }
@@ -670,7 +707,8 @@ private fun Dialogs(vm: SeedTagViewModel) {
         null -> Unit
         is Dialog.Error -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
-            title = { Text("Error") },
+            icon = { WarningIcon() },
+            title = { WarningTitle("Error") },
             text = { Text(d.message) },
             confirmButton = { TextButton(onClick = { vm.dialog = null }) { Text("OK") } },
         )
@@ -682,7 +720,8 @@ private fun Dialogs(vm: SeedTagViewModel) {
         )
         is Dialog.ConfirmOverwrite -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
-            title = { Text("Tag is not empty") },
+            icon = { WarningIcon() },
+            title = { WarningTitle("Tag is not empty") },
             text = {
                 GuardDialogWindow()
                 Text(
@@ -697,7 +736,8 @@ private fun Dialogs(vm: SeedTagViewModel) {
         )
         is Dialog.ConfirmWeakPassword -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
-            title = { Text("Weak password") },
+            icon = { WarningIcon() },
+            title = { WarningTitle("Weak password") },
             text = {
                 GuardDialogWindow()
                 val parts = buildList {
@@ -721,7 +761,8 @@ private fun Dialogs(vm: SeedTagViewModel) {
         )
         Dialog.ConfirmLock -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
-            title = { Text("Make tag read-only?") },
+            icon = { WarningIcon() },
+            title = { WarningTitle("Make tag read-only?") },
             text = {
                 GuardDialogWindow()
                 Text(
