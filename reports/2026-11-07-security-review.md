@@ -19,7 +19,7 @@ signing key living in a dev container that an AI agent can run commands in.
 | 4 | A revealed password can be copied to the clipboard | **Fixed** in `51afe6a` (no text fields left) |
 | 5 | Accessibility services can read the screen | **Fixed**: Android 14+ hides the app's windows from services that aren't accessibility tools (`setAccessibilityDataSensitive`); every version shows a banner naming installed apps with accessibility access. Documented in the README. |
 | 6 | No decrypt check before writing | **Fixed** in `9d90fc0` |
-| 7 | Build supply chain unverified | Open |
+| 7 | Build supply chain unverified | **Fixed**: Gradle dependency verification (cross-checked against the repositories), pinned Gradle distribution and wrapper jar, base image pinned by digest, command-line tools zip checked, release APK SHA-256 published by `sign-release.sh`. Claude Code's `curl \| bash` installer is left as is (not part of the app; the release key is no longer in the container). |
 | 8 | Task hijacking and overlays | **Fixed**: task affinity in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`. Android 8–11 can't hide overlays; the README warns. |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
 | 10 | Secret copies that aren't zeroed | **Fixed** for passwords (zeroable in-place buffer, no `String`s; branch `fix/zeroable-secrets`); the AES key copies are **documented** in the README and kept on purpose (platform AES is hardware-accelerated and constant-time) |
@@ -115,7 +115,7 @@ signing key living in a dev container that an AI agent can run commands in.
 - **Fix:** before writing, decrypt the blob with a second, independent key derivation. It costs one more
   Argon2 run, a few seconds.
 
-### 7. Build supply chain is unverified
+### 7. Build supply chain is unverified — *fixed*
 
 - **The gaps:**
   - No Gradle dependency verification (`gradle/verification-metadata.xml`).
@@ -202,7 +202,7 @@ doesn't stop someone locking the owner out of the tag.
 
 1. ~~Move release signing out of the container (#1).~~ Done.
 2. ~~Small fixes on `main`: #2, #6, #8.~~ Done.
-3. #5 needs device testing (the risk is already documented in the README).
+3. ~~#5 needs device testing (the risk is already documented in the README).~~ Done.
 4. #11: first the read-back check and the README correction, then the proper lock or write key on a
    separate branch, tested with spare tags.
-5. #7 is build work. It adds no new dependencies to the app, but it changes the devcontainer.
+5. ~~#7 is build work. It adds no new dependencies to the app, but it changes the devcontainer.~~ Done.

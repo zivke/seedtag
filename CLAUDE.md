@@ -41,7 +41,7 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   overlay hiding; no access to anything).
 - `tools/sign-release.sh <keystore>` runs outside the container: signs
   `seedtag-unsigned.apk` into `seedtag.apk` and refuses any certificate but the
-  one in `tools/release-cert.sha256`. `make install` / `make run` install that
+  one in `tools/release-cert.sha256`; it also writes `seedtag.apk.sha256`. `make install` / `make run` install that
   signed `seedtag.apk`; they never build or sign.
 - `make connect DEVICE_IP=… [ADB_PORT=…]`, `make run-test` / `make run-debug`,
   `make logcat`, `make stop`, `make uninstall`, `make clean`, `make check` (+ lint).
@@ -131,6 +131,11 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   alone is `0BSD`, so recovery is never in legal doubt: keep it that way. Every source file starts
   with an `SPDX-License-Identifier` line and `Copyright (C) 2026 zivke85`; add them to new files.
 - No new dependencies without asking. Bouncy Castle is the only crypto library.
+- Every download is pinned: the wrapper jar (`gradle-wrapper.jar.sha256`, checked by `make`), the
+  Gradle distribution (`distributionSha256Sum`), every dependency (`gradle/verification-metadata.xml`),
+  and in the Dockerfile the base image digest and the command-line tools SHA-256. After changing a
+  dependency, run `make deps-metadata` (records and cross-checks the checksums) and commit the XML.
+  Never hand-edit checksums or turn verification off to get a build through.
 - Four-space indent for Kotlin, XML, shell and Python (`.editorconfig`).
 - For any user-visible change: add an entry under `## [Unreleased]` in
   `changelog.md` (Keep a Changelog) and update `README.md` if behaviour or

@@ -23,8 +23,14 @@ with `platform-tools` (adb), `platforms;android-35` and `build-tools;34.0.0`.
 The versions are `ARG`s at the top of the Dockerfile. Building the image
 accepts the Android SDK licence agreements (`sdkmanager --licenses`).
 
+The base image is pinned by digest and the command-line tools zip by its
+SHA-256 (from the download table on developer.android.com/studio). When
+changing either, update the digest or checksum next to it; the Dockerfile says
+how to look up the digest.
+
 Gradle itself is not in the image: `./gradlew` downloads the version pinned in
-`gradle/wrapper/gradle-wrapper.properties` into the `gradle-cache` volume.
+`gradle/wrapper/gradle-wrapper.properties` into the `gradle-cache` volume, and
+checks it against `distributionSha256Sum` there.
 post-create warms it up once.
 
 There is no emulator. The app needs real NFC hardware and a tag, and the

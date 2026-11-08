@@ -75,6 +75,27 @@ Two caveats:
 
 Keep a backup of the key: without it no update can ever be installed over the app.
 
+When you publish a release, publish `seedtag.apk.sha256` (written by `sign-release.sh`) and the certificate digest
+above with it, so others can check what they downloaded.
+
+### Build integrity
+
+Everything the build downloads is checked against a pinned checksum, so a tampered download fails the build:
+
+- **Gradle:** `make` checks the wrapper jar against `gradle/wrapper/gradle-wrapper.jar.sha256` (the official
+  Gradle 8.14 wrapper) before every Gradle run; the wrapper checks the Gradle download against
+  `distributionSha256Sum`.
+- **Dependencies:** Gradle checks every library and plugin file against `gradle/verification-metadata.xml`.
+  After adding or updating a dependency, run `make deps-metadata`: it records the new checksums and then
+  cross-checks all of them against what Maven Central, Google's Maven repository and the Gradle Plugin Portal
+  publish (`tools/check-deps.py`, also `make check-deps`), so a bad download isn't simply trusted. Review the
+  diff of the XML before committing it.
+- **Dev container:** the base image is pinned by digest, and the Android command-line tools zip is checked against
+  the SHA-256 Google publishes; `sdkmanager` checks the SDK packages itself.
+
+Not pinned: Claude Code's installer (`curl | bash` from claude.ai in `post-create.sh`) and Ubuntu's packages
+(signed by Ubuntu's apt keys). Neither is part of the app, and the release key isn't in the container.
+
 ## Using it
 
 **Read every instruction on screen carefully before you tap.** Some steps, such as overwriting or locking a

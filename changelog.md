@@ -75,6 +75,12 @@ All notable user-visible changes to SeedTag. The format follows
   certificate but the release one. `make build-test` signs the release build
   with the debug key for testing, and every build prints the APK's SHA-256.
   The README has the steps and the release certificate's SHA-256.
+- Building: every download is now checked against a pinned checksum: the
+  Gradle wrapper and distribution, every dependency (Gradle dependency
+  verification, cross-checked against the repositories with `make deps-
+  metadata`), and in the dev container the base image (by digest) and the
+  Android command-line tools. `tools/sign-release.sh` also writes
+  `seedtag.apk.sha256` to publish with a release.
 
 ### Fixed
 - Passwords are no longer kept in memory as text. They live in one buffer

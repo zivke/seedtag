@@ -6,7 +6,8 @@
 #
 #   tools/sign-release.sh <keystore> [key alias]
 #
-# Reads seedtag-unsigned.apk (from `make build`), writes seedtag.apk. apksigner asks for the
+# Reads seedtag-unsigned.apk (from `make build`), writes seedtag.apk and its checksum in
+# seedtag.apk.sha256. apksigner asks for the
 # keystore password. The result must be signed with the certificate whose SHA-256 is in
 # tools/release-cert.sha256, or it's deleted. Needs the Android build-tools (apksigner, aapt2),
 # from ANDROID_HOME or on PATH.
@@ -48,4 +49,5 @@ if [ "$actual" != "$expected" ]; then
     exit 1
 fi
 "$HERE/check-apk.sh" "$OUT"
-echo ">> $OUT is signed with the release key."
+sha256sum "$OUT" > "$OUT.sha256"
+echo ">> $OUT is signed with the release key. Publish $OUT.sha256 and the certificate digest with it."

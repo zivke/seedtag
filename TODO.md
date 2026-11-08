@@ -8,7 +8,7 @@
   project its own volume.
 - [x] **#5 (Medium): block accessibility services on Android 14+.** `setAccessibilityDataSensitive(YES)`
   on the window and dialogs, plus a banner naming apps with accessibility access on every version.
-- [ ] **#7 (Medium): verify the build supply chain.**
+- [x] **#7 (Medium): verify the build supply chain.**
   - Add Gradle dependency verification and `distributionSha256Sum`.
   - Pin the Docker image digest and checksum the Android tools zip.
   - Publish each release APK's SHA-256.

@@ -25,11 +25,17 @@ GRADLE    := ./gradlew --console=plain
 OUT       := app/build/outputs/apk
 
 .DEFAULT_GOAL := build
-.PHONY: build build-test debug test test-core test-py check connect install install-test \
-        install-debug run run-test run-debug stop uninstall logcat clean help
+.PHONY: build build-test debug test test-core test-py check deps-metadata check-deps wrapper-check \
+        connect install install-test install-debug run run-test run-debug stop uninstall logcat clean help
+
+# Every Gradle run first checks the wrapper jar against its pinned SHA-256 (the official
+# Gradle 8.14 wrapper); the wrapper then checks the Gradle download (distributionSha256Sum)
+# and Gradle checks every dependency (gradle/verification-metadata.xml).
+wrapper-check:
+	@sha256sum --quiet -c gradle/wrapper/gradle-wrapper.jar.sha256
 
 ## build: unsigned release seedtag-unsigned.apk (R8 on); sign it outside the container with tools/sign-release.sh
-build:
+build: wrapper-check
 	$(GRADLE) :app:assembleRelease
 	cp $(OUT)/release/app-release-unsigned.apk $(UNSIGNED_APK)
 	tools/check-apk.sh --unsigned $(UNSIGNED_APK)
@@ -43,7 +49,7 @@ build-test: build
 	tools/check-apk.sh $(TEST_APK)
 
 ## debug: seedtag-debug.apk signed with the debug key
-debug:
+debug: wrapper-check
 	$(GRADLE) :app:assembleDebug
 	cp $(OUT)/debug/app-debug.apk $(DEBUG_APK)
 	tools/check-apk.sh $(DEBUG_APK)
@@ -52,7 +58,7 @@ debug:
 test: test-core test-py
 
 ## test-core: BIP39 + SeedBox unit tests (:core, plain JVM)
-test-core:
+test-core: wrapper-check
 	$(GRADLE) :core:test
 
 ## test-py: seedtag.py against the Trezor and SeedTag v1 vectors
@@ -62,6 +68,15 @@ test-py:
 ## check: tests, plus lint on the app
 check: test
 	$(GRADLE) :app:lintDebug
+
+## deps-metadata: after changing a dependency, re-record every dependency's SHA-256, then cross-check it
+deps-metadata: wrapper-check
+	$(GRADLE) --write-verification-metadata sha256 help :core:test :app:assembleDebug :app:assembleRelease :app:lintDebug
+	python3 tools/check-deps.py
+
+## check-deps: cross-check gradle/verification-metadata.xml against the repositories (needs network)
+check-deps:
+	python3 tools/check-deps.py
 
 ## connect: attach to the device over the network (make connect DEVICE_IP=192.168.1.50)
 connect:
@@ -112,9 +127,9 @@ logcat:
 	$(ADB) logcat --pid=$$pid
 
 ## clean: remove build output
-clean:
+clean: wrapper-check
 	$(GRADLE) clean
-	rm -f $(APK) $(UNSIGNED_APK) $(TEST_APK) $(DEBUG_APK)
+	rm -f $(APK) $(APK).sha256 $(UNSIGNED_APK) $(TEST_APK) $(DEBUG_APK)
 
 ## help: list targets
 help:

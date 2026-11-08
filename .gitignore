@@ -3,6 +3,7 @@ build/
 .gradle/
 .kotlin/
 *.apk
+*.apk.sha256
 *.aab
 
 # Signing keys: never commit these
