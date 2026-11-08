@@ -512,13 +512,20 @@ private fun LockButton(vm: SeedTagViewModel) {
 
 // ===================================================== verify / restore ===
 
+/**
+ * Verify and Restore are two steps, like Back up: 1 · type the password and scan, 2 · the result.
+ * The password field and keyboard are gone once the password has done its job.
+ */
 @Composable
 private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
-    // The keyboard is out of the way once there's a result; tap the field to bring it back.
-    var typing by remember { mutableStateOf(true) }
-    val decrypted = vm.verifyResult != null
-    LaunchedEffect(decrypted) { if (decrypted) typing = false }
+    val result = vm.verifyResult?.takeIf { it.restored == reveal }
+    if (result == null) ReadPasswordStep(vm, reveal) else ReadResultStep(vm, reveal, result)
+}
+
+@Composable
+private fun ReadPasswordStep(vm: SeedTagViewModel, reveal: Boolean) {
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Only the guidance scrolls; the password, keyboard and Scan button stay fixed at the bottom.
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -527,65 +534,76 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
                 if (reveal) "Restore: decrypt and show the words" else "Verify: check the tag without showing the words",
                 style = MaterialTheme.typography.titleMedium,
             )
-            if (vm.verifyResult == null) {
-                ReadCarefullyWarning()
-                if (!reveal) VerifyExplanation()
-                PrepareTagInfo(writing = false)
-            }
+            ReadCarefullyWarning()
             if (reveal) {
                 WarningCard(
                     "Only do this in private",
                     "The words will be on screen. Make sure nobody, and no camera, can see it. They're hidden again as " +
                         "soon as you leave the app.",
                 )
+            } else {
+                VerifyExplanation()
             }
-            SecretDisplay("Password", vm, PwField.Read, revealDefault = false, active = typing) { typing = true }
+            PrepareTagInfo(writing = false)
+            Text("1 · Type the password, then scan the tag", style = MaterialTheme.typography.titleSmall)
+        }
+        SecretDisplay("Password", vm, PwField.Read, revealDefault = false, active = true) {}
+        PasswordKeyboard(vm, PwField.Read)
+        Button(
+            onClick = if (reveal) vm::scanForRestore else vm::scanForVerify,
+            enabled = vm.passwordLength(PwField.Read) > 0,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Scan tag") }
+    }
+}
 
-            val result = vm.verifyResult
-            if (result != null) {
-                val differs = result.matchesBackup == false
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (differs) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-                    ),
-                ) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("✓ Decrypted: ${result.wordCount}-word seed, checksum OK", fontWeight = FontWeight.SemiBold)
-                        Text("Fingerprint: ${result.fingerprint}", fontFamily = FontFamily.Monospace)
-                        passwordFixNote(result.passwordFix)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
-                        when (result.matchesBackup) {
-                            true -> Text("✓ Matches the backup you just wrote", fontWeight = FontWeight.SemiBold)
-                            false -> Text(
-                                "✗ A different seed from the backup you just wrote (${vm.backupFingerprint}). Check you scanned the right tag.",
-                                color = MaterialTheme.colorScheme.onErrorContainer,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            null -> Unit
-                        }
-                    }
-                }
-                if (!reveal) {
-                    VerifyResultExplanation(result)
-                    LockButton(vm)
+@Composable
+private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: VerifyResult) {
+    ScreenColumn {
+        Text(if (reveal) "2 · Restored" else "2 · Verified", style = MaterialTheme.typography.titleMedium)
+        val differs = result.matchesBackup == false
+        Card(
+            colors = CardDefaults.cardColors(
+                containerColor = if (differs) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
+            ),
+        ) {
+            Column(Modifier.padding(12.dp)) {
+                Text("✓ Decrypted: ${result.wordCount}-word seed, checksum OK", fontWeight = FontWeight.SemiBold)
+                Text("Fingerprint: ${result.fingerprint}", fontFamily = FontFamily.Monospace)
+                passwordFixNote(result.passwordFix)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                when (result.matchesBackup) {
+                    true -> Text("✓ Matches the backup you just wrote", fontWeight = FontWeight.SemiBold)
+                    false -> Text(
+                        "✗ A different seed from the backup you just wrote (${vm.backupFingerprint}). Check you scanned the right tag.",
+                        color = MaterialTheme.colorScheme.onErrorContainer,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    null -> Unit
                 }
             }
+        }
+        if (reveal) {
             val words = vm.restoredWords
-            if (reveal && words != null) {
+            if (words != null) {
                 WordGrid(words)
                 Button(
                     onClick = vm::hideRestored,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     modifier = Modifier.fillMaxWidth(),
                 ) { Text("Hide words") }
+            } else {
+                Text(
+                    "The words are hidden. To see them again, restore the tag again.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
             }
+        } else {
+            VerifyResultExplanation(result)
+            LockButton(vm)
         }
-
-        if (typing) PasswordKeyboard(vm, PwField.Read)
-        Button(
-            onClick = if (reveal) vm::scanForRestore else vm::scanForVerify,
-            enabled = vm.passwordLength(PwField.Read) > 0,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Scan tag") }
+        OutlinedButton(onClick = vm::readAnother, modifier = Modifier.fillMaxWidth()) {
+            Text(if (reveal) "Restore another tag" else "Verify another tag")
+        }
     }
 }
 

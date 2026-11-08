@@ -80,6 +80,10 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
 4. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
 5. **Restore**: same as Verify, but the words are shown.
 
+Verify and Restore are two steps, like Back up: type the password and scan, then the result. Once the tag has
+been decrypted, the password field and keyboard are gone; **Verify another tag** or **Restore another tag** starts
+again from an empty password.
+
 Leaving the app (home button, Recents, screen off) wipes everything typed or decrypted.
 
 ## Choosing a tag

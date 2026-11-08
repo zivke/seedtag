@@ -31,7 +31,7 @@
   the phone when the app asks.
 - [x] Add haptic feedback.
 - [x] Explain the verification procedure in more detail on screen.
-- [ ] Make Verify and Restore multi-step procedures like Back up:
+- [x] Make Verify and Restore multi-step procedures like Back up:
   - remove the password field once it has done its job;
   - add "Verify another tag" and "Restore another tag" options;
   - etc.

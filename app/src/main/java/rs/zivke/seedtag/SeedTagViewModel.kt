@@ -39,12 +39,14 @@ data class ScanPrompt(val title: String, val error: String? = null)
 /**
  * [matchesBackup]: compared with the backup written in this session, null if there was none.
  * [passwordFix]: what had to be ignored in the typed password before it matched.
+ * [restored]: from Restore rather than Verify, so each tab shows only its own result.
  */
 data class VerifyResult(
     val wordCount: Int,
     val fingerprint: String,
     val matchesBackup: Boolean? = null,
     val passwordFix: PasswordFix = PasswordFix.None,
+    val restored: Boolean = false,
 )
 
 sealed interface Dialog {
@@ -319,6 +321,11 @@ class SeedTagViewModel : ViewModel() {
 
     fun hideRestored() { restoredWords = null }
 
+    /** "Verify another tag" / "Restore another tag": back to the password step, nothing kept. */
+    fun readAnother() {
+        verifyResult = null; restoredWords = null; clearPasswords(PwField.Read)
+    }
+
     fun startOver() {
         wipeBackup(); step = BackupStep.Length; backupFingerprint = null; lockTarget = null
     }
@@ -395,7 +402,7 @@ class SeedTagViewModel : ViewModel() {
                     } finally { opened.entropy.fill(0) }
                 }
                 if (wipes != wipesAtStart) return@launch
-                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, fix)
+                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, fix, restored = reveal)
                 lockTarget = text
                 if (reveal) restoredWords = words
                 clearPasswords(PwField.Read)

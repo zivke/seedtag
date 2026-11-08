@@ -42,6 +42,11 @@ All notable user-visible changes to SeedTag. The format follows
   app covering SeedTag). Dialogs that confirm something risky or permanent
   (overwrite, weak password, lock) and error messages have a ⚠ icon and a red
   title.
+- Verify and Restore are now two steps, like Back up: first the password and
+  Scan tag, then the result on a screen of its own, without the password field
+  and keyboard. **Verify another tag** and **Restore another tag** start again
+  with an empty password, and each tab only shows its own result. The password
+  field stays in view above the keyboard while typing.
 
 ### Fixed
 - Passwords are no longer kept in memory as text. They live in one buffer
