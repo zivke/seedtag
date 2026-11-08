@@ -26,8 +26,11 @@ import javax.crypto.spec.SecretKeySpec
 /** What [SeedBox.openForgiving] had to change in the typed password before it matched. */
 enum class PasswordFix { None, Spaces, Case, SpacesAndCase }
 
-/** Decrypted entropy (the caller zeroes it) and the fix the password needed. */
-class Opened(val entropy: ByteArray, val fix: PasswordFix)
+/**
+ * Decrypted entropy, the fix the password needed and, only if asked for, the tag's write-password
+ * secret ([TagKey.secret]). The caller zeroes [entropy] and [tagSecret].
+ */
+class Opened(val entropy: ByteArray, val fix: PasswordFix, val tagSecret: ByteArray? = null)
 
 object SeedBox {
     const val VERSION: Int = 0x01
@@ -68,7 +71,9 @@ object SeedBox {
      * Decrypts a blob back to raw entropy. Caller must zero the result when done.
      * @throws SeedTagException.WrongPassword / UnsupportedVersion / Malformed
      */
-    fun open(blob: ByteArray, password: CharArray): ByteArray {
+    fun open(blob: ByteArray, password: CharArray): ByteArray = open(blob, password, PasswordFix.None, false).entropy
+
+    private fun open(blob: ByteArray, password: CharArray, fix: PasswordFix, withTagSecret: Boolean): Opened {
         if (blob.isEmpty()) throw SeedTagException.Malformed("empty")
         val version = blob[0].toInt() and 0xFF
         if (version != VERSION) throw SeedTagException.UnsupportedVersion(version)
@@ -82,7 +87,8 @@ object SeedBox {
             cipher.init(Cipher.DECRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(TAG_LEN * 8, nonce))
             cipher.updateAAD(blob, 0, 1)
             val offset = 1 + SALT_LEN + NONCE_LEN
-            return cipher.doFinal(blob, offset, blob.size - offset)
+            val entropy = cipher.doFinal(blob, offset, blob.size - offset)
+            return Opened(entropy, fix, if (withTagSecret) TagKey.secret(key) else null)
         } catch (e: AEADBadTagException) {
             throw SeedTagException.WrongPassword()
         } finally {
@@ -93,12 +99,13 @@ object SeedBox {
     /**
      * Like [open], but if the password is wrong, also tries it with extra spaces removed, then
      * also lower-cased ([passwordVariants]): a typo there shouldn't look like a lost backup.
-     * Each retry is one more Argon2 run. Caller must zero [Opened.entropy].
+     * Each retry is one more Argon2 run. With [withTagSecret], also returns the tag's write-password
+     * secret, from the key that matched. Caller must zero [Opened.entropy] and [Opened.tagSecret].
      * @throws SeedTagException.WrongPassword if no variant matches, or open's other errors at once.
      */
-    fun openForgiving(blob: ByteArray, password: CharArray): Opened {
+    fun openForgiving(blob: ByteArray, password: CharArray, withTagSecret: Boolean = false): Opened {
         val wrong = try {
-            return Opened(open(blob, password), PasswordFix.None)
+            return open(blob, password, PasswordFix.None, withTagSecret)
         } catch (e: SeedTagException.WrongPassword) {
             e
         }
@@ -106,7 +113,7 @@ object SeedBox {
         try {
             for ((fix, candidate) in variants) {
                 try {
-                    return Opened(open(blob, candidate), fix)
+                    return open(blob, candidate, fix, withTagSecret)
                 } catch (_: SeedTagException.WrongPassword) {
                     // try the next one
                 }

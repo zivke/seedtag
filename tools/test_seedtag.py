@@ -122,5 +122,24 @@ class PasswordVariants(unittest.TestCase):
         self.assertNotIsInstance(cm.exception, seedtag.WrongPassword)
 
 
+class TagKey(unittest.TestCase):
+    """Same file TagKeyTest.kt reads: both must derive the same write password for a tag."""
+
+    def test_tag_keys_match_vectors(self):
+        vecs = rows("tag-key-vectors.tsv")
+        self.assertGreaterEqual(len(vecs), 5)
+        for pw, b64, ulc_key, ulc_pages, pwd, pack in vecs:
+            _, fix, key = seedtag._open_forgiving_key(base64.b64decode(b64), bytes.fromhex(pw).decode("utf-8"))
+            self.assertIsNone(fix)
+            k = seedtag.tag_keys(seedtag.tag_secret(key))
+            self.assertEqual([ulc_key, ulc_pages, pwd, pack],
+                             [k[n].hex() for n in ("ulc_key", "ulc_pages", "ntag_pwd", "ntag_pack")])
+
+    def test_ultralight_c_page_order(self):
+        # MF0ICU2 datasheet, section 7.5.7: Key1 00..07 and Key2 08..0F as stored in pages 2Ch..2Fh.
+        k = seedtag.tag_keys(bytes.fromhex("000102030405060708090a0b0c0d0e0f") + bytes(16))
+        self.assertEqual("07060504" "03020100" "0f0e0d0c" "0b0a0908", k["ulc_pages"].hex())
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -23,7 +23,7 @@ signing key living in a dev container that an AI agent can run commands in.
 | 8 | Task hijacking and overlays | **Fixed**: task affinity in `b976e94`; overlays hidden (Android 12+) and obscured taps ignored (all versions) in `776588e`. Android 8–11 can't hide overlays; the README warns. |
 | 9 | Autofill after a Compose update | **Resolved** by `51afe6a` (no text fields left) |
 | 10 | Secret copies that aren't zeroed | **Fixed** for passwords (zeroable in-place buffer, no `String`s; branch `fix/zeroable-secrets`); the AES key copies are **documented** in the README and kept on purpose (platform AES is hardware-accelerated and constant-time) |
-| 11 | Skimming, destruction and lockout of a "read-only" tag (raised from Low to Medium) | Open; options analysed in [the tag write-protection report](2026-11-07-tag-write-protection.md) |
+| 11 | Skimming, destruction and lockout of a "read-only" tag (raised from Low to Medium) | **Partly fixed**: write password for Ultralight C and NTAG213/215/216 (not yet tested on a device); the read-back check, README correction, proper lock and rescue are open. See [the tag write-protection report](2026-11-07-tag-write-protection.md) |
 | 12 | The passphrase looks like a seed | **Fixed**: the app and README tell users to label it "SeedTag password" |
 | 13 | Whitespace and case must match exactly | **Fixed**: wrong passwords are retried with spaces collapsed, then lower-cased, in the app and `seedtag.py` |
 | 14 | Fingerprint as a guess checker for a mostly known seed | **Documented** in the README (informational, no code change) |
@@ -129,7 +129,12 @@ signing key living in a dev container that an AI agent can run commands in.
   - Pin the image digest and verify the tools zip.
   - Publish each release APK's SHA-256 next to the certificate digest.
 
-### 11. Skimming, destruction, and lockout of a "read-only" tag — *raised from Low; open*
+### 11. Skimming, destruction, and lockout of a "read-only" tag — *raised from Low; partly fixed*
+
+**Status (2026-11-08):** **Protect tag** gives MIFARE Ultralight C and NTAG213/215/216 tags a write password
+derived from the backup password, with reads left open (see the report's *Implementation* section). That
+stops overwriting, erasing and lockout on those chips. Not yet tested on a device. Still open: the
+read-back check after locking, the README note on storage, the proper lock and the `FF 0F` rescue.
 
 `app/src/main/java/rs/zivke/seedtag/TagIo.kt` (`lock()`)
 
@@ -203,6 +208,6 @@ doesn't stop someone locking the owner out of the tag.
 1. ~~Move release signing out of the container (#1).~~ Done.
 2. ~~Small fixes on `main`: #2, #6, #8.~~ Done.
 3. ~~#5 needs device testing (the risk is already documented in the README).~~ Done.
-4. #11: first the read-back check and the README correction, then the proper lock or write key on a
-   separate branch, tested with spare tags.
+4. #11: the write password is in (test it with spare tags); still to do are the read-back check after
+   locking and the README note on storage, then possibly the proper lock and the `FF 0F` rescue.
 5. ~~#7 is build work. It adds no new dependencies to the app, but it changes the devcontainer.~~ Done.

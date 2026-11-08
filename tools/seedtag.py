@@ -29,6 +29,8 @@ Run it on an offline machine.
     python3 seedtag.py decrypt [BLOB]   # Base64 blob + password -> words
     python3 seedtag.py verify  [BLOB]   # like decrypt, but only prints OK / FAIL
                                         # plus a short fingerprint, not the words
+    python3 seedtag.py tag-key [BLOB]   # the tag's write password, for other NFC
+                                        # tools, if the app isn't there to remove it
 
 decrypt and verify forgive extra spaces and wrong capitals: a wrong password
 is tried again trimmed and with single spaces, then also lower-cased.
@@ -39,7 +41,17 @@ Format v1 (all multi-byte fields raw bytes):
     AAD    = 0x01 (the header byte)
     entropy= raw BIP39 entropy: 16/20/24/28/32 bytes for 12/15/18/21/24 words
     on tag = NDEF Text record, lang "en", UTF-8, standard Base64 with padding
+
+Tag write password (the app's "Protect tag"; not part of the blob, which it
+leaves unchanged). Reading never needs it; only writing to the tag does:
+    secret = HMAC-SHA256(key=<the AES key above>, "seedtag tag key v1")
+    MIFARE Ultralight C: 3DES key K1|K2 = secret[0:16], written to pages 2Ch-2Fh
+                         with each 8-byte half reversed; AUTH0 (page 2Ah) = 03h,
+                         AUTH1 (page 2Bh) = 01h (writes only). Off: AUTH0 = 30h.
+    NTAG213/215/216:     PWD = secret[16:20], PACK = secret[20:22]; AUTH0 = 03h,
+                         ACCESS PROT = 0 (writes only), AUTHLIM = 0. Off: AUTH0 = FFh.
 """
+import hmac
 import base64
 import getpass
 import hashlib
@@ -297,6 +309,11 @@ class WrongPassword(ValueError):
 
 
 def open_blob(blob: bytes, password: str) -> bytes:
+    return _open_with_key(blob, password)[0]
+
+
+def _open_with_key(blob: bytes, password: str) -> tuple[bytes, bytes]:
+    """(entropy, AES key)."""
     if not blob or blob[0] != VERSION:
         raise ValueError(f"unsupported blob version: {blob[:1].hex() or 'empty'}")
     ent_len = len(blob) - 1 - SALT_LEN - NONCE_LEN - TAG_LEN
@@ -306,8 +323,9 @@ def open_blob(blob: bytes, password: str) -> bytes:
     nonce = blob[1 + SALT_LEN:1 + SALT_LEN + NONCE_LEN]
     ct = blob[1 + SALT_LEN + NONCE_LEN:]
     from cryptography.exceptions import InvalidTag
+    key = derive_key(password, salt)
     try:
-        return _aesgcm(derive_key(password, salt)).decrypt(nonce, ct, blob[:1])
+        return _aesgcm(key).decrypt(nonce, ct, blob[:1]), key
     except InvalidTag:
         raise WrongPassword("wrong password or corrupted blob") from None
 
@@ -333,16 +351,43 @@ def password_variants(password: str) -> list[tuple[str, str]]:
 def open_forgiving(blob: bytes, password: str) -> tuple[bytes, str | None]:
     """Like open_blob, but a wrong password is also tried without extra spaces, then lower-cased.
     Returns (entropy, fix), fix being None or a key of FIXES."""
+    entropy, fix, _ = _open_forgiving_key(blob, password)
+    return entropy, fix
+
+
+def _open_forgiving_key(blob: bytes, password: str) -> tuple[bytes, str | None, bytes]:
+    """open_forgiving, plus the AES key that matched."""
     try:
-        return open_blob(blob, password), None
+        entropy, key = _open_with_key(blob, password)
+        return entropy, None, key
     except WrongPassword as first:
         wrong = first
     for fix, candidate in password_variants(password):
         try:
-            return open_blob(blob, candidate), fix
+            entropy, key = _open_with_key(blob, candidate)
+            return entropy, fix, key
         except WrongPassword:
             pass
     raise wrong
+
+
+TAG_KEY_LABEL = b"seedtag tag key v1"
+
+
+def tag_secret(key: bytes) -> bytes:
+    """The tag's write-password secret for an AES key (same as TagKey.secret in the app)."""
+    return hmac.new(key, TAG_KEY_LABEL, hashlib.sha256).digest()
+
+
+def tag_keys(secret: bytes) -> dict[str, bytes]:
+    """Ultralight C 3DES key (K1|K2), the same in page order for pages 2Ch-2Fh, NTAG PWD and PACK."""
+    ulc = secret[:16]
+    return {
+        "ulc_key": ulc,
+        "ulc_pages": ulc[7::-1] + ulc[:7:-1],
+        "ntag_pwd": secret[16:20],
+        "ntag_pack": secret[20:22],
+    }
 
 
 def fingerprint(entropy: bytes) -> str:
@@ -358,7 +403,7 @@ def _read_blob(argv) -> bytes:
 
 
 def main(argv):
-    if not argv or argv[0] not in ("encrypt", "decrypt", "verify"):
+    if not argv or argv[0] not in ("encrypt", "decrypt", "verify", "tag-key"):
         print(__doc__)
         return 2
     cmd, rest = argv[0], argv[1:]
@@ -378,12 +423,22 @@ def main(argv):
             print(f"fingerprint: {fingerprint(entropy)}", file=sys.stderr)
         else:
             blob = _read_blob(rest)
-            entropy, fix = open_forgiving(blob, getpass.getpass("Password: "))
+            entropy, fix, key = _open_forgiving_key(blob, getpass.getpass("Password: "))
             if fix:
                 print(f"note: the password only matched with {FIXES[fix]} ignored; "
                       "check your written copy.", file=sys.stderr)
             if cmd == "decrypt":
                 print(" ".join(entropy_to_words(entropy)))
+            elif cmd == "tag-key":
+                k = tag_keys(tag_secret(key))
+                pages = " ".join(k["ulc_pages"][i:i + 4].hex() for i in range(0, 16, 4))
+                print("Write password of a tag protected by SeedTag with this backup's password.")
+                print("It only protects the tag against writes; it reveals nothing about the seed.")
+                print(f"MIFARE Ultralight C 3DES key: {k['ulc_key'].hex()}")
+                print(f"  as stored in pages 2Ch-2Fh: {pages}")
+                print("  to remove: authenticate, then write 30 00 00 00 to page 2Ah")
+                print(f"NTAG213/215/216 PWD: {k['ntag_pwd'].hex()}  PACK: {k['ntag_pack'].hex()}")
+                print("  to remove: PWD_AUTH, then set AUTH0 (byte 3 of page 29h/83h/E3h) to FF")
             else:
                 print(f"OK  {len(entropy) * 3 // 4} words  fingerprint: {fingerprint(entropy)}")
     except ValueError as e:

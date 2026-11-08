@@ -560,7 +560,8 @@ private fun DoneStep(vm: SeedTagViewModel) {
         Text(
             "1. Go to Verify and decrypt the tag by typing the password from your written copy.\n" +
                 "2. Optionally recover it on an offline computer with seedtag.py.\n" +
-                "3. Only then lock the tag (permanent, on the Verify tab) and keep another backup of the seed elsewhere.",
+                "3. Only then protect the tag with a write password (on the Verify tab), and keep another backup of the " +
+                "seed elsewhere.",
             style = MaterialTheme.typography.bodyMedium,
         )
         Button(onClick = { vm.tab = Screen.Verify }, modifier = Modifier.fillMaxWidth()) { Text("Verify now") }
@@ -670,7 +671,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
             }
         } else {
             VerifyResultExplanation(result)
-            LockButton(vm)
+            TagProtection(vm, result.tag)
         }
         OutlinedButton(onClick = vm::readAnother, modifier = Modifier.fillMaxWidth()) {
             Text(if (reveal) "Restore another tag" else "Verify another tag")
@@ -702,8 +703,67 @@ private fun VerifyResultExplanation(result: VerifyResult) {
             "The fingerprint is the same for the same seed on any tag, with any password, and in seedtag.py; it isn't " +
             "secret and doesn't reveal the words. Compare it with the one shown after the backup: if they match, " +
             "this tag holds that seed.\n\n" +
-            "Once you're sure, you can make the tag read-only below. That's permanent.",
+            "Once you're sure, you can protect the tag below.",
     )
+}
+
+/**
+ * The chip, its write protection and what can be done about it. Make tag read-only is only offered
+ * while the tag has no write password (it would be refused), and never for a read-only tag.
+ */
+@Composable
+private fun TagProtection(vm: SeedTagViewModel, tag: TagInfo?) {
+    Text("Protection", style = MaterialTheme.typography.titleSmall)
+    val chip = tag?.chip
+    val body = MaterialTheme.typography.bodyMedium
+    val verifyAgain = "Verify the tag again to change its protection."
+    when {
+        tag == null -> {
+            Text("Couldn't check the tag's protection on this tap. Verify it again to see it.", style = body)
+            LockButton(vm)
+        }
+        tag.readOnly -> Text("${chip?.label ?: "This tag"} is read-only: it can't be rewritten, and it can't get a write password.", style = body)
+        chip == null -> {
+            Text(
+                "SeedTag can only write-protect MIFARE Ultralight C and NTAG213/215/216 tags, and this is neither. Anyone " +
+                    "holding a phone to it can overwrite it, so keep it where strangers can't reach it.",
+                style = body,
+            )
+            LockButton(vm)
+        }
+        tag.protection == Protection.Off -> {
+            WarningCard(
+                "${chip.label}: not write-protected",
+                "Anyone holding a phone to it can overwrite or erase it, or lock it with a password of their own so it " +
+                    "can't be read any more. Protect it with a write password made from this backup's password: reading " +
+                    "still needs none.",
+            )
+            when {
+                tag.settingsLocked -> Text("Its protection settings are locked, so it can't get a write password.", style = body)
+                vm.canChangeProtection -> Button(onClick = vm::requestProtect, modifier = Modifier.fillMaxWidth()) { Text("Protect tag") }
+                else -> Text(verifyAgain, style = body)
+            }
+            LockButton(vm)
+        }
+        tag.protection == Protection.Write -> {
+            InfoCard(
+                "${chip.label}: write-protected",
+                "Reading needs no password. Overwriting, erasing or locking it needs this backup's password, if SeedTag set " +
+                    "the protection. To back up onto it again, remove the protection first.",
+            )
+            when {
+                tag.settingsLocked -> Text("Its protection settings are locked, so the protection can't be removed.", style = body)
+                vm.canChangeProtection -> OutlinedButton(onClick = vm::removeProtection, modifier = Modifier.fillMaxWidth()) {
+                    Text("Remove protection")
+                }
+                else -> Text(verifyAgain, style = body)
+            }
+        }
+        else -> Text(
+            "${chip.label}: protected against reading too, by a password SeedTag didn't set. SeedTag can't change it.",
+            style = body,
+        )
+    }
 }
 
 /** Says what had to be ignored in the typed password, so the user can fix their written copy. */
@@ -932,7 +992,9 @@ private fun AboutPage() {
             "Encryption",
             "Argon2id (64 MiB, 3 passes) turns the password into a key, and AES-256-GCM encrypts the seed's raw " +
                 "entropy. The format is documented and versioned. seedtag.py, a single-file Python tool, encrypts " +
-                "and decrypts the same format on any computer, so a backup doesn't depend on this app.",
+                "and decrypts the same format on any computer, so a backup doesn't depend on this app. Protect tag " +
+                "gives MIFARE Ultralight C and NTAG213/215/216 chips a write password made from the same key; " +
+                "reading never needs it.",
         )
         DisclaimerWarning()
         AboutSection(
@@ -1064,6 +1126,35 @@ private fun Dialogs(vm: SeedTagViewModel) {
                 TextButton(onClick = vm::confirmWeakPassword) { Text("Write anyway", color = MaterialTheme.colorScheme.error) }
             },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Change password") } },
+        )
+        is Dialog.ConfirmProtect -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            title = { Text("Protect this tag?") },
+            text = {
+                GuardDialogWindow()
+                val points = buildList {
+                    add(
+                        "SeedTag gives the ${d.chip.label} a write password made from this backup's password. There's " +
+                            "nothing new to remember.",
+                    )
+                    add("Reading, Verify and Restore work as before. The chip asks for no password to read.")
+                    add(
+                        "Nobody can overwrite, erase or lock the tag without this backup's password, you included: to back " +
+                            "up onto it again, verify it and tap Remove protection first.",
+                    )
+                    if (d.chip != Chip.UltralightC) {
+                        add(
+                            "On NTAG tags the write password goes over the air unencrypted each time it's used (now, and " +
+                                "when removing the protection). Someone with radio equipment close by at that moment could " +
+                                "copy it and change the tag. It reveals nothing about the seed or the backup password.",
+                        )
+                    }
+                    add("It takes two taps. Hold the tag still each time.")
+                }
+                Column(Modifier.verticalScroll(rememberScrollState())) { Text(points.joinToString("\n\n") { "• $it" }) }
+            },
+            confirmButton = { TextButton(onClick = vm::confirmProtect) { Text("Protect") } },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
         )
         Dialog.ConfirmLock -> AlertDialog(
             onDismissRequest = { vm.dialog = null },

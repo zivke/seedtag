@@ -127,7 +127,9 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    If the password is wrong, the app tries it again without extra spaces, then in lower case, and tells you if that
    worked, so you can correct your written copy.
 3. Optionally recover once with `seedtag.py` on an offline computer.
-4. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
+4. Only then protect the tag, on the Verify result (see [Write protection](#write-protection)): **Protect tag** on
+   MIFARE Ultralight C and NTAG213/215/216, otherwise **Make tag read-only**, which is permanent. Both only work on
+   the tag you last verified (or, for read-only, wrote).
 5. **Restore**: same as Verify, but the words are shown.
 
 Verify and Restore are two steps, like Back up: type the password and scan, then the result. Once the tag has
@@ -138,6 +140,29 @@ Leaving the app (home button, Recents, screen off) wipes everything typed or dec
 
 **About** in the top bar shows the version, what the app does with your data (nothing leaves the phone), the
 encryption used and the licence.
+
+### Write protection
+
+Without protection, anyone who holds a phone to the tag can overwrite or erase it, or give it a read password of
+their own so it can't be read any more. Verify shows the chip and whether it's protected.
+
+- **Protect tag** (MIFARE Ultralight C, NTAG213/215/216) gives the chip a write password made from the backup
+  password: nothing new to remember, and the backup format is unchanged. Reading, Verify and Restore need no
+  password on the chip; writing does. It takes two taps: the first stores the password, the second checks that
+  the chip accepts it and only then switches protection on. Protection covers writes only and allows unlimited
+  wrong tries, so it can't make the tag unreadable or lock you out.
+- **Remove protection** switches it off again, with the same backup password (Verify first). Back up and **Make
+  tag read-only** refuse a protected tag until then.
+- On an **NTAG** the write password goes over the air unencrypted whenever it's used (protecting, removing).
+  Someone with radio equipment close by at that moment could copy it and change the tag. It reveals nothing
+  about the seed or the backup password. The Ultralight C never sends its key.
+- If the app is ever gone, `seedtag.py tag-key` prints the write password, for other NFC tools.
+- **Make tag read-only** is permanent. On these chips it can leave the chip's own protection settings open, so a
+  read-only tag may still be given a read password by a stranger; prefer **Protect tag** where it's offered.
+- Either way, keep the tag where strangers can't reach it: a write password doesn't stop someone reading the
+  (encrypted) backup, or destroying the tag.
+- This is new and has not yet been tested on real tags of every kind: try it on a spare tag with a throwaway
+  seed first.
 
 ## Choosing a tag
 
@@ -178,8 +203,9 @@ copy among several, and verify it every now and then.
 ³ Retention and password scheme differ by model: ST25TV02K is rated for 60 y with 32- or 64-bit passwords,
 ST25TV16K/64K for 40 y with 64-bit passwords (ST25TV16K is *not recommended for new designs*).
 
-SeedTag doesn't use any of these write protections yet: the payload is encrypted either way, and **Make tag
-read-only** is the only protection against overwriting. Only Ultralight C has been tested with SeedTag: try
+SeedTag uses the write protection of MIFARE Ultralight C and NTAG213/215/216 (**Protect tag**, see
+[Write protection](#write-protection)). On every other tag, **Make tag read-only** is the only protection
+against overwriting; the payload is encrypted either way. Only Ultralight C has been tested with SeedTag: try
 any other tag with your phone (write, verify, restore) before relying on it. A tag mounted on metal needs an
 on-metal version.
 
@@ -233,6 +259,16 @@ entropy = raw BIP39 entropy, 16/20/24/28/32 bytes (12–24 words; checksum recom
 tag   = one NDEF Text record, lang "en", standard Base64 of blob (104 chars for 24 words)
 ```
 
+**Tag write password** (Protect tag). It's not part of the blob and doesn't change it:
+
+```
+secret = HMAC-SHA256(key = the AES key above, "seedtag tag key v1")
+Ultralight C: 3DES key K1|K2 = secret[0:16] in pages 2Ch–2Fh (each half reversed);
+              AUTH1 (2Bh) = 01h (writes only), AUTH0 (2Ah) = 03h. Off: AUTH0 = 30h.
+NTAG21x:      PWD = secret[16:20], PACK = secret[20:22]; ACCESS: PROT = 0, AUTHLIM = 0;
+              AUTH0 = 03h. Off: AUTH0 = FFh.
+```
+
 The *fingerprint* is the first 4 bytes of `SHA-256("seedtag-fp" ‖ entropy)`. It isn't secret, and it lets you confirm two
 backups or a recovery match without showing the words. The same seed always gives the same fingerprint, whatever the tag
 or password.
@@ -252,6 +288,7 @@ pip install cryptography          # do this before going offline
 python3 seedtag.py verify  <BASE64>   # OK + fingerprint, no words
 python3 seedtag.py decrypt <BASE64>   # prints the words
 python3 seedtag.py encrypt            # create a tag string on the computer instead
+python3 seedtag.py tag-key <BASE64>   # a protected tag's write password, for other NFC tools
 ```
 
 Like the app, `decrypt` and `verify` retry a wrong password without extra spaces, then in lower case, and say so if
@@ -313,7 +350,9 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
 
   Everything is dropped when the app is backgrounded. What's left in memory until it's overwritten can only be read
   with root access or a debugger.
-- The Ultralight C's own 3DES access protection isn't used, and isn't needed: the payload is encrypted.
+- **The tag's write password** ([Write protection](#write-protection)) only stops changes to the tag. It comes from
+  the AES key through HMAC-SHA256, so it reveals nothing about that key or the password, even on an NTAG, where
+  it's sent in plain text. Reads never need it: secrecy comes from the encryption alone.
 
 ## Tests
 

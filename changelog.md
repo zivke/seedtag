@@ -7,6 +7,21 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- **Write protection** for MIFARE Ultralight C and NTAG213/215/216 tags. After
+  a successful Verify, **Protect tag** gives the chip a write password made
+  from the backup password, so there's nothing new to remember. The tag still
+  reads with no password, as before, but nobody can overwrite, erase or lock
+  it (with a read password of their own, say) without the backup password.
+  It takes two taps: the second checks that the chip accepts the password
+  before protection is switched on, and protection only ever covers writes,
+  with no limit on wrong tries, so it can't make the tag unreadable.
+  **Remove protection** switches it off again. Verify now shows the chip and
+  whether it's write-protected. Back up and **Make tag read-only** refuse a
+  write-protected tag until its protection is removed. The backup format is
+  unchanged.
+- `seedtag.py tag-key` prints a protected tag's write password (Ultralight C
+  3DES key, NTAG PWD and PACK), for removing the protection with other NFC
+  tools if the app isn't around.
 - Verify, Restore and `seedtag.py` forgive the most common typing mistakes:
   if the password is wrong, it's tried again without extra spaces (leading,
   trailing or doubled), then also in lower case. If that's what matched, the

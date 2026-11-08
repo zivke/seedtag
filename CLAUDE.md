@@ -14,6 +14,10 @@ BIP39 seed phrase on an NFC tag and reads it back:
 - **Verify**: decrypt and show only ✓ plus a fingerprint, never the words.
 - **Restore**: decrypt and show the words.
 - **Lock**: make the tag permanently read-only, behind a confirmation.
+- **Protect / Remove protection** (after Verify, MIFARE Ultralight C and
+  NTAG213/215/216): a write password on the chip, derived from the backup
+  password (format below). Reads stay open; Back up and Lock refuse a
+  protected tag.
 
 `tools/seedtag.py` is the desktop counterpart: it must stay able to encrypt and
 decrypt exactly what the app writes, so a backup survives the app.
@@ -61,7 +65,12 @@ Two Gradle modules plus the Python tool:
     `openForgiving` retries a wrong password with spaces collapsed, then
     lower-cased (`passwordVariants`); `seedtag.py` has the same rules, checked
     against `password-variants.tsv`. Only the typed password changes, never
-    the format.
+    the format. `openForgiving(…, withTagSecret = true)` also returns the
+    tag's write-password secret, from the key that matched.
+  - `TagKey.kt`: the tag write password (below): secret, Ultralight C key and
+    page order, NTAG PWD / PACK. Vectors in `tag-key-vectors.tsv`.
+  - `UltralightCAuth.kt`: reader side of the Ultralight C 3DES mutual
+    authentication, no I/O; tested against the datasheet's worked example.
   - `Passphrase.kt`: 7-word generator from the BIP39 list, rough strength estimate.
   - `SecretChars.kt`: zeroable, in-place password buffer.
   - `NdefText.kt`: Text-record payload decode (encode is `NdefRecord.createTextRecord`).
@@ -81,11 +90,17 @@ Two Gradle modules plus the Python tool:
     `Dispatchers.Default`. The pending tag operation is an `AtomicReference`
     because the reader callback runs on a binder thread. A failed tag operation
     stays armed so the user can just tap again.
-  - `TagIo.kt`: blocking NFC I/O (write + read-back, read, lock), returns a
-    `TagResult`, never throws.
+  - `TagIo.kt`: blocking NFC I/O (write + read-back, read, lock, protect,
+    unprotect), returns a `TagResult`, never throws. Chips are identified with
+    READ only (plus GET_VERSION once the size says NTAG): an unknown command
+    ends the tag session. Protect is two taps: the first stores the password
+    and sets writes-only (AUTH1 / PROT, AUTHLIM 0) with AUTH0 off; the second,
+    in a new session, authenticates and only then sets AUTH0 = 03h. Never set
+    read protection or AUTHLIM, and never write AUTH0 before the tag has
+    accepted the password.
   - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
 - **`tools/seedtag.py`**: single file, wordlist embedded, `encrypt` /
-  `decrypt` / `verify`. Needs `cryptography` ≥ 44, or `argon2-cffi` as fallback.
+  `decrypt` / `verify` / `tag-key`. Needs `cryptography` ≥ 44, or `argon2-cffi` as fallback.
 
 ## Blob format v1 (do not change in place)
 
@@ -100,6 +115,19 @@ Existing tags in the field depend on this. Any change to parameters or layout
 is a **new version byte**, with `open` still accepting v1, matching changes in
 `seedtag.py`, and new rows in the vector files. Generate vectors with
 `seedtag.py` (fixed salt/nonce) and check them in both test suites.
+
+### Tag write password (do not change in place either)
+
+```
+secret = HMAC-SHA256(key = AES key above, "seedtag tag key v1")
+Ultralight C: 3DES key = secret[0:16]; pages 2Ch–2Fh hold each 8-byte half reversed;
+              AUTH1 (2Bh) = 01h, AUTH0 (2Ah) = 03h; off: AUTH0 = 30h
+NTAG21x:      PWD = secret[16:20], PACK = secret[20:22]; PROT = 0, AUTHLIM = 0;
+              AUTH0 = 03h; off: AUTH0 = FFh
+```
+
+Protected tags depend on this: the same backup password must always give the
+same write password, in the app and in `seedtag.py tag-key`.
 
 ## Security rules
 

@@ -48,6 +48,7 @@ data class ScanPrompt(val title: String, val error: String? = null)
  * [matchesBackup]: compared with the backup written in this session, null if there was none.
  * [passwordFix]: what had to be ignored in the typed password before it matched.
  * [restored]: from Restore rather than Verify, so each tab shows only its own result.
+ * [tag]: the chip and its write protection (Verify only); null if that couldn't be read.
  */
 data class VerifyResult(
     val wordCount: Int,
@@ -55,6 +56,7 @@ data class VerifyResult(
     val matchesBackup: Boolean? = null,
     val passwordFix: PasswordFix = PasswordFix.None,
     val restored: Boolean = false,
+    val tag: TagInfo? = null,
 )
 
 sealed interface Dialog {
@@ -62,6 +64,7 @@ sealed interface Dialog {
     data class Info(val title: String, val message: String) : Dialog
     data class ConfirmOverwrite(val looksLikeSeedTag: Boolean) : Dialog
     data object ConfirmLock : Dialog
+    data class ConfirmProtect(val chip: Chip) : Dialog
     /** The password is below [Passphrase.MIN_BITS] or reuses words of the seed. */
     data class ConfirmWeakPassword(val bits: Int, val sharesSeedWords: Boolean) : Dialog
 }
@@ -69,7 +72,7 @@ sealed interface Dialog {
 /** Vibration for things that happen without a tap: a tag was handled, something succeeded or failed. */
 enum class Haptic { Tick, Success, Failure }
 
-private enum class Purpose { BackupWrite, Verify, Restore, Lock }
+private enum class Purpose { BackupWrite, Verify, Restore, Lock, Protect, Unprotect }
 /** [id] tells a result for the current scan from one that arrives after Cancel or a new scan. */
 private data class Pending(val request: TagRequest, val purpose: Purpose, val id: Long)
 
@@ -155,6 +158,14 @@ class SeedTagViewModel : ViewModel() {
     var verifyResult by mutableStateOf<VerifyResult?>(null)
         private set
     var restoredWords by mutableStateOf<List<String>?>(null)
+        private set
+    /**
+     * The verified tag's write-password secret ([rs.zivke.seedtag.core.TagKey]), kept after Verify so
+     * Protect / Remove protection don't need the password typed again. Zeroed by readAnother() and
+     * wipeAll(); [canChangeProtection] says whether it's there.
+     */
+    private var tagSecret: ByteArray? = null
+    var canChangeProtection by mutableStateOf(false)
         private set
 
     // ---- shared ---------------------------------------------------------------
@@ -320,8 +331,8 @@ class SeedTagViewModel : ViewModel() {
 
     private fun scanForRead(purpose: Purpose) {
         if (readPassword.isEmpty()) return showError("Enter the password first.")
-        verifyResult = null; restoredWords = null
-        arm(TagRequest.Read, purpose, "Hold the tag to the back of the phone to read")
+        verifyResult = null; restoredWords = null; wipeTagSecret()
+        arm(TagRequest.Read(withInfo = purpose == Purpose.Verify), purpose, "Hold the tag to the back of the phone to read")
     }
 
     fun requestLock() {
@@ -335,13 +346,32 @@ class SeedTagViewModel : ViewModel() {
         arm(TagRequest.Lock(target), Purpose.Lock, "Hold the same tag to make it permanently read-only")
     }
 
+    fun requestProtect() {
+        val chip = verifyResult?.tag?.chip ?: return
+        if (tagSecret == null) return showError("Verify the tag again first.")
+        dialog = Dialog.ConfirmProtect(chip)
+    }
+
+    fun confirmProtect() {
+        dialog = null
+        val target = lockTarget ?: return
+        val secret = tagSecret ?: return showError("Verify the tag again first.")
+        arm(TagRequest.Protect(target, secret, finish = false), Purpose.Protect, PROTECT_STEP_1)
+    }
+
+    fun removeProtection() {
+        val target = lockTarget ?: return
+        val secret = tagSecret ?: return showError("Verify the tag again first.")
+        arm(TagRequest.Unprotect(target, secret), Purpose.Unprotect, "Hold the same tag to the phone to remove its write protection")
+    }
+
     fun cancelScan() { scanId++; pending.set(null); scanPrompt = null }
 
     fun hideRestored() { restoredWords = null }
 
     /** "Verify another tag" / "Restore another tag": back to the password step, nothing kept. */
     fun readAnother() {
-        verifyResult = null; restoredWords = null; clearPasswords(PwField.Read)
+        verifyResult = null; restoredWords = null; clearPasswords(PwField.Read); wipeTagSecret()
     }
 
     fun startOver() {
@@ -387,9 +417,14 @@ class SeedTagViewModel : ViewModel() {
             is TagResult.Failed -> {
                 if (stale) return
                 _haptics.tryEmit(Haptic.Failure)
-                // stay armed so the user can simply tap again
-                pending.set(p)
-                scanPrompt = scanPrompt?.copy(error = r.message) ?: ScanPrompt("Hold the tag to the phone", r.message)
+                // stay armed so the user can simply tap again (or, with a retry, redo an earlier step)
+                if (r.retry != null) {
+                    pending.set(p.copy(request = r.retry))
+                    scanPrompt = ScanPrompt(PROTECT_STEP_1, r.message)
+                } else {
+                    pending.set(p)
+                    scanPrompt = scanPrompt?.copy(error = r.message) ?: ScanPrompt("Hold the tag to the phone", r.message)
+                }
             }
             is TagResult.NotEmpty -> {
                 if (stale) return
@@ -418,26 +453,55 @@ class SeedTagViewModel : ViewModel() {
                 if (stale) return
                 scanPrompt = null
                 _haptics.tryEmit(Haptic.Tick)
-                decrypt(r.text, reveal = p.purpose == Purpose.Restore)
+                decrypt(r.text, reveal = p.purpose == Purpose.Restore, r.info)
+            }
+            TagResult.ProtectPrepared -> {
+                if (stale) return
+                _haptics.tryEmit(Haptic.Tick)
+                val req = p.request as? TagRequest.Protect ?: return
+                arm(TagRequest.Protect(req.expected, req.secret, finish = true), Purpose.Protect, PROTECT_STEP_2)
+            }
+            TagResult.Protected -> {
+                scanPrompt = null
+                _haptics.tryEmit(Haptic.Success)
+                setProtection(Protection.Write)
+                dialog = Dialog.Info(
+                    "Tag write-protected",
+                    "Nobody can overwrite, erase or lock this tag now without this backup's password. Reading it needs no " +
+                        "password, as before. To back up onto it again, verify it and remove the protection first.",
+                )
+            }
+            TagResult.Unprotected -> {
+                scanPrompt = null
+                _haptics.tryEmit(Haptic.Success)
+                setProtection(Protection.Off)
+                dialog = Dialog.Info("Protection removed", "Anyone can write to this tag again.")
             }
         }
     }
 
-    private fun decrypt(text: String, reveal: Boolean) {
+    private fun decrypt(text: String, reveal: Boolean, info: TagInfo?) {
         val pw = readPassword.copy()
         val wipesAtStart = wipes
+        // Only Verify offers Protect / Remove protection, and only for a chip that has it.
+        val wantSecret = !reveal && info?.chip != null
         viewModelScope.launch {
             busy = "Decrypting… (Argon2id, a few seconds; longer if the password needs a second try)"
+            var secret: ByteArray? = null
             try {
                 val (words, fp, fix) = withContext(Dispatchers.Default) {
                     // A wrong password is retried without extra spaces, then lower-cased.
-                    val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)
+                    val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw, withTagSecret = wantSecret)
+                    secret = opened.tagSecret
                     try {
                         Triple(Bip39.entropyToWords(opened.entropy), SeedBox.fingerprint(opened.entropy), opened.fix)
                     } finally { opened.entropy.fill(0) }
                 }
                 if (wipes != wipesAtStart) return@launch
-                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, fix, restored = reveal)
+                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, fix, restored = reveal, tag = info)
+                wipeTagSecret()
+                tagSecret = secret; secret = null
+                canChangeProtection = tagSecret != null
                 lockTarget = text
                 if (reveal) restoredWords = words
                 clearPasswords(PwField.Read)
@@ -445,13 +509,22 @@ class SeedTagViewModel : ViewModel() {
             } catch (e: SeedTagException) {
                 showError(e.message ?: "Decryption failed.")
             } finally {
+                secret?.fill(0) // not kept: the scan was abandoned meanwhile
                 pw.fill(' ')
                 busy = null
             }
         }
     }
 
+    private fun setProtection(p: Protection) {
+        verifyResult = verifyResult?.let { v -> v.copy(tag = v.tag?.copy(protection = p)) }
+    }
+
     // ============================================================== hygiene ===
+
+    private fun wipeTagSecret() {
+        tagSecret?.fill(0); tagSecret = null; canChangeProtection = false
+    }
 
     private fun wipeBackup() {
         words.clear(); prefix = ""; clearPasswords(PwField.Password, PwField.Repeat); hideWords = true; wordCount = 24
@@ -464,12 +537,17 @@ class SeedTagViewModel : ViewModel() {
         cancelScan()
         if (step != BackupStep.Done) step = BackupStep.Length
         wipeBackup()
-        clearPasswords(PwField.Read); restoredWords = null
-        if (dialog is Dialog.ConfirmOverwrite || dialog is Dialog.ConfirmWeakPassword) dialog = null
+        clearPasswords(PwField.Read); restoredWords = null; wipeTagSecret()
+        if (dialog is Dialog.ConfirmOverwrite || dialog is Dialog.ConfirmWeakPassword || dialog is Dialog.ConfirmProtect) dialog = null
     }
 
     private fun showError(msg: String) {
         dialog = Dialog.Error(msg)
         _haptics.tryEmit(Haptic.Failure)
+    }
+
+    private companion object {
+        const val PROTECT_STEP_1 = "Step 1 of 2: hold the same tag to the phone to store its write password"
+        const val PROTECT_STEP_2 = "Step 1 done. Take the tag away, then hold it to the phone again to switch the protection on"
     }
 }

@@ -2,7 +2,32 @@
 
 - **Date:** 2026-11-07
 - **Follows:** finding #11 of [the security review](2026-11-07-security-review.md) (skimming and destruction)
-- **Status:** analysis only. Nothing is implemented, and nothing was tested on a device.
+- **Status:** the write password is implemented on `main` (2026-11-08, see [Implementation](#implementation)), but
+  not yet tested on a device. The proper lock and the `FF 0F` rescue are not implemented.
+
+## Implementation
+
+Added on 2026-11-08, following the recommendation below.
+
+- **Chips:** MIFARE Ultralight C and NTAG213/215/216, with the NTAG caveats below.
+- **Key:** derived from the backup password, so there's nothing new to remember:
+  `secret = HMAC-SHA256(AES key, "seedtag tag key v1")`. Ultralight C key = `secret[0:16]`; NTAG PWD =
+  `secret[16:20]`, PACK = `secret[20:22]`. Blob format v1 is unchanged.
+- **Where:** **Protect tag** and **Remove protection** on the Verify result, which also shows the chip and
+  whether it's protected. Only the tag that was just verified.
+- **Two taps.** The first stores the key or PWD/PACK and sets writes-only (Ultralight C AUTH1 = 1; NTAG PROT = 0,
+  AUTHLIM = 0) while AUTH0 is still off, and reads the settings back. The second, in a new session,
+  authenticates (3DES, or PWD_AUTH with PACK checked) and only then writes AUTH0 = 03h and reads it back.
+  A failed authentication goes back to the first step. Each tap is safe to repeat.
+- **Refusals:** Back up and **Make tag read-only** refuse a protected tag; a read-only tag can't be protected;
+  locked settings are reported and left alone.
+- **Make tag read-only** is unchanged. The `FF 0F` rescue isn't included.
+- **Chip identification** uses READ only, plus GET_VERSION once the size already says NTAG, because an
+  unknown command ends the session. A 144-byte tag is told apart by where READ wraps back to page 0
+  (Ultralight C after 2Bh, NTAG213 after 2Ch, NTAG203 after 29h).
+- **Changing the password:** remove the protection (old password), back up with the new password, verify,
+  protect again.
+- `seedtag.py tag-key` prints the key, PWD and PACK, for other NFC tools.
 
 ## Background
 
