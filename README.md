@@ -220,6 +220,9 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
 
 - **The password is the whole security.** A tag can be read by anyone who holds it, and the attack is offline password guessing.
   Argon2id at 64 MiB slows that down, but a weak password still falls. Use the generated passphrase.
+- **A lost password can't be recovered.** Without it nothing can decrypt the tag: not the app, not `seedtag.py`,
+  not the developer. There's no reset or recovery of any kind. Keep the written password safe, and keep a copy of
+  the seed itself somewhere else.
 - **This is not your only backup.** NFC chips can fail. Keep a metal or paper copy of the seed somewhere separate.
 - The phone is still a general-purpose, normally online device. For maximum safety use it in airplane mode, or on a spare
   phone that is never online.

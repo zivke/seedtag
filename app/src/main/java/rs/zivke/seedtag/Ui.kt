@@ -353,6 +353,11 @@ private fun PasswordStep(vm: SeedTagViewModel) {
                 "Anyone who finds the tag can try passwords offline, without limit. A generated 7-word passphrase " +
                     "(≈77 bits) is strongly recommended. Write it down, label it \"SeedTag password\" and store it apart from the tag.",
             )
+            WarningCard(
+                "Lose this password and the seed is gone",
+                "Without it, nothing can decrypt the tag: not this app, not seedtag.py, not the developer, nobody. " +
+                    "There's no reset and no recovery. Keep the written copy safe, and keep another backup of the seed itself.",
+            )
             OutlinedButton(onClick = vm::generatePassphrase, modifier = Modifier.fillMaxWidth()) {
                 Text("Generate 7-word passphrase")
             }

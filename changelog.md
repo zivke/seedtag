@@ -12,6 +12,9 @@ All notable user-visible changes to SeedTag. The format follows
   trailing or doubled), then also in lower case. If that's what matched, the
   app says so, so you can correct your written copy. Each retry takes another
   few seconds, only when the password didn't match.
+- A warning when choosing the password, and in the README: if the password is
+  lost, the seed can't be restored from the tag by anyone, not by the app,
+  `seedtag.py` or the developer.
 
 ### Changed
 - The generated passphrase comes with a reminder to label it "SeedTag
