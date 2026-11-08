@@ -117,6 +117,9 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
 
 - Keep `core` free of Android imports so `make test` stays a plain JVM test.
   Add a test when BIP39 or crypto behaviour changes, in Kotlin and Python.
+- Licences: the app and everything else are `GPL-3.0-or-later` (`LICENSE`); `tools/seedtag.py`
+  alone is `0BSD`, so recovery is never in legal doubt: keep it that way. Every source file starts
+  with an `SPDX-License-Identifier` line and `Copyright (C) 2026 zivke85`; add them to new files.
 - No new dependencies without asking. Bouncy Castle is the only crypto library.
 - Four-space indent for Kotlin, XML, shell and Python (`.editorconfig`).
 - For any user-visible change: add an entry under `## [Unreleased]` in
