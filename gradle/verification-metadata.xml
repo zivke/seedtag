@@ -3,6 +3,12 @@
    <configuration>
       <verify-metadata>true</verify-metadata>
       <verify-signatures>false</verify-signatures>
+      <trusted-artifacts>
+         <!-- Source and javadoc jars are only fetched by IDEs (the Kotlin language server) to show
+              library code. They're never compiled or packaged, so they aren't verified. -->
+         <trust file=".*-javadoc[.]jar" regex="true"/>
+         <trust file=".*-sources[.]jar" regex="true"/>
+      </trusted-artifacts>
    </configuration>
    <components>
       <component group="androidx.activity" name="activity" version="1.9.3">

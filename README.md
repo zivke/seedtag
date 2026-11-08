@@ -89,7 +89,8 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
   After adding or updating a dependency, run `make deps-metadata`: it records the new checksums and then
   cross-checks all of them against what Maven Central, Google's Maven repository and the Gradle Plugin Portal
   publish (`tools/check-deps.py`, also `make check-deps`), so a bad download isn't simply trusted. Review the
-  diff of the XML before committing it.
+  diff of the XML before committing it. Source and javadoc jars, which only the IDE downloads to show library
+  code, aren't checked: they're never compiled into the app.
 - **Dev container:** the base image is pinned by digest, and the Android command-line tools zip is checked against
   the SHA-256 Google publishes; `sdkmanager` checks the SDK packages itself.
 
