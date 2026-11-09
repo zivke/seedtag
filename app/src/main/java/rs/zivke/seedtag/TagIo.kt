@@ -66,7 +66,7 @@ sealed interface TagResult {
 /** Blocking tag I/O. Call only from the NFC reader-mode callback thread. */
 object TagIo {
 
-    private const val NOT_READ = "Couldn't read the tag properly (it may have moved away too soon). Hold it still against the phone and tap again."
+    private const val NOT_READ = "Couldn't read the tag properly (it may have moved away too soon). Hold it still against the phone and try again."
 
     fun perform(tag: Tag, request: TagRequest): TagResult = try {
         when (request) {
@@ -77,13 +77,13 @@ object TagIo {
             is TagRequest.Lock -> lock(tag, request.expected)
         }
     } catch (e: TagLostException) {
-        TagResult.Failed("Tag moved away too early. Hold it still against the phone and try again.")
+        TagResult.Failed("The tag moved away too early. Hold it still against the phone and try again.")
     } catch (e: IOException) {
         TagResult.Failed("Communication with the tag failed (${e.javaClass.simpleName}). Try again.")
     } catch (e: FormatException) {
         TagResult.Failed("The tag contains malformed NDEF data.")
     } catch (e: SecurityException) {
-        TagResult.Failed("Tag is no longer in range. Try again.")
+        TagResult.Failed("The tag is no longer in range. Try again.")
     } catch (e: rs.zivke.seedtag.core.SeedTagException) {
         TagResult.Failed(e.message ?: "Unreadable tag data.")
     }
@@ -105,7 +105,7 @@ object TagIo {
                 throw e
             } catch (e: IOException) {
                 return TagResult.Failed(
-                    "Couldn't format this blank tag. Hold it still and tap again. If it keeps failing, the tag may be too " +
+                    "Couldn't format this blank tag. Hold it still and try again. If it keeps failing, the tag may be too " +
                         "small (this backup needs $needed bytes) or not writable.",
                 )
             }
@@ -131,7 +131,7 @@ object TagIo {
             // cached message: that's what the tag held before this write.
             val back = it.ndefMessage ?: it.ndefMessage
                 ?: return TagResult.WrittenUnchecked(req.text) // couldn't read: check on the next tap
-            if (firstText(back) != req.text) return TagResult.Failed("Read-back mismatch after writing. The tag may be faulty – don't use it.")
+            if (firstText(back) != req.text) return TagResult.Failed("What was read back doesn't match what was written. The tag may be faulty – don't use it.")
             return TagResult.Written(req.text)
         }
     }
@@ -163,8 +163,8 @@ object TagIo {
     private fun tooSmall(text: String, needed: Int, has: Int, estimated: Boolean): String {
         val words = (runCatching { SeedBox.fromBase64(text).size }.getOrDefault(0) - SeedBox.OVERHEAD) * 3 / 4
         val fits = SeedBox.maxWordsFor(has)?.let { "It can hold a backup of up to $it words." } ?: "It's too small for any backup."
-        return "This tag is too small: the $words-word backup needs $needed bytes, and the tag has ${if (estimated) "about " else ""}" +
-            "$has. $fits Nothing was written. Cancel and use a bigger tag (an NTAG215 or NTAG216, for example), or hold another tag."
+        return "This tag is too small – the $words-word backup needs $needed bytes, but the tag only has ${if (estimated) "about " else ""}" +
+            "$has. $fits Nothing was written. Cancel and use a bigger tag (an NTAG215 or NTAG216, for example), or hold another tag to the phone."
     }
 
     private fun checkWritten(tag: Tag, expected: String): TagResult {
@@ -173,7 +173,7 @@ object TagIo {
             it.connect()
             val msg = readMessage(it) ?: return TagResult.Failed(NOT_READ)
             if (firstText(msg) != expected) {
-                return TagResult.Failed("This tag doesn't hold what was just written. Hold the same tag again; if this keeps failing, the tag may be faulty.")
+                return TagResult.Failed("This tag doesn't hold what was just written. Hold the same tag to the phone again. If this keeps happening, the tag may be faulty.")
             }
             return TagResult.Written(expected)
         }
@@ -184,7 +184,7 @@ object TagIo {
         ndef.use {
             it.connect()
             val msg = readMessage(it) ?: return TagResult.Failed(
-                "The tag is empty, or it couldn't be read properly. Hold it still against the phone and tap again.",
+                "The tag is empty, or it couldn't be read properly. Hold it still against the phone and try again.",
             )
             val text = firstText(msg) ?: return TagResult.Failed("The tag holds no text record.")
             return TagResult.Read(text)

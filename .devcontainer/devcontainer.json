@@ -37,7 +37,7 @@
     "source=claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume",
     // No signing keys in here, on purpose: release APKs are signed outside the
     // container (tools/sign-release.sh). See .devcontainer/README.md.
-    // adb's own key pair (and the debug key), so the device stays authorised
+    // adb's own key pair (and the debug key), so the device stays authorized
     // across rebuilds. Deliberately NOT ${devcontainerId}: the adb identity is
     // yours and shared by every Android project.
     "source=android-adb,target=/home/vscode/.android,type=volume",

@@ -28,7 +28,7 @@ ARG ANDROID_BUILD_TOOLS=34.0.0
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}:${PATH}
 
-# `sdkmanager --licenses` accepts the Android SDK licence agreements for you.
+# `sdkmanager --licenses` accepts the Android SDK license agreements for you.
 # The zip is checked against its published SHA-256; sdkmanager then checks every
 # package it installs against the checksums in Google's repository index.
 # The SDK is owned by vscode, so AGP can still fetch anything extra it wants.

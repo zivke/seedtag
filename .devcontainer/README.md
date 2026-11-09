@@ -21,7 +21,7 @@ Ubuntu 24.04 (`mcr.microsoft.com/devcontainers/base`), OpenJDK 21, Python 3
 with `cryptography` and `argon2-cffi`, and an Android SDK in `/opt/android-sdk`
 with `platform-tools` (adb), `platforms;android-35` and `build-tools;34.0.0`.
 The versions are `ARG`s at the top of the Dockerfile. Building the image
-accepts the Android SDK licence agreements (`sdkmanager --licenses`).
+accepts the Android SDK license agreements (`sdkmanager --licenses`).
 
 The base image is pinned by digest and the command-line tools zip by its
 SHA-256 (from the download table on developer.android.com/studio). When
@@ -63,7 +63,7 @@ make connect DEVICE_IP=<ip> ADB_PORT=<port>
 On LineageOS, *ADB over network* uses the fixed port 5555, so
 `make connect DEVICE_IP=<ip>` is enough. Export `SEEDTAG_DEVICE_IP` on the host
 to preset the address. adb's key pair lives in the `android-adb` volume, so
-the authorisation survives rebuilds.
+the authorization survives rebuilds.
 
 **Over USB.** Uncomment the `runArgs` line in `devcontainer.json`, rebuild,
 and run `adb kill-server` on the host so the host's adb releases the device.

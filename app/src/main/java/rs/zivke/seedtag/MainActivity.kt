@@ -96,7 +96,7 @@ class MainActivity : ComponentActivity() {
     /**
      * Tapjacking guard for every Android version: a touch that reaches us through another app's
      * window (FLAG_WINDOW_IS_OBSCURED) never gets to the UI, and the app says why. If an overlay
-     * shows up in the middle of a gesture, what the UI saw so far is cancelled, so a tap can't land.
+     * shows up in the middle of a gesture, what the UI saw so far is canceled, so a tap can't land.
      * Dialogs are windows of their own; they filter touches in Ui.kt (GuardDialogWindow).
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {

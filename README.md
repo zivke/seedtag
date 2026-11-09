@@ -141,11 +141,11 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
 1. **Back up**: first hold the tag you'll use to the phone. The app checks it (nothing is written): whether it
    works, whether it's read-only, blank or already holds data, and how long a backup it has room for. A 24-word
    backup needs 111 bytes of NDEF space, 12 words need 91. Then choose how many words your phrase has (12, 15, 18,
-   21 or 24; lengths the tag can't hold are greyed out), enter them with the in-app keypad (tap a suggestion to
+   21 or 24; lengths the tag can't hold are grayed out), enter them with the in-app keypad (tap a suggestion to
    accept each word), then set a password.
    Words already entered are hidden by default; tap **Show words** to check them.
    **Generate a 7-word passphrase** is recommended (≈77 bits). Write it down and label it *SeedTag password*: it's made of
-   the same BIP39 words as a seed phrase, so an unlabelled copy is easy to mistake for one, by you or by your heirs. Tap
+   the same BIP39 words as a seed phrase, so an unlabeled copy is easy to mistake for one, by you or by your heirs. Tap
    *Encrypt & write*, then hold the tag to the phone.
    The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
    A password estimated below 60 bits, or one that uses words of the seed, needs a confirmation before writing.
@@ -170,7 +170,7 @@ Leaving or closing the app (home button, Recents, screen off) deletes everything
 ever saved on the phone.
 
 **ⓘ** (About) in the top bar shows the version, what the app does with your data (nothing leaves the phone), the
-encryption used and the licence.
+encryption used and the license.
 
 ## Choosing a tag
 
@@ -316,7 +316,7 @@ SeedTag can only protect you from what happens inside its own window, and only f
   *accessibility tool* (screen readers such as TalkBack keep working), but a malicious app installed from outside
   Google Play can claim to be one. On **Android 8–13 it can't hide anything.** On every version, SeedTag shows a red
   banner naming the installed apps that have accessibility access (preinstalled system services aren't listed).
-  Open *Settings › Accessibility* and turn off any you don't recognise or don't need before entering your seed.
+  Open *Settings › Accessibility* and turn off any you don't recognize or don't need before entering your seed.
 - **Fake SeedTag apps.** Nothing inside SeedTag can protect you from a different app that looks like it. Install
   only an APK you built yourself or got from a source you trust, and check its signing certificate with
   `apksigner verify --print-certs seedtag.apk`.
@@ -365,7 +365,7 @@ throwaway mnemonic.
 ## Disclaimer
 
 SeedTag comes **without any warranty**, and its developer isn't responsible for any loss or damage from using it,
-including a lost seed or lost funds. You use it at your own risk (see also the [licences](#license)).
+including a lost seed or lost funds. You use it at your own risk (see also the [licenses](#license)).
 
 **Make sure yourself that there's no malware on the phone before you enter a seed.** SeedTag defends against some
 attacks by other apps (see the warnings above), but it can't cover every possible one: if the phone is compromised,
@@ -374,9 +374,9 @@ so may be your seed. The app shows this before a seed is entered, and on its Abo
 ## License
 
 - The app and everything else in this repository: [GNU GPL v3 or later](LICENSE) (`GPL-3.0-or-later`). You may use,
-  share and change it, but anything you distribute that's based on it must be released under the same licence, with
+  share and change it, but anything you distribute that's based on it must be released under the same license, with
   its source.
 - `tools/seedtag.py`: [BSD Zero Clause](tools/seedtag.py) (`0BSD`, the full text is in the file's header), so
   anyone can always use it to recover a tag, for any purpose.
 
-Each source file names its licence in an `SPDX-License-Identifier` line. See [changelog.md](changelog.md) for changes.
+Each source file names its license in an `SPDX-License-Identifier` line. See [changelog.md](changelog.md) for changes.

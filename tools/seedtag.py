@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: 0BSD
 # Copyright (C) 2026 zivke85
 #
-# This file alone is under the BSD Zero Clause licence, unlike the rest of SeedTag
+# This file alone is under the BSD Zero Clause license, unlike the rest of SeedTag
 # (GPL-3.0-or-later), so anyone can always use it to recover a tag, for any purpose:
 #
 # Permission to use, copy, modify, and/or distribute this software for any

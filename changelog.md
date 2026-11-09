@@ -17,7 +17,7 @@ All notable user-visible changes to SeedTag. The format follows
   phone and the app says whether it works, whether it's read-only, blank or
   already holds data (a SeedTag backup or something else), and how long a
   backup it has room for. Nothing is written. Word counts the tag can't hold
-  are greyed out, and **Use another tag** goes back to the check.
+  are grayed out, and **Use another tag** goes back to the check.
 - **Find NFC spot** says how long a backup a tag has room for (for example "137
   bytes: room for a backup of any length"), or that it's too small for any.
 - Verify, Restore and `seedtag.py` forgive the most common typing mistakes:
@@ -44,7 +44,7 @@ All notable user-visible changes to SeedTag. The format follows
   the fingerprint mean.
 - An **About** page, from the top bar: the version, privacy (offline, no
   network permission, nothing stored), the protections on the phone, the
-  encryption and `seedtag.py`, and the licence.
+  encryption and `seedtag.py`, and the license.
 - **Find NFC spot** in the top bar opens a finder for the phone's NFC antenna:
   slide a tag or any contactless card over the back of the phone until it
   vibrates and says *Tag detected*. It also says whether SeedTag can use that
@@ -64,7 +64,7 @@ All notable user-visible changes to SeedTag. The format follows
 
 ### Changed
 - A new, calmer look. One fixed palette in dark and light (ink surfaces, a
-  single amber accent) instead of wallpaper colours, so warnings look the same
+  single amber accent) instead of wallpaper colors, so warnings look the same
   on every phone: red only for what is risky or permanent, green only for a
   good result. Each step shows *Step N of M* with a progress bar, and its main
   button stays at the bottom of the screen. The safety advice before Back up,
@@ -78,6 +78,8 @@ All notable user-visible changes to SeedTag. The format follows
   red-outlined button. The top bar shows the app icon, and About opens from
   its ⓘ. The NFC spot finder and the scan window pulse while they wait for a
   tag, and every screen scrolls back to the top when a prompt closes.
+- Copy-edited every text in the app: clearer phrasing, fixed punctuation, US
+  spelling, and dashes instead of chains of colons.
 - *Before you start* says to hold the tag to the phone only when the app asks,
   not the whole time: the app only reads or writes it while it's held over
   the NFC spot. It also says that everything typed or decrypted is deleted
@@ -93,7 +95,7 @@ All notable user-visible changes to SeedTag. The format follows
 - **Check your tag** explains what the scan is for: to inspect the tag before
   anything is typed, with nothing written.
 - The generated passphrase comes with a reminder to label it "SeedTag
-  password": it's made of the same words as a seed phrase, so an unlabelled
+  password": it's made of the same words as a seed phrase, so an unlabeled
   copy is easy to mistake for one.
 - README: what the fingerprint does and doesn't reveal, and not to keep it
   next to a partly readable copy of the seed.
@@ -109,7 +111,7 @@ All notable user-visible changes to SeedTag. The format follows
   with an empty password, and each tab only shows its own result. The password
   field stays in view above the keyboard while typing.
 - New app icon: a key-fob NFC tag with a ₿ on a dark background, plus a
-  single-colour version for themed icons on Android 13+. The app's window
+  single-color version for themed icons on Android 13+. The app's window
   background matches the new icon's.
 - Building: the release signing key no longer lives in the dev container.
   `make build` makes an unsigned `seedtag-unsigned.apk`, which `tools/sign-
@@ -198,7 +200,7 @@ All notable user-visible changes to SeedTag. The format follows
 - Writing to a blank, unformatted tag no longer reports a failure and then
   asks to overwrite its own backup. It now asks for a second tap and reads the
   tag back.
-- Cancelling a scan, or leaving the app while a tag was being read, no longer
+- Canceling a scan, or leaving the app while a tag was being read, no longer
   brings the scan prompt or an error back afterwards.
 - Leaving the app while Argon2 is still running no longer puts the decrypted
   words back on screen.

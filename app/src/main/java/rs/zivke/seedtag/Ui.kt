@@ -113,7 +113,7 @@ import rs.zivke.seedtag.core.SeedBox
 // ============================================================== theme ===
 //
 // One fixed palette, matching the icon: ink surfaces, a single amber accent, red only for what is
-// risky or permanent, green only for a result that's good. No dynamic (wallpaper) colours, so the
+// risky or permanent, green only for a result that's good. No dynamic (wallpaper) colors, so the
 // app looks the same on every phone and its warnings always look like warnings.
 
 private val DarkColors = darkColorScheme(
@@ -172,7 +172,7 @@ private val LightColors = lightColorScheme(
     onErrorContainer = Color(0xFF410E0B),
 )
 
-/** Colours Material has no slot for: a good result, and "fair" in the strength meter. */
+/** Colors Material has no slot for: a good result, and "fair" in the strength meter. */
 private class ExtraColors(val success: Color, val successContainer: Color, val onSuccessContainer: Color, val fair: Color)
 
 private val DarkExtra = ExtraColors(Color(0xFF7FD3A0), Color(0xFF16291D), Color(0xFFC9EED6), Color(0xFFE5A54B))
@@ -318,13 +318,13 @@ private val LocalAirplaneMode = compositionLocalOf { false }
 /** Counts closed prompts and dialogs; [StepScreen] scrolls to the top when it changes. */
 private val LocalActionsDone = compositionLocalOf { 0 }
 
-/** A text style whose line box is just the font's height, centred, so the letters sit on a row's centre line. */
-private fun TextStyle.centred() =
+/** A text style whose line box is just the font's height, centered, so the letters sit on a row's center line. */
+private fun TextStyle.centered() =
     copy(lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both))
 
 /**
  * The top bar: one row, so the icon, the title, Find NFC spot and ⓘ (or the back arrow and a page's
- * title) all share the same vertical centre.
+ * title) all share the same vertical center.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -347,14 +347,14 @@ private fun Header(page: Page?, onBack: () -> Unit, onFindSpot: () -> Unit, onAb
         }
         Text(
             page?.title ?: "SeedTag",
-            style = MaterialTheme.typography.titleLarge.centred(),
+            style = MaterialTheme.typography.titleLarge.centered(),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
         if (page == null) {
             TextButton(onClick = onFindSpot) {
-                Text(Page.Antenna.button, style = MaterialTheme.typography.labelLarge.centred())
+                Text(Page.Antenna.button, style = MaterialTheme.typography.labelLarge.centered())
             }
             IconButton(onClick = onAbout) { Icon(Icons.Outlined.Info, Page.About.title) }
         }
@@ -409,7 +409,7 @@ private fun Banners(
             Notice(
                 Tone.Caution,
                 if (nfcState == NfcState.Missing) "This device has no NFC" else "NFC is turned off",
-                if (nfcState == NfcState.Missing) "SeedTag can't read or write tags on it." else "SeedTag needs it to read and write the tag.",
+                if (nfcState == NfcState.Missing) "SeedTag can't read or write tags on it." else "SeedTag needs it to read and write tags.",
             ) {
                 if (nfcState == NfcState.Disabled) Link("Turn on NFC", onClick = openNfcSettings)
             }
@@ -418,8 +418,8 @@ private fun Banners(
             Notice(
                 Tone.Caution,
                 "Another app is covering SeedTag",
-                "Your taps are ignored while it does. Close it, or turn off apps such as screen dimmers or chat bubbles, " +
-                    "then tap again. If you don't know which app it is, don't enter your seed.",
+                "SeedTag ignores your taps while it's there. Close it, or turn off apps such as screen dimmers or " +
+                    "chat bubbles, then try again. If you don't know which app it is, don't enter your seed.",
             )
         }
         if (accessibilityApps.isNotEmpty()) AccessibilityBanner(accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
@@ -430,13 +430,13 @@ private fun Banners(
 @Composable
 private fun AccessibilityBanner(apps: List<String>, openSettings: () -> Unit, hide: () -> Unit) {
     val names = apps.joinToString(", ")
-    val text = "$names ${if (apps.size == 1) "has" else "have"} accessibility access: such apps can read the screen " +
-        "and see what you tap. If you don't recognise " + (if (apps.size == 1) "it" else "one") + " or don't need it, " +
-        "turn it off in Settings › Accessibility before entering your seed." +
+    val text = "$names ${if (apps.size == 1) "has" else "have"} accessibility access, which lets an app read the " +
+        "screen and see what you tap. If you don't recognize " + (if (apps.size == 1) "it" else "one of them") +
+        " or don't need it, turn it off in Settings › Accessibility before you enter your seed." +
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            " SeedTag hides its screen from apps that aren't accessibility tools, but a malicious app can claim to be one."
+            " SeedTag hides its screen from apps that aren't accessibility tools, but a malicious app can pretend to be one."
         } else {
-            " On this Android version SeedTag can't hide its screen from them."
+            " On this Android version, SeedTag can't hide its screen from them."
         }
     Notice(Tone.Caution, "Apps that can read your screen", text) {
         Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -680,7 +680,7 @@ private fun Hero(tone: Tone, title: String, subtitle: String) {
     }
 }
 
-/** Label / value lines in one quiet card. [Fact.tone] colours the value (null: plain). */
+/** Label / value lines in one quiet card. [Fact.tone] colors the value (null: plain). */
 private class Fact(val label: String, val value: String, val tone: Tone? = null, val mono: Boolean = false)
 
 @Composable
@@ -728,21 +728,21 @@ private fun Steps(steps: List<String>) {
  */
 @Composable
 private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
-    val restart = "close SeedTag and restart the phone before it goes back online: some spyware doesn't survive a " +
-        "restart, and loses whatever it caught."
+    val restart = "close SeedTag and restart the phone before it goes back online. Some spyware doesn't survive a " +
+        "restart and loses whatever it captured."
     val offline = if (LocalAirplaneMode.current) {
         Item(
             Tone.Info,
             "Airplane mode is on",
-            "Check that Wi-Fi and Bluetooth are off too: they can be switched on in airplane mode.",
+            "Check that Wi-Fi and Bluetooth are off too – they can be turned on even in airplane mode.",
             "When you're done, $restart",
         )
     } else {
         Item(
             Tone.Caution,
             "Go offline first",
-            "SeedTag can't go online, but other apps on this phone can, and malware could send what you type or see here.",
-            "The safest way to use this application is on a spare phone that's never online. Otherwise restart the phone, turn on airplane mode and check " +
+            "SeedTag can't go online, but other apps on this phone can – and malware could send out whatever you type or see here.",
+            "The safest way to use this application is on a spare phone that's never online. Otherwise, restart the phone, turn on airplane mode and check " +
                 "that Wi-Fi and Bluetooth are off (NFC normally stays on). When you're done, $restart",
         )
     }
@@ -751,7 +751,7 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
             Item(
                 Tone.Caution,
                 "Read every screen carefully",
-                "Each one says exactly what to do. Read all of it before you tap, and open every Learn more: the " +
+                "Each one says exactly what to do. Read all of it, including every Learn more, before you tap – the " +
                     "details matter. Some steps, such as overwriting or locking a tag, can't be undone.",
             ),
         )
@@ -760,7 +760,7 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
                 Item(
                     Tone.Caution,
                     "Only do this in private",
-                    "The words will be on screen. Make sure nobody, and no camera, can see it.",
+                    "The words will be shown on screen. Make sure no one – and no camera – can see it.",
                     "They're hidden again as soon as you leave the app.",
                 ),
             )
@@ -770,13 +770,13 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
             Item(
                 Tone.Info,
                 "Hold the tag to the phone only when asked",
-                (if (flow == Flow.Backup) "The app asks twice: now, to check the tag, and at the end, to write the backup. " else "The app asks once, after the password. ") +
+                (if (flow == Flow.Backup) "The app will ask for it twice – once now to check it and once at the end to write the backup. " else "The app will ask for it once, after you've typed the password. ") +
                     "You don't need to hold it while you read or type. When asked, hold it flat over the phone's NFC " +
-                    "spot and keep it still until the app says it's done: it only reads or writes the tag while it's " +
-                    "held there.",
+                    "spot and keep it still until the app says it's done. The app only reads or writes the tag while " +
+                    "it's held there.",
                 "The spot is usually near the middle or the top of the back. A thick or metal case can block it. If " +
-                    "the tag moves away too early, nothing is lost: hold it there again. Small tags and rings have a small " +
-                    "NFC symbol on them: put that side right against the spot.",
+                    "the tag moves away too early, nothing is lost – just hold it there again. Small tags and rings have a " +
+                    "small NFC symbol on them; put that side right against the spot.",
                 "Find where to hold it" to { vm.page = Page.Antenna },
             ),
         )
@@ -785,7 +785,7 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
                 Tone.Info,
                 "Nothing is kept",
                 "Everything you type or decrypt is deleted as soon as you close or leave SeedTag, and nothing is ever " +
-                    "saved on the phone. If you leave halfway, you type it again.",
+                    "saved on the phone. If you leave halfway through, you'll have to type it again.",
             ),
         )
         if (flow == Flow.Verify) {
@@ -793,17 +793,17 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
                 Item(
                     Tone.Info,
                     "What Verify does",
-                    "It proves the tag reads, that your written password opens it and that it holds a valid seed, " +
-                        "without ever showing the words.",
-                    "Type the password from your written copy, not from memory: that checks the copy too. You get ✓ and " +
-                        "a fingerprint; right after a backup, it also says whether the tag holds the seed you just " +
-                        "wrote. Do it after every backup, before locking the tag, and again every now and then (say " +
+                    "It checks that the tag can be read, that your written password opens it and that it holds a valid " +
+                        "seed – without ever showing the words.",
+                    "Type the password from your written copy, not from memory – that checks the copy too. You'll get ✓ " +
+                        "and a fingerprint, and right after a backup, it also tells you whether the tag holds the seed you " +
+                        "just wrote. Verify after every backup, before you lock the tag and again every now and then (say, " +
                         "once a year) to make sure the tag still reads.",
                 ),
             )
         }
         if (flow == Flow.Backup) {
-            add(Item(Tone.Caution, "Use at your own risk", "No warranty, and make sure yourself there's no malware on this phone.", DISCLAIMER))
+            add(Item(Tone.Caution, "Use at your own risk", "There's no warranty, and it's up to you to make sure this phone is free of malware.", DISCLAIMER))
         }
     }
     Checklist("Before you start", items)
@@ -847,10 +847,10 @@ private fun BackupScreen(vm: SeedTagViewModel) {
 }
 
 private const val DISCLAIMER =
-    "SeedTag comes without any warranty, and its developer isn't responsible for any loss or damage from using " +
-        "it, including a lost seed or lost funds. You use it at your own risk.\n\n" +
-        "Before you enter a seed, make sure yourself that there's no malware on this phone. SeedTag defends against " +
-        "some attacks by other apps, but it can't cover every possible one: if the phone is compromised, so may be your seed."
+    "SeedTag comes without any warranty, and its developer isn't responsible for any loss or damage resulting from " +
+        "its use, including a lost seed or lost funds. You use it at your own risk.\n\n" +
+        "Before you enter a seed, it's up to you to make sure this phone is free of malware. SeedTag defends against " +
+        "some attacks by other apps, but it can't cover every possible one. If the phone is compromised, your seed may be too."
 
 @Composable
 private fun TagStep(vm: SeedTagViewModel) {
@@ -870,9 +870,8 @@ private fun TagStep(vm: SeedTagViewModel) {
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             StepHeader(
                 1, BACKUP_STEPS, "Check your tag",
-                "First, SeedTag scans the tag you'll use, to inspect it: whether it works, whether it already holds " +
-                    "data, and how long a backup it has room for. Nothing is written to it. Tap Scan tag, then hold it " +
-                    "to the phone.",
+                "First, SeedTag scans your tag to check whether it works, whether it already holds data and how much " +
+                    "it can hold. Nothing is written to it. Tap Scan tag, then hold the tag to the phone.",
             )
             Link("Not sure where to hold it? Find your NFC spot") { vm.page = Page.Antenna }
         }
@@ -886,8 +885,8 @@ private fun TagStep(vm: SeedTagViewModel) {
 private fun TagCheckResult(c: TagCheck) {
     val (title, hint) = when {
         !c.supported -> "This tag can't be used" to
-            "It doesn't support NDEF, the standard way of storing data on an NFC tag. Use another tag (an NTAG215 or NTAG216, for example)."
-        !c.writable -> "This tag can't be used" to "It's read-only: nothing can be written to it. Use another tag."
+            "It doesn't support NDEF, the standard way of storing data on NFC tags. Use another tag (an NTAG215 or NTAG216, for example)."
+        !c.writable -> "This tag can't be used" to "It's read-only, so nothing can be written to it. Use another tag."
         c.tooSmall -> "This tag is too small" to "Use a bigger tag (an NTAG215 or NTAG216, for example)."
         else -> "This tag works" to null
     }
@@ -906,14 +905,14 @@ private fun TagCheckResult(c: TagCheck) {
                     add(
                         Fact(
                             "Room",
-                            c.capacity?.let { capacityText(it, c.estimated) } ?: "Unknown: it's checked again when the backup is written.",
+                            c.capacity?.let { capacityText(it, c.estimated) } ?: "Unknown – it's checked again when the backup is written.",
                             if (c.tooSmall) Tone.Caution else null,
                         ),
                     )
-                    add(Fact("State", if (c.ndef) "Read without problems" else "Blank: formatted when writing, then a second tap reads it back"))
+                    add(Fact("State", if (c.ndef) "Read without problems" else "Blank – it's formatted when the backup is written, then a second tap reads it back"))
                     when (c.content) {
-                        TagContent.Backup -> add(Fact("Holds", "A SeedTag backup. A new one replaces it; the app asks first.", Tone.Caution))
-                        TagContent.Other -> add(Fact("Holds", "Other data, which the backup would replace; the app asks first.", Tone.Caution))
+                        TagContent.Backup -> add(Fact("Holds", "A SeedTag backup. A new backup would replace it (the app asks first).", Tone.Caution))
+                        TagContent.Other -> add(Fact("Holds", "Other data, which the backup would replace (the app asks first).", Tone.Caution))
                         TagContent.Empty -> add(Fact("Holds", "Nothing yet"))
                     }
                 },
@@ -927,16 +926,16 @@ private fun capacityText(bytes: Int, estimated: Boolean): String {
     val size = (if (estimated) "about " else "") + "$bytes bytes"
     val max = SeedBox.maxWordsFor(bytes)
     return when (max) {
-        null -> "$size: too small for any backup (12 words need ${SeedBox.ndefBytesFor(12)} bytes)."
-        24 -> "$size: room for a backup of any length (24 words need ${SeedBox.ndefBytesFor(24)} bytes)."
-        else -> "$size: room for a backup of up to $max words (24 words need ${SeedBox.ndefBytesFor(24)} bytes)."
+        null -> "$size – too small for any backup (12 words need ${SeedBox.ndefBytesFor(12)} bytes)."
+        24 -> "$size – room for a backup of any length (24 words need ${SeedBox.ndefBytesFor(24)} bytes)."
+        else -> "$size – room for a backup of up to $max words (24 words need ${SeedBox.ndefBytesFor(24)} bytes)."
     }
 }
 
 @Composable
 private fun LengthStep(vm: SeedTagViewModel) {
     StepScreen(bottom = { SecondaryButton("Use another tag", vm::checkAnotherTag) }) {
-        StepHeader(2, BACKUP_STEPS, "How many words?", "Pick the length written on your recovery phrase. The keypad then stops at that many words.")
+        StepHeader(2, BACKUP_STEPS, "How many words?", "Choose the number of words in your recovery phrase. The keypad stops once that many are entered.")
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Bip39.validWordCounts.sorted().forEach { n ->
                 // Can't pick fewer words than are already entered (after Back from the keypad), nor
@@ -950,7 +949,7 @@ private fun LengthStep(vm: SeedTagViewModel) {
                 when {
                     max != null && max < 24 -> "This tag has room for up to $max words. Longer phrases need a bigger tag."
                     c.capacity == null -> "This tag's size is checked again when the backup is written."
-                    else -> "This tag has room for any length."
+                    else -> "This tag has room for a phrase of any length."
                 },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1143,11 +1142,11 @@ private fun PasswordStep(vm: SeedTagViewModel) {
         Notice(
             Tone.Caution,
             "This password is the only key",
-            "Anyone who finds the tag can try passwords offline, without limit. And if you lose it, nothing can decrypt " +
-                "the tag: not this app, not seedtag.py, not the developer, nobody.",
+            "Anyone who finds the tag can try passwords offline, without limit. And if you lose the password, nothing can " +
+                "decrypt the tag – not this app, not seedtag.py, not the developer, nobody.",
             "A generated 7-word passphrase (≈77 bits) is strongly recommended. Write it down, label it \"SeedTag " +
-                "password\" and store it apart from the tag. There's no reset and no recovery: keep the written copy " +
-                "safe, and keep another backup of the seed itself.",
+                "password\" and store it apart from the tag. There's no reset and no recovery, so keep the written copy " +
+                "safe and keep another backup of the seed itself.",
         )
         FilledTonalButton(onClick = vm::generatePassphrase, modifier = Modifier.fillMaxWidth().height(48.dp)) {
             Text("Generate a 7-word passphrase")
@@ -1156,7 +1155,7 @@ private fun PasswordStep(vm: SeedTagViewModel) {
             Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "Write this down now, labelled \"SeedTag password\"",
+                        "Write this down now and label it \"SeedTag password\"",
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
@@ -1168,8 +1167,8 @@ private fun PasswordStep(vm: SeedTagViewModel) {
                         color = MaterialTheme.colorScheme.onPrimaryContainer,
                     )
                     Text(
-                        "It's made of the same kind of words as a seed phrase, but it isn't one. Label it so that nobody, " +
-                            "you or your heirs, mistakes one for the other, and keep it apart from the tag and the seed.",
+                        "It's made of the same kind of words as a seed phrase, but it isn't one. Label it so that no one – " +
+                            "neither you nor your heirs – mistakes one for the other, and keep it apart from the tag and the seed.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     )
@@ -1197,8 +1196,8 @@ private fun PasswordStep(vm: SeedTagViewModel) {
 private fun StrengthMeter(bits: Int) {
     val x = LocalExtra.current
     val (level, msg, color) = when {
-        bits < 50 -> Triple(1, "Weak · ≈$bits bits · crackable offline. Use a passphrase.", MaterialTheme.colorScheme.error)
-        bits < 70 -> Triple(2, "Fair · ≈$bits bits · consider a longer passphrase.", x.fair)
+        bits < 50 -> Triple(1, "Weak · ≈$bits bits · can be cracked offline. Use a passphrase.", MaterialTheme.colorScheme.error)
+        bits < 70 -> Triple(2, "Fair · ≈$bits bits · a longer passphrase would be safer.", x.fair)
         else -> Triple(3, "Strong · ≈$bits bits", x.success)
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1219,12 +1218,12 @@ private fun DoneStep(vm: SeedTagViewModel) {
             SecondaryButton("Back up another seed", vm::startOver)
         },
     ) {
-        Hero(Tone.Success, "Backup written", "Written to the tag and read back.")
+        Hero(Tone.Success, "Backup written", "Written to the tag and checked by reading it back.")
         vm.backupFingerprint?.let {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Facts(listOf(Fact("Fingerprint", it, mono = true)))
                 Text(
-                    "Not secret. Verify on this phone or with seedtag.py shows the same value if the backup is intact.",
+                    "This isn't secret. If the backup is intact, Verify (here or in seedtag.py) shows the same value.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1234,14 +1233,14 @@ private fun DoneStep(vm: SeedTagViewModel) {
             Tone.Caution,
             "Not finished yet",
             "Verify the tag with the password from your written copy before you rely on it or lock it. Keep another " +
-                "copy of the seed somewhere else: NFC chips can fail.",
+                "copy of the seed somewhere else, too – NFC chips can fail.",
         )
         SectionLabel("Next steps")
         Steps(
             listOf(
                 "Go to Verify and decrypt the tag by typing the password from your written copy.",
-                "Optionally recover it on an offline computer with seedtag.py.",
-                "Only then lock the tag (permanent, on the Verify tab), and keep another backup of the seed elsewhere.",
+                "Optionally, recover it on an offline computer with seedtag.py.",
+                "Only then lock the tag (on the Verify tab – it's permanent) and keep another backup of the seed somewhere else.",
             ),
         )
     }
@@ -1278,7 +1277,7 @@ private fun ReadPasswordStep(vm: SeedTagViewModel, reveal: Boolean) {
         StepHeader(
             1, 2,
             if (reveal) "Restore a seed" else "Verify a tag",
-            if (reveal) "Type the password, then scan the tag. The words will be shown." else
+            if (reveal) "Type the password, then scan the tag. The words will be shown on screen." else
                 "Type the password from your written copy, then scan the tag. The words stay hidden.",
         )
         Preflight(vm, if (reveal) Flow.Restore else Flow.Verify)
@@ -1292,7 +1291,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
         Hero(
             if (differs) Tone.Caution else Tone.Success,
             if (reveal) "Restored" else "Verified",
-            "Decrypted a ${result.wordCount}-word seed, checksum OK.",
+            "Decrypted a ${result.wordCount}-word seed with a valid checksum.",
         )
         Facts(
             buildList {
@@ -1300,7 +1299,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                 when (result.matchesBackup) {
                     true -> add(Fact("Backup from this session", "Same seed", Tone.Success))
                     false -> add(
-                        Fact("Backup from this session", "A different seed (${vm.backupFingerprint}). Check you scanned the right tag.", Tone.Caution),
+                        Fact("Backup from this session", "A different seed (${vm.backupFingerprint}). Check that you scanned the right tag.", Tone.Caution),
                     )
                     null -> Unit
                 }
@@ -1314,7 +1313,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                 DangerButton("Hide words", vm::hideRestored)
             } else {
                 Text(
-                    "The words are hidden. To see them again, restore the tag again.",
+                    "The words are hidden. To see them again, restore the tag once more.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1324,14 +1323,14 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                 Tone.Info,
                 "What this means",
                 "The tag reads correctly, and your password decrypts it to a valid ${result.wordCount}-word seed.",
-                "The fingerprint is the same for the same seed on any tag, with any password, and in seedtag.py; it " +
-                    "isn't secret and doesn't reveal the words. Compare it with the one shown after the backup: if they " +
+                "The fingerprint is the same for the same seed on any tag, with any password and in seedtag.py. It " +
+                    "isn't secret and doesn't reveal the words. Compare it with the one shown after the backup – if they " +
                     "match, this tag holds that seed.",
             )
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionLabel("Lock the tag")
                 Text(
-                    "Once you're sure, you can make the tag read-only. That's permanent: it can never be rewritten or erased.",
+                    "Once you're sure, you can make the tag read-only. This is permanent – the tag can never be rewritten or erased.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1349,7 +1348,7 @@ private fun passwordFixNote(fix: PasswordFix): String? {
         PasswordFix.Case -> "capital letters"
         PasswordFix.SpacesAndCase -> "extra spaces and capital letters"
     }
-    return "The password only matched with $ignored ignored. Check that your written copy shows it exactly as it was set."
+    return "The password only matched once $ignored were ignored. Make sure your written copy shows it exactly as it was set."
 }
 
 /**
@@ -1488,8 +1487,8 @@ private fun AntennaPage(vm: SeedTagViewModel, nfcState: NfcState, openNfcSetting
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text("Find your phone's NFC spot", style = MaterialTheme.typography.headlineSmall)
             Text(
-                "Every phone reads tags at one small spot on its back. Find it now, so you know where to hold the tag " +
-                    "when the app asks. Nothing is written to the tag, and its contents aren't read.",
+                "Every phone reads tags at one small spot on its back. Find it now so you know where to hold the tag " +
+                    "when the app asks. Nothing is written to the tag and its contents aren't read.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1499,7 +1498,7 @@ private fun AntennaPage(vm: SeedTagViewModel, nfcState: NfcState, openNfcSetting
             SectionLabel("1 · Check that NFC is on")
             when (nfcState) {
                 NfcState.Ready -> Notice(Tone.Success, "NFC is on", "Go on to the next step.")
-                NfcState.Disabled -> Notice(Tone.Caution, "NFC is off", "Turn it on first: without it, no tag is detected.") {
+                NfcState.Disabled -> Notice(Tone.Caution, "NFC is off", "Turn it on first – without it, no tag can be detected.") {
                     Link("Turn on NFC", onClick = openNfcSettings)
                 }
                 NfcState.Missing -> Notice(Tone.Caution, "This device has no NFC", "SeedTag can't read or write tags on it.")
@@ -1510,7 +1509,7 @@ private fun AntennaPage(vm: SeedTagViewModel, nfcState: NfcState, openNfcSetting
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionLabel("2 · Slide the tag over the back of the phone")
             Text(
-                "Use your tag, or any contactless card. Move it slowly, flat against the phone, until the phone " +
+                "Use your tag or any contactless card. Move it slowly, flat against the phone, until the phone " +
                     "vibrates and Tag detected appears below.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1523,7 +1522,7 @@ private fun AntennaPage(vm: SeedTagViewModel, nfcState: NfcState, openNfcSetting
             } else {
                 Text("Tag detected" + if (p.count > 1) " · ${p.count} times" else "", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "That's the spot. Lift the tag away and back to try again.",
+                    "That's the spot. Lift the tag away and bring it back to try again.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -1536,11 +1535,11 @@ private fun AntennaPage(vm: SeedTagViewModel, nfcState: NfcState, openNfcSetting
                     Fact(
                         "This tag",
                         when {
-                            p.ndef && p.writable == false -> "Read-only: SeedTag can read it but not write to it."
+                            p.ndef && p.writable == false -> "Read-only – SeedTag can read it but can't write to it."
                             p.ndef && p.ndefSize != null -> "NDEF tag, " + capacityText(p.ndefSize, estimated = false)
-                            p.ndef -> "Can hold NDEF data: SeedTag can use it."
-                            p.formatable -> "Blank. Back up checks its size first and formats it on the first write."
-                            else -> "Not an NDEF tag: SeedTag can't use it, but it's fine for finding the spot."
+                            p.ndef -> "Can hold NDEF data, so SeedTag can use it."
+                            p.formatable -> "Blank. Back up checks its size first and formats it when the backup is written."
+                            else -> "Not an NDEF tag. SeedTag can't use it, but it's fine for finding the spot."
                         },
                     ),
                 ),
@@ -1550,12 +1549,12 @@ private fun AntennaPage(vm: SeedTagViewModel, nfcState: NfcState, openNfcSetting
             SectionLabel("Tips")
             Steps(
                 listOf(
-                    "The spot is usually in the upper half of the back, near the camera, or in the middle. On some phones it's at the very top edge.",
+                    "The spot is usually in the upper half of the back, near the camera, or in the middle. On some phones, it's at the very top edge.",
                     "Hold the tag flat against the phone, not edge-on, and keep it still for a moment.",
-                    "Small tags, stickers and rings have a small antenna and usually a small NFC symbol: put that " +
-                        "side directly against the phone's NFC spot.",
-                    "Thick or metal cases, magnetic mounts, ring holders and card wallets can block it: take them off.",
-                    "Later, the tag only needs to be there while the app asks for it, not the whole time.",
+                    "Small tags, stickers and rings have a small antenna and usually a small NFC symbol. Put the side " +
+                        "with the symbol directly against the phone's NFC spot.",
+                    "Thick or metal cases, magnetic mounts, ring holders and card wallets can block it – take them off.",
+                    "Later, you only need to hold the tag there when the app asks for it, not the whole time.",
                 ),
             )
         }
@@ -1597,8 +1596,8 @@ private fun AboutPage() {
             Text("SeedTag", style = MaterialTheme.typography.headlineSmall)
             Text("Version ${version ?: "unknown"}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                "Stores a password-encrypted BIP39 seed phrase on an NFC tag, and reads it back: Back up writes it, " +
-                    "Verify checks it without showing the words, Restore shows them.",
+                "Stores a password-encrypted BIP39 seed phrase on an NFC tag and reads it back. Back up writes it, " +
+                    "Verify checks it without showing the words and Restore shows them.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -1607,26 +1606,27 @@ private fun AboutPage() {
             AboutSection(
                 "Privacy",
                 "SeedTag works entirely offline. It has no internet permission, so it can't send anything anywhere, " +
-                    "and no analytics or crash reporting. Its only permissions are NFC, hiding other apps' overlays and vibrating. " +
-                    "It stores nothing on the phone: everything typed or decrypted is wiped when you leave the app.",
+                    "and it has no analytics or crash reporting. Its only permissions are NFC, hiding other apps' " +
+                    "overlays and vibration. It stores nothing on the phone – everything typed or decrypted is wiped " +
+                    "when you leave the app.",
             )
             AboutSection(
                 "Protection on the phone",
-                "Seed words and passwords are typed on the app's own keyboards, never the system one. Screenshots and " +
-                    "screen recording are blocked, other apps' overlays are hidden (Android 12+), and taps that come " +
+                "Seed words and passwords are typed on the app's own keyboards, never the system keyboard. Screenshots " +
+                    "and screen recording are blocked, other apps' overlays are hidden (Android 12+) and taps that come " +
                     "through another app's window are ignored.",
             )
             AboutSection(
                 "Encryption",
                 "Argon2id (64 MiB, 3 passes) turns the password into a key, and AES-256-GCM encrypts the seed's raw " +
                     "entropy. The format is documented and versioned. seedtag.py, a single-file Python tool, encrypts " +
-                    "and decrypts the same format on any computer, so a backup doesn't depend on this app.",
+                    "and decrypts the same format on any computer, so your backup doesn't depend on this app.",
             )
             AboutSection(
-                "Licence",
-                "Free and open source under the GNU General Public License, version 3 or later: you may use, share and " +
-                    "change it, but anything you distribute that's based on it must be released under the same licence, " +
-                    "with its source. seedtag.py is under the BSD Zero Clause licence, so anyone can always use it to " +
+                "License",
+                "Free and open source under the GNU General Public License, version 3 or later. You may use, share and " +
+                    "modify it, but anything you distribute that's based on it must be released under the same license, " +
+                    "together with its source code. seedtag.py is under the BSD Zero Clause license, so anyone can always use it to " +
                     "recover a tag. © 2026 zivke85.",
             )
         }
@@ -1704,7 +1704,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
                     ScanPulse()
                     Text(p.title, textAlign = TextAlign.Center, style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Hold it flat over the phone's NFC spot and keep it still until this window closes: the app " +
+                        "Hold it flat over the phone's NFC spot and keep it still until this window closes. The app " +
                             "only reads or writes the tag while it's held there.",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
@@ -1749,7 +1749,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
             text = {
                 GuardDialogWindow()
                 Text(
-                    if (d.looksLikeSeedTag) "This tag already holds a SeedTag backup. Overwriting destroys it. Continue?"
+                    if (d.looksLikeSeedTag) "This tag already holds a SeedTag backup. Overwriting it destroys that backup. Continue?"
                     else "This tag already contains data. Overwriting replaces it. Continue?",
                 )
             },
@@ -1768,11 +1768,11 @@ private fun Dialogs(vm: SeedTagViewModel) {
                     }
                     if (d.bits < Passphrase.MIN_BITS) {
                         add(
-                            "This password is estimated at only about ${d.bits} bits. Anyone who gets the tag can try " +
-                                "passwords offline, without limit, and a password this weak may be guessed.",
+                            "This password's strength is estimated at only about ${d.bits} bits. Anyone who gets hold of the " +
+                                "tag can try passwords offline without limit, and a password this weak could be guessed.",
                         )
                     }
-                    add("A generated 7-word passphrase is about 77 bits.")
+                    add("A generated 7-word passphrase has about 77 bits.")
                 }
                 Text(parts.joinToString("\n\n"))
             },
@@ -1786,8 +1786,8 @@ private fun Dialogs(vm: SeedTagViewModel) {
             text = {
                 GuardDialogWindow()
                 Text(
-                    "This is permanent: the tag can never be rewritten or erased. " +
-                        "Only do it after you have successfully verified the backup with your written password.",
+                    "This is permanent – the tag can never be rewritten or erased. " +
+                        "Only do this after you've successfully verified the backup with your written password.",
                 )
             },
             confirmButton = { TextButton(onClick = vm::confirmLock) { DangerText("Lock forever") } },

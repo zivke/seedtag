@@ -295,7 +295,7 @@ class SeedTagViewModel : ViewModel() {
         val pw = password.copy()
         val wipesAtStart = wipes
         viewModelScope.launch {
-            busy = "Encrypting and checking… (Argon2id runs twice, a few seconds)"
+            busy = "Encrypting and checking… (Argon2id runs twice; this takes a few seconds)"
             try {
                 val sealed = withContext(Dispatchers.Default) {
                     val entropy = Bip39.wordsToEntropy(snapshot)
@@ -309,14 +309,14 @@ class SeedTagViewModel : ViewModel() {
                 if (wipes != wipesAtStart) return@launch
                 if (sealed == null) {
                     return@launch showError(
-                        "Self-check failed: the encrypted backup didn't decrypt again. Nothing was written to the tag. " +
-                            "Try again; if it keeps failing, don't make backups on this phone.",
+                        "Self-check failed – the encrypted backup didn't decrypt again. Nothing was written to the tag. " +
+                            "Try again, and if it keeps failing, don't make backups on this phone.",
                     )
                 }
                 val (text, fp) = sealed
                 backupFingerprint = fp
                 pendingText = text
-                arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write")
+                arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write the backup")
             } catch (e: SeedTagException) {
                 showError(e.message ?: "Encryption failed.")
             } finally {
@@ -345,7 +345,7 @@ class SeedTagViewModel : ViewModel() {
     private fun scanForRead(purpose: Purpose) {
         if (readPassword.isEmpty()) return showError("Enter the password first.")
         verifyResult = null; restoredWords = null
-        arm(TagRequest.Read, purpose, "Hold the tag to the back of the phone to read")
+        arm(TagRequest.Read, purpose, "Hold the tag to the back of the phone to read it")
     }
 
     fun requestLock() {
@@ -404,7 +404,7 @@ class SeedTagViewModel : ViewModel() {
     }
 
     private fun handle(p: Pending, r: TagResult) {
-        // Cancelled, left the app or started another scan while the tag was busy: drop results
+        // Canceled, left the app or started another scan while the tag was busy: drop results
         // that only ask for more input. Writes and locks did happen, so those are still shown.
         val stale = p.id != scanId
         when (r) {
@@ -456,7 +456,7 @@ class SeedTagViewModel : ViewModel() {
         val pw = readPassword.copy()
         val wipesAtStart = wipes
         viewModelScope.launch {
-            busy = "Decrypting… (Argon2id, a few seconds; longer if the password needs a second try)"
+            busy = "Decrypting… (Argon2id takes a few seconds, longer if the password needs a second try)"
             try {
                 val (words, fp, fix) = withContext(Dispatchers.Default) {
                     // A wrong password is retried without extra spaces, then lower-cased.

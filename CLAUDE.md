@@ -72,7 +72,7 @@ Two Gradle modules plus the Python tool:
 - **`app/`**: Compose, single activity.
   - `MainActivity.kt`: `FLAG_SECURE`, NFC **reader mode** while in the
     foreground (no other app sees the tag), `vm.wipeAll()` in `onStop`.
-    Overlay defence: `setHideOverlayWindows` (Android 12+) and
+    Overlay defense: `setHideOverlayWindows` (Android 12+) and
     `dispatchTouchEvent` drops touches flagged `FLAG_WINDOW_IS_OBSCURED`
     (all versions, with a banner). Accessibility: Android 14+ marks the window
     `setAccessibilityDataSensitive(YES)` (only accessibility tools see it), and
@@ -130,8 +130,8 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
 ## Conventions
 
 - Keep `core` free of Android imports so `make test` stays a plain JVM test.
-  Add a test when BIP39 or crypto behaviour changes, in Kotlin and Python.
-- Licences: the app and everything else are `GPL-3.0-or-later` (`LICENSE`); `tools/seedtag.py`
+  Add a test when BIP39 or crypto behavior changes, in Kotlin and Python.
+- Licenses: the app and everything else are `GPL-3.0-or-later` (`LICENSE`); `tools/seedtag.py`
   alone is `0BSD`, so recovery is never in legal doubt: keep it that way. Every source file starts
   with an `SPDX-License-Identifier` line and `Copyright (C) 2026 zivke85`; add them to new files.
 - No new dependencies without asking. Bouncy Castle is the only crypto library.
@@ -142,7 +142,7 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   Never hand-edit checksums or turn verification off to get a build through.
 - Four-space indent for Kotlin, XML, shell and Python (`.editorconfig`).
 - For any user-visible change: add an entry under `## [Unreleased]` in
-  `changelog.md` (Keep a Changelog) and update `README.md` if behaviour or
+  `changelog.md` (Keep a Changelog) and update `README.md` if behavior or
   setup changed. Don't touch `versionCode` / `versionName` and don't invent a
   version heading: unreleased work is never filed under a version number.
 - Versions are semver (`MAJOR.MINOR.PATCH`), chosen only when releasing, from
