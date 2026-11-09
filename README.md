@@ -1,7 +1,7 @@
 # SeedTag
 
-Offline Android app that stores a **password-encrypted BIP39 seed phrase on an NFC tag**,
-plus a single-file Python tool to recover it on any computer.
+Free, open-source, offline Android app that stores a **password-encrypted BIP39 seed phrase on an NFC tag**,
+plus a single-file Python tool to recover it on any computer. Source: <https://github.com/zivke/seedtag>.
 
 - Encrypts the raw seed entropy (not the words) → 77 bytes for 24 words, fits a 137-byte MIFARE Ultralight C.
 - Argon2id (64 MiB) + AES-256-GCM. Documented, versioned format.
@@ -170,7 +170,8 @@ Leaving or closing the app (home button, Recents, screen off) deletes everything
 ever saved on the phone.
 
 **ⓘ** (About) in the top bar shows the version, what the app does with your data (nothing leaves the phone), the
-encryption used and the license.
+encryption used and the license, with links to the source code and to donate. Links open in the browser, and only
+when tapped; leaving SeedTag deletes everything typed in it.
 
 ## Choosing a tag
 
@@ -370,6 +371,11 @@ including a lost seed or lost funds. You use it at your own risk (see also the [
 **Make sure yourself that there's no malware on the phone before you enter a seed.** SeedTag defends against some
 attacks by other apps (see the warnings above), but it can't cover every possible one: if the phone is compromised,
 so may be your seed. The app shows this before a seed is entered, and on its About page.
+
+## Support
+
+SeedTag is free and has no ads. If you've found it useful, you can support its development with a
+[donation](https://github.com/zivke/.github/blob/main/DONATE.md).
 
 ## License
 

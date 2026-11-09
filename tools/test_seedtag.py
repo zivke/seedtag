@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 zivke85
+# Copyright (C) 2026 zivke
 """Tests for seedtag.py against the same vectors the Kotlin core uses.
 
     python3 tools/test_seedtag.py      (or: make test-py)

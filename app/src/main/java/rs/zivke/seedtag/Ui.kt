@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 zivke85
+// Copyright (C) 2026 zivke
 
 package rs.zivke.seedtag
 
@@ -93,6 +93,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
@@ -1587,6 +1588,10 @@ private fun Detector(found: Boolean) {
 
 // =============================================================== about ===
 
+/** Where the source code lives, and where to donate. Opened in the browser, only when tapped. */
+private const val REPO_URL = "https://github.com/zivke/seedtag"
+private const val DONATE_URL = "https://github.com/zivke/.github/blob/main/DONATE.md"
+
 @Composable
 private fun AboutPage() {
     val ctx = LocalContext.current
@@ -1596,13 +1601,20 @@ private fun AboutPage() {
             Text("SeedTag", style = MaterialTheme.typography.headlineSmall)
             Text("Version ${version ?: "unknown"}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
-                "Stores a password-encrypted BIP39 seed phrase on an NFC tag and reads it back. Back up writes it, " +
-                    "Verify checks it without showing the words and Restore shows them.",
+                "SeedTag is free, open-source software. It stores a password-encrypted BIP39 seed phrase on an NFC " +
+                    "tag and reads it back. Back up writes it, Verify checks it without showing the words and Restore " +
+                    "shows them.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Column {
+            AboutSection(
+                "Open source",
+                "SeedTag's full source code, including seedtag.py, is public on GitHub, so anyone can check what it " +
+                    "does and build it themselves.",
+                "github.com/zivke/seedtag" to REPO_URL,
+            )
             AboutSection(
                 "Privacy",
                 "SeedTag works entirely offline. It has no internet permission, so it can't send anything anywhere, " +
@@ -1627,7 +1639,17 @@ private fun AboutPage() {
                 "Free and open source under the GNU General Public License, version 3 or later. You may use, share and " +
                     "modify it, but anything you distribute that's based on it must be released under the same license, " +
                     "together with its source code. seedtag.py is under the BSD Zero Clause license, so anyone can always use it to " +
-                    "recover a tag. © 2026 zivke85.",
+                    "recover a tag. © 2026 zivke.",
+            )
+            AboutSection(
+                "Support SeedTag",
+                "SeedTag is free and has no ads. If you've found it useful, you can support its development with a donation.",
+                "Donate" to DONATE_URL,
+            )
+            Text(
+                "Links open in your browser. Leaving SeedTag deletes everything you've typed in it.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Notice(Tone.Caution, "Use at your own risk", DISCLAIMER)
@@ -1635,11 +1657,16 @@ private fun AboutPage() {
 }
 
 @Composable
-private fun AboutSection(title: String, text: String) {
+private fun AboutSection(title: String, text: String, link: Pair<String, String>? = null) {
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(title, style = MaterialTheme.typography.titleSmall)
         Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        link?.let { (label, url) ->
+            val uri = LocalUriHandler.current
+            // No browser installed: nothing happens.
+            Link("$label ↗") { runCatching { uri.openUri(url) } }
+        }
     }
 }
 

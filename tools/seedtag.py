@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: 0BSD
-# Copyright (C) 2026 zivke85
+# Copyright (C) 2026 zivke
 #
 # This file alone is under the BSD Zero Clause license, unlike the rest of SeedTag
 # (GPL-3.0-or-later), so anyone can always use it to recover a tag, for any purpose:

@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 zivke85
+# Copyright (C) 2026 zivke
 # Checks a built APK: valid signature, and no permission except NFC, HIDE_OVERLAY_WINDOWS and VIBRATE.
 # Prints the signing certificate and the APK's SHA-256.
 #

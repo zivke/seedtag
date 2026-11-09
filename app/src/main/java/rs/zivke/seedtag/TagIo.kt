@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Copyright (C) 2026 zivke85
+// Copyright (C) 2026 zivke
 
 package rs.zivke.seedtag
 

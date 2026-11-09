@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 zivke85
+# Copyright (C) 2026 zivke
 """Cross-check gradle/verification-metadata.xml against the repositories.
 
 `make deps-metadata` records the SHA-256 of every dependency file in Gradle's local cache, so

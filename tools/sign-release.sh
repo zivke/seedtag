@@ -1,6 +1,6 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
-# Copyright (C) 2026 zivke85
+# Copyright (C) 2026 zivke
 # Signs the release APK with the release key. Run it OUTSIDE the dev container, on the machine
 # that holds the key: the key and its password never enter the container.
 #

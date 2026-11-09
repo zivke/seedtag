@@ -133,7 +133,7 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   Add a test when BIP39 or crypto behavior changes, in Kotlin and Python.
 - Licenses: the app and everything else are `GPL-3.0-or-later` (`LICENSE`); `tools/seedtag.py`
   alone is `0BSD`, so recovery is never in legal doubt: keep it that way. Every source file starts
-  with an `SPDX-License-Identifier` line and `Copyright (C) 2026 zivke85`; add them to new files.
+  with an `SPDX-License-Identifier` line and `Copyright (C) 2026 zivke`; add them to new files.
 - No new dependencies without asking. Bouncy Castle is the only crypto library.
 - Every download is pinned: the wrapper jar (`gradle-wrapper.jar.sha256`, checked by `make`), the
   Gradle distribution (`distributionSha256Sum`), every dependency (`gradle/verification-metadata.xml`),

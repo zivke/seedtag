@@ -7,6 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- The About page says SeedTag is free, open-source software, links to its
+  source code on GitHub, and links to a page where you can donate if you've
+  found it useful. Links open in the browser, only when tapped; SeedTag itself
+  still has no network access.
 - Back up, Verify and Restore advise going offline before you start: safest
   is a spare phone that's never online; otherwise restart the phone, turn on
   airplane mode with Wi-Fi and Bluetooth off, and restart it again before it
