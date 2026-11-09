@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -69,7 +70,6 @@ import androidx.compose.material3.SuggestionChipDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -95,9 +95,12 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
@@ -282,25 +285,11 @@ fun SeedTagApp(
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
-                TopAppBar(
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            if (page == null) AppIcon()
-                            Text(page?.title ?: "SeedTag", style = MaterialTheme.typography.titleLarge, maxLines = 1)
-                        }
-                    },
-                    navigationIcon = {
-                        if (page != null) {
-                            IconButton(onClick = { vm.page = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
-                        }
-                    },
-                    actions = {
-                        if (page == null) {
-                            TextButton(onClick = { vm.page = Page.Antenna }) { Text(Page.Antenna.button) }
-                            IconButton(onClick = { vm.page = Page.About }) { Icon(Icons.Outlined.Info, Page.About.title) }
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
+                Header(
+                    page = page,
+                    onBack = { vm.page = null },
+                    onFindSpot = { vm.page = Page.Antenna },
+                    onAbout = { vm.page = Page.About },
                 )
             },
         ) { pad ->
@@ -328,6 +317,49 @@ private val LocalAirplaneMode = compositionLocalOf { false }
 
 /** Counts closed prompts and dialogs; [StepScreen] scrolls to the top when it changes. */
 private val LocalActionsDone = compositionLocalOf { 0 }
+
+/** A text style whose line box is just the font's height, centred, so the letters sit on a row's centre line. */
+private fun TextStyle.centred() =
+    copy(lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both))
+
+/**
+ * The top bar: one row, so the icon, the title, Find NFC spot and ⓘ (or the back arrow and a page's
+ * title) all share the same vertical centre.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun Header(page: Page?, onBack: () -> Unit, onFindSpot: () -> Unit, onAbout: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth()
+            .background(MaterialTheme.colorScheme.background)
+            .windowInsetsPadding(TopAppBarDefaults.windowInsets)
+            .height(64.dp)
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (page != null) {
+            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            Spacer(Modifier.width(4.dp))
+        } else {
+            Spacer(Modifier.width(12.dp))
+            AppIcon()
+            Spacer(Modifier.width(10.dp))
+        }
+        Text(
+            page?.title ?: "SeedTag",
+            style = MaterialTheme.typography.titleLarge.centred(),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f),
+        )
+        if (page == null) {
+            TextButton(onClick = onFindSpot) {
+                Text(Page.Antenna.button, style = MaterialTheme.typography.labelLarge.centred())
+            }
+            IconButton(onClick = onAbout) { Icon(Icons.Outlined.Info, Page.About.title) }
+        }
+    }
+}
 
 /** The launcher icon, small: its foreground on the icon's own background, cropped like a launcher does. */
 @Composable
