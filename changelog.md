@@ -18,7 +18,7 @@ All notable user-visible changes to SeedTag. The format follows
   already holds data (a SeedTag backup or something else), and how long a
   backup it has room for. Nothing is written. Word counts the tag can't hold
   are greyed out, and **Use another tag** goes back to the check.
-- **NFC spot** says how long a backup a tag has room for (for example "137
+- **Find NFC spot** says how long a backup a tag has room for (for example "137
   bytes: room for a backup of any length"), or that it's too small for any.
 - Verify, Restore and `seedtag.py` forgive the most common typing mistakes:
   if the password is wrong, it's tried again without extra spaces (leading,
@@ -45,7 +45,7 @@ All notable user-visible changes to SeedTag. The format follows
 - An **About** page, from the top bar: the version, privacy (offline, no
   network permission, nothing stored), the protections on the phone, the
   encryption and `seedtag.py`, and the licence.
-- **NFC spot** in the top bar opens a finder for the phone's NFC antenna:
+- **Find NFC spot** in the top bar opens a finder for the phone's NFC antenna:
   slide a tag or any contactless card over the back of the phone until it
   vibrates and says *Tag detected*. It also says whether SeedTag can use that
   tag (NDEF and its size, blank, or read-only), with tips on where the spot
@@ -63,6 +63,34 @@ All notable user-visible changes to SeedTag. The format follows
   Accessibility.
 
 ### Changed
+- A new, calmer look. One fixed palette in dark and light (ink surfaces, a
+  single amber accent) instead of wallpaper colours, so warnings look the same
+  on every phone: red only for what is risky or permanent, green only for a
+  good result. Each step shows *Step N of M* with a progress bar, and its main
+  button stays at the bottom of the screen. The safety advice before Back up,
+  Verify and Restore is one *Before you start* checklist with a short line per
+  item and **Learn more** for the details, instead of a stack of cards. Back
+  up, Verify and Restore are a segmented switch, hidden while words or a
+  password are being typed. Results start with one clear status mark and a
+  short list of facts (fingerprint, match with the backup just written). The
+  tag check lists the tag's room, state and contents, and word counts are
+  tiles. Passwords have a strength bar. **Make tag read-only** is the only
+  red-outlined button. The top bar shows the app icon, and About opens from
+  its ⓘ. The NFC spot finder and the scan window pulse while they wait for a
+  tag, and every screen scrolls back to the top when a prompt closes.
+- *Before you start* says to hold the tag to the phone only when the app asks,
+  not the whole time: the app only reads or writes it while it's held over
+  the NFC spot. It also says that everything typed or decrypted is deleted
+  when you close or leave the app. *Read every screen carefully* comes first
+  and asks you to open every **Learn more**.
+- The NFC spot finder is now **Find NFC spot** in the top bar (*Where to hold
+  the tag*), and **Check your tag** in Back up links to it. Its first step
+  checks that NFC is on; the tips explain that small tags and rings have an
+  NFC symbol to put right against the spot. When it detects a tag, the phone
+  buzzes longer, three strong pulses (apps can't set the strength or length
+  of a vibration without an extra permission).
+- **Check your tag** explains what the scan is for: to inspect the tag before
+  anything is typed, with nothing written.
 - The generated passphrase comes with a reminder to label it "SeedTag
   password": it's made of the same words as a seed phrase, so an unlabelled
   copy is easy to mistake for one.
@@ -72,8 +100,8 @@ All notable user-visible changes to SeedTag. The format follows
   border, ⚠ and a bold title (the password warning, seed words in the
   password, private-only Restore, "not finished yet" after a backup, another
   app covering SeedTag). Dialogs that confirm something risky or permanent
-  (overwrite, weak password, lock) and error messages have a ⚠ icon and a red
-  title.
+  (overwrite, weak password, lock) and error messages have a red ⚠ icon, and
+  the risky choice is in red.
 - Verify and Restore are now two steps, like Back up: first the password and
   Scan tag, then the result on a screen of its own, without the password field
   and keyboard. **Verify another tag** and **Restore another tag** start again

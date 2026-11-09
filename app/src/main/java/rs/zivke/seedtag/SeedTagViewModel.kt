@@ -29,7 +29,7 @@ import java.util.concurrent.atomic.AtomicReference
 
 enum class Screen(val title: String) { Backup("Back up"), Verify("Verify"), Restore("Restore") }
 /** Pages opened from the top bar ([button]), shown instead of the tabs. */
-enum class Page(val title: String, val button: String) { Antenna("Find NFC spot", "NFC spot"), About("About", "About") }
+enum class Page(val title: String, val button: String) { Antenna("Where to hold the tag", "Find NFC spot"), About("About", "About") }
 
 /** What the NFC-spot finder saw, from the tag's discovery info only: nothing is read from its memory. */
 data class ProbeResult(val count: Int, val ndef: Boolean, val formatable: Boolean, val ndefSize: Int?, val writable: Boolean?)
@@ -67,8 +67,11 @@ sealed interface Dialog {
     data class ConfirmWeakPassword(val bits: Int, val sharesSeedWords: Boolean) : Dialog
 }
 
-/** Vibration for things that happen without a tap: a tag was handled, something succeeded or failed. */
-enum class Haptic { Tick, Success, Failure }
+/**
+ * Vibration for things that happen without a tap: a tag was handled, something succeeded or failed.
+ * [Found]: the NFC-spot finder saw a tag; a longer buzz, so it's felt through a hand on the phone.
+ */
+enum class Haptic { Tick, Success, Failure, Found }
 
 private enum class Purpose { Check, BackupWrite, Verify, Restore, Lock }
 /** [id] tells a result for the current scan from one that arrives after Cancel or a new scan. */
@@ -396,7 +399,7 @@ class SeedTagViewModel : ViewModel() {
         viewModelScope.launch {
             if (!probing.get()) return@launch
             probe = ProbeResult((probe?.count ?: 0) + 1, ndef != null, formatable, size, writable)
-            _haptics.tryEmit(Haptic.Success)
+            _haptics.tryEmit(Haptic.Found)
         }
     }
 

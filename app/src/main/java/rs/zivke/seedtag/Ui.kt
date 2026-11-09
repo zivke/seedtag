@@ -7,10 +7,20 @@ import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -24,45 +34,62 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.Shapes
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.Switch
-import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
+import androidx.compose.material3.SuggestionChipDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.dynamicDarkColorScheme
-import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -74,23 +101,110 @@ import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
 import rs.zivke.seedtag.core.SeedBox
+import kotlinx.coroutines.delay
 
 // ============================================================== theme ===
+//
+// One fixed palette, matching the icon: ink surfaces, a single amber accent, red only for what is
+// risky or permanent, green only for a result that's good. No dynamic (wallpaper) colours, so the
+// app looks the same on every phone and its warnings always look like warnings.
 
-private val Amber = Color(0xFFF2B84B)
+private val DarkColors = darkColorScheme(
+    primary = Color(0xFFF2B84B),
+    onPrimary = Color(0xFF241A05),
+    primaryContainer = Color(0xFF3A2D12),
+    onPrimaryContainer = Color(0xFFF8DDA4),
+    secondary = Color(0xFFB9C1CC),
+    onSecondary = Color(0xFF1B1F24),
+    secondaryContainer = Color(0xFF2A2F37),
+    onSecondaryContainer = Color(0xFFE2E6EC),
+    background = Color(0xFF111317),
+    onBackground = Color(0xFFE6E8EB),
+    surface = Color(0xFF111317),
+    onSurface = Color(0xFFE6E8EB),
+    surfaceVariant = Color(0xFF22262D),
+    onSurfaceVariant = Color(0xFF9EA4AD),
+    surfaceContainerLowest = Color(0xFF0C0E11),
+    surfaceContainerLow = Color(0xFF16191D),
+    surfaceContainer = Color(0xFF1A1D22),
+    surfaceContainerHigh = Color(0xFF21252B),
+    surfaceContainerHighest = Color(0xFF2A2E35),
+    outline = Color(0xFF3A3F47),
+    outlineVariant = Color(0xFF2A2E35),
+    error = Color(0xFFF28B82),
+    onError = Color(0xFF3B0A06),
+    errorContainer = Color(0xFF3A1D1B),
+    onErrorContainer = Color(0xFFF7CCC7),
+)
+
+private val LightColors = lightColorScheme(
+    primary = Color(0xFF8A5A00),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFFBEBCB),
+    onPrimaryContainer = Color(0xFF2C1B00),
+    secondary = Color(0xFF555D68),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFE6E8EC),
+    onSecondaryContainer = Color(0xFF1B1F24),
+    background = Color(0xFFF8F8F6),
+    onBackground = Color(0xFF1A1C1F),
+    surface = Color(0xFFF8F8F6),
+    onSurface = Color(0xFF1A1C1F),
+    surfaceVariant = Color(0xFFECECE8),
+    onSurfaceVariant = Color(0xFF5B616A),
+    surfaceContainerLowest = Color.White,
+    surfaceContainerLow = Color(0xFFF2F2EF),
+    surfaceContainer = Color(0xFFEDEDEA),
+    surfaceContainerHigh = Color(0xFFE7E7E3),
+    surfaceContainerHighest = Color(0xFFE0E0DB),
+    outline = Color(0xFFCBCBC5),
+    outlineVariant = Color(0xFFE0E0DA),
+    error = Color(0xFFB3261E),
+    onError = Color.White,
+    errorContainer = Color(0xFFFBE9E7),
+    onErrorContainer = Color(0xFF410E0B),
+)
+
+/** Colours Material has no slot for: a good result, and "fair" in the strength meter. */
+private class ExtraColors(val success: Color, val successContainer: Color, val onSuccessContainer: Color, val fair: Color)
+
+private val DarkExtra = ExtraColors(Color(0xFF7FD3A0), Color(0xFF16291D), Color(0xFFC9EED6), Color(0xFFE5A54B))
+private val LightExtra = ExtraColors(Color(0xFF1E7B45), Color(0xFFE3F3E8), Color(0xFF0B2E18), Color(0xFFB06A00))
+private val LocalExtra = staticCompositionLocalOf { DarkExtra }
+
+private val AppTypography = Typography().let { t ->
+    t.copy(
+        headlineSmall = t.headlineSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 24.sp, lineHeight = 30.sp),
+        titleLarge = t.titleLarge.copy(fontWeight = FontWeight.SemiBold),
+        titleMedium = t.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+        titleSmall = t.titleSmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
+        bodyMedium = t.bodyMedium.copy(lineHeight = 21.sp),
+        labelLarge = t.labelLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.sp),
+    )
+}
+
+private val AppShapes = Shapes(
+    extraSmall = RoundedCornerShape(6.dp),
+    small = RoundedCornerShape(10.dp),
+    medium = RoundedCornerShape(16.dp),
+    large = RoundedCornerShape(20.dp),
+    extraLarge = RoundedCornerShape(28.dp),
+)
 
 @Composable
 fun SeedTagTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
-    val ctx = LocalContext.current
-    val scheme = when {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S ->
-            if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
-        dark -> darkColorScheme(primary = Amber, onPrimary = Color(0xFF1B1F24))
-        else -> lightColorScheme(primary = Color(0xFF8A5A00))
+    CompositionLocalProvider(LocalExtra provides if (dark) DarkExtra else LightExtra) {
+        MaterialTheme(
+            colorScheme = if (dark) DarkColors else LightColors,
+            typography = AppTypography,
+            shapes = AppShapes,
+            content = content,
+        )
     }
-    MaterialTheme(colorScheme = scheme, content = content)
 }
+
+private val Gutter = 20.dp
 
 // ================================================================ app ===
 
@@ -102,7 +216,23 @@ private val Haptic.constant: Int
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.CONFIRM else HapticFeedbackConstants.LONG_PRESS
         Haptic.Failure ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
+        Haptic.Found -> HapticFeedbackConstants.LONG_PRESS
     }
+
+/**
+ * Plays [h]. Apps can't set a vibration's length or strength without the VIBRATE permission, which
+ * SeedTag doesn't have, so [Haptic.Found] is three of the strongest standard buzzes back to back.
+ */
+private suspend fun View.play(h: Haptic) {
+    if (h != Haptic.Found) {
+        performHapticFeedback(h.constant)
+        return
+    }
+    repeat(3) {
+        performHapticFeedback(h.constant)
+        delay(70)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,38 +247,48 @@ fun SeedTagApp(
     hideAccessibilityBanner: () -> Unit = {},
 ) {
     val view = LocalView.current
-    LaunchedEffect(vm) { vm.haptics.collect { view.performHapticFeedback(it.constant) } }
+    LaunchedEffect(vm) { vm.haptics.collect { view.play(it) } }
     val page = vm.page
     BackHandler(enabled = page != null) { vm.page = null }
-    CompositionLocalProvider(LocalAirplaneMode provides airplaneMode) {
+    // While words or a password are being typed, the mode switch is hidden: one task on screen.
+    val typing = vm.tab == Screen.Backup && (vm.step == BackupStep.Words || vm.step == BackupStep.Password)
+    // Each time the last prompt or dialog closes, the screen behind it scrolls back to the top, so
+    // what changed (a tag check result, an error's context) is in view.
+    val prompting = vm.busy != null || vm.scanPrompt != null || vm.dialog != null
+    var actionsDone by remember { mutableIntStateOf(0) }
+    LaunchedEffect(prompting) { if (!prompting) actionsDone++ }
+    CompositionLocalProvider(LocalAirplaneMode provides airplaneMode, LocalActionsDone provides actionsDone) {
         Scaffold(
+            containerColor = MaterialTheme.colorScheme.background,
             topBar = {
                 TopAppBar(
-                    title = { Text(page?.title ?: "SeedTag") },
-                    navigationIcon = { if (page != null) TextButton(onClick = { vm.page = null }) { Text("‹ Back") } },
-                    actions = {
-                        if (page == null) {
-                            Page.entries.forEach { p -> TextButton(onClick = { vm.page = p }) { Text(p.button) } }
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (page == null) AppIcon()
+                            Text(page?.title ?: "SeedTag", style = MaterialTheme.typography.titleLarge, maxLines = 1)
                         }
                     },
+                    navigationIcon = {
+                        if (page != null) {
+                            IconButton(onClick = { vm.page = null }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+                        }
+                    },
+                    actions = {
+                        if (page == null) {
+                            TextButton(onClick = { vm.page = Page.Antenna }) { Text(Page.Antenna.button) }
+                            IconButton(onClick = { vm.page = Page.About }) { Icon(Icons.Outlined.Info, Page.About.title) }
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.background),
                 )
             },
         ) { pad ->
             Column(Modifier.padding(pad).fillMaxSize()) {
-                if (page == null) {
-                    TabRow(selectedTabIndex = vm.tab.ordinal) {
-                        Screen.entries.forEach { t ->
-                            Tab(selected = vm.tab == t, onClick = { vm.tab = t }, text = { Text(t.title) })
-                        }
-                    }
-                }
-                NfcBanner(nfcState, openNfcSettings)
-                if (overlayDetected) OverlayBanner()
-                if (accessibilityApps.isNotEmpty()) {
-                    AccessibilityBanner(accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
-                }
+                if (page == null && !typing) ModeSwitch(vm)
+                // The NFC spot page says it itself, as its first step.
+                Banners(if (page == Page.Antenna) NfcState.Ready else nfcState, openNfcSettings, overlayDetected, accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
                 when (page) {
-                    Page.Antenna -> AntennaPage(vm)
+                    Page.Antenna -> AntennaPage(vm, nfcState, openNfcSettings)
                     Page.About -> AboutPage()
                     null -> when (vm.tab) {
                         Screen.Backup -> BackupScreen(vm)
@@ -162,35 +302,75 @@ fun SeedTagApp(
     Dialogs(vm)
 }
 
-/** Whether airplane mode is on, for [OfflineAdvice]. */
+/** Whether airplane mode is on, for [Preflight]. */
 private val LocalAirplaneMode = compositionLocalOf { false }
 
+/** Counts closed prompts and dialogs; [StepScreen] scrolls to the top when it changes. */
+private val LocalActionsDone = compositionLocalOf { 0 }
+
+/** The launcher icon, small: its foreground on the icon's own background, cropped like a launcher does. */
 @Composable
-private fun NfcBanner(state: NfcState, openNfcSettings: () -> Unit) {
-    if (state == NfcState.Ready) return
-    Card(
-        Modifier.fillMaxWidth().padding(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-    ) {
-        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                if (state == NfcState.Missing) "This device has no NFC." else "NFC is turned off.",
-                Modifier.weight(1f),
-                color = MaterialTheme.colorScheme.onErrorContainer,
-            )
-            if (state == NfcState.Disabled) TextButton(onClick = openNfcSettings) { Text("Turn on") }
+private fun AppIcon() {
+    Box(Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).background(Color(0xFF121418)), contentAlignment = Alignment.Center) {
+        Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.size(30.dp).scale(1.45f))
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ModeSwitch(vm: SeedTagViewModel) {
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 4.dp)) {
+        Screen.entries.forEachIndexed { i, t ->
+            SegmentedButton(
+                selected = vm.tab == t,
+                onClick = { vm.tab = t },
+                shape = SegmentedButtonDefaults.itemShape(i, Screen.entries.size),
+                icon = {},
+                colors = SegmentedButtonDefaults.colors(
+                    activeContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    activeContentColor = MaterialTheme.colorScheme.onSurface,
+                    inactiveContainerColor = Color.Transparent,
+                    inactiveContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                    activeBorderColor = MaterialTheme.colorScheme.outline,
+                    inactiveBorderColor = MaterialTheme.colorScheme.outline,
+                ),
+            ) { Text(t.title, style = MaterialTheme.typography.labelLarge) }
         }
     }
 }
 
+/** Device-level problems, above whatever is on screen. */
 @Composable
-private fun OverlayBanner() {
-    WarningCard(
-        "Another app is covering SeedTag",
-        "Your taps are ignored while it does. Close it, or turn off apps such as screen dimmers or chat bubbles, " +
-            "then tap again. If you don't know which app it is, don't enter your seed.",
-        Modifier.padding(12.dp),
-    )
+private fun Banners(
+    nfcState: NfcState,
+    openNfcSettings: () -> Unit,
+    overlayDetected: Boolean,
+    accessibilityApps: List<String>,
+    openAccessibilitySettings: () -> Unit,
+    hideAccessibilityBanner: () -> Unit,
+) {
+    val any = nfcState != NfcState.Ready || overlayDetected || accessibilityApps.isNotEmpty()
+    if (!any) return
+    Column(Modifier.padding(horizontal = Gutter, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (nfcState != NfcState.Ready) {
+            Notice(
+                Tone.Caution,
+                if (nfcState == NfcState.Missing) "This device has no NFC" else "NFC is turned off",
+                if (nfcState == NfcState.Missing) "SeedTag can't read or write tags on it." else "SeedTag needs it to read and write the tag.",
+            ) {
+                if (nfcState == NfcState.Disabled) Link("Turn on NFC", onClick = openNfcSettings)
+            }
+        }
+        if (overlayDetected) {
+            Notice(
+                Tone.Caution,
+                "Another app is covering SeedTag",
+                "Your taps are ignored while it does. Close it, or turn off apps such as screen dimmers or chat bubbles, " +
+                    "then tap again. If you don't know which app it is, don't enter your seed.",
+            )
+        }
+        if (accessibilityApps.isNotEmpty()) AccessibilityBanner(accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
+    }
 }
 
 /** Apps with accessibility access can read the screen and see every tap, seed words included. */
@@ -205,99 +385,378 @@ private fun AccessibilityBanner(apps: List<String>, openSettings: () -> Unit, hi
         } else {
             " On this Android version SeedTag can't hide its screen from them."
         }
-    Column(Modifier.padding(12.dp)) {
-        WarningCard("Apps that can read your screen", text)
-        Row {
-            TextButton(onClick = openSettings) { Text("Open settings") }
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = hide) { Text("Hide") }
+    Notice(Tone.Caution, "Apps that can read your screen", text) {
+        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            Link("Open settings", onClick = openSettings)
+            Link("Hide", onClick = hide)
         }
     }
 }
 
+// ========================================================= components ===
+
+private enum class Tone { Info, Caution, Success }
+
+private class ToneColors(val container: Color, val accent: Color, val content: Color)
+
+@Composable
+private fun colorsOf(tone: Tone): ToneColors {
+    val c = MaterialTheme.colorScheme
+    val x = LocalExtra.current
+    return when (tone) {
+        Tone.Info -> ToneColors(c.surfaceContainer, c.onSurfaceVariant, c.onSurface)
+        Tone.Caution -> ToneColors(c.errorContainer, c.error, c.onErrorContainer)
+        Tone.Success -> ToneColors(x.successContainer, x.success, x.onSuccessContainer)
+    }
+}
+
+private fun iconOf(tone: Tone): ImageVector = when (tone) {
+    Tone.Info -> Icons.Outlined.Info
+    Tone.Caution -> Icons.Outlined.Warning
+    Tone.Success -> Icons.Outlined.CheckCircle
+}
+
 /**
- * Every warning looks the same, and unlike anything else on screen: red card, red border, ⚠ and a
- * bold title, so it isn't skimmed over like the explanatory text around it.
+ * A message that matters before a step. Caution (risky, permanent, or a security risk) is red with
+ * a hairline red border and a warning icon, the only red cards in the app, so it's never mistaken
+ * for explanation. [details] fold away behind "Learn more" so a screen stays short.
  */
 @Composable
-private fun WarningCard(title: String, text: String, modifier: Modifier = Modifier) {
-    Card(
-        modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
-        border = BorderStroke(2.dp, MaterialTheme.colorScheme.error),
+private fun Notice(
+    tone: Tone,
+    title: String,
+    text: String? = null,
+    details: String? = null,
+    action: (@Composable () -> Unit)? = null,
+) {
+    val t = colorsOf(tone)
+    Surface(
+        Modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.medium,
+        color = t.container,
+        border = if (tone == Tone.Caution) BorderStroke(1.dp, t.accent.copy(alpha = 0.45f)) else null,
     ) {
-        Row(Modifier.padding(12.dp)) {
-            Text("⚠", fontSize = 24.sp, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(end = 12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onErrorContainer,
-                )
-                Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onErrorContainer)
+        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Icon(iconOf(tone), null, tint = t.accent, modifier = Modifier.size(20.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall, color = t.content)
+                text?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = t.content.copy(alpha = 0.86f)) }
+                details?.let { Expandable(it, t.content.copy(alpha = 0.86f), if (tone == Tone.Info) MaterialTheme.colorScheme.primary else t.accent) }
+                action?.invoke()
             }
         }
     }
 }
 
-/** Plain guidance that matters before a step, quieter than a warning. */
+/** "Learn more" that reveals [text] in place. */
 @Composable
-private fun InfoCard(title: String, text: String, modifier: Modifier = Modifier) {
-    Card(
-        modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-            Text(text, style = MaterialTheme.typography.bodyMedium)
+private fun ColumnScope.Expandable(text: String, textColor: Color, linkColor: Color) {
+    var open by remember { mutableStateOf(false) }
+    AnimatedVisibility(open) { Text(text, style = MaterialTheme.typography.bodyMedium, color = textColor) }
+    Link(if (open) "Show less" else "Learn more", color = linkColor) { open = !open }
+}
+
+@Composable
+private fun Link(text: String, color: Color = MaterialTheme.colorScheme.primary, onClick: () -> Unit) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = color,
+        modifier = Modifier.clip(MaterialTheme.shapes.extraSmall).clickable(onClick = onClick).padding(vertical = 6.dp),
+    )
+}
+
+/** One line of a checklist: like a [Notice], without its own card. */
+private class Item(
+    val tone: Tone,
+    val title: String,
+    val text: String,
+    val details: String? = null,
+    val action: Pair<String, () -> Unit>? = null,
+)
+
+/** A titled group of [Item]s in one quiet card, divided by hairlines. */
+@Composable
+private fun Checklist(title: String, items: List<Item>) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionLabel(title)
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        ) {
+            Column {
+                items.forEachIndexed { i, item ->
+                    if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                    ChecklistRow(item)
+                }
+            }
         }
     }
 }
 
-/** Where the tag goes, said before any procedure asks for it. */
 @Composable
-private fun OfflineAdvice() {
-    val restart = "and restart the phone before it goes back online: some spyware doesn't survive a restart, and " +
-        "loses whatever it caught."
-    if (LocalAirplaneMode.current) {
-        InfoCard(
-            "Airplane mode is on",
-            "Check that Wi-Fi and Bluetooth are off too: they can be switched on in airplane mode. When you're done, " +
-                "close SeedTag $restart",
-        )
-    } else {
-        WarningCard(
-            "Go offline first",
-            "SeedTag itself can't go online, but other apps on this phone can, and malware could send what you type " +
-                "or see here. Safest is a spare phone that's never online. Otherwise restart the phone, turn on " +
-                "airplane mode and check that Wi-Fi and Bluetooth are off (NFC normally stays on). When you're done, " +
-                "close SeedTag $restart",
-        )
+private fun ChecklistRow(item: Item) {
+    val t = colorsOf(item.tone)
+    val caution = item.tone == Tone.Caution
+    Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Icon(iconOf(item.tone), null, tint = t.accent, modifier = Modifier.size(20.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                item.title,
+                style = MaterialTheme.typography.titleSmall,
+                color = if (caution) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
+            )
+            Text(item.text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            item.details?.let { Expandable(it, MaterialTheme.colorScheme.onSurfaceVariant, MaterialTheme.colorScheme.primary) }
+            item.action?.let { (label, onClick) -> Link(label, onClick = onClick) }
+        }
     }
 }
 
 @Composable
-private fun PrepareTagInfo(writing: Boolean) {
-    InfoCard(
-        "Have your NFC tag ready",
-        (if (writing) "You'll need it now, to check it, and again at the end to write the backup. " else "You'll need the tag after typing the password. ") +
-            "When the app asks, hold it flat against the back of the phone, over the phone's NFC spot (usually near " +
-            "the middle or the top), and keep it still until the app says it's done. A thick or metal case can block it. " +
-            "Not sure where the spot is? Tap NFC spot at the top first.",
-    )
+private fun SectionLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
-/** Icon and title for dialogs that confirm something risky or permanent. */
+/** "Step 2 of 4", a segmented progress bar, the title and a one-line explanation. */
 @Composable
-private fun WarningIcon() {
-    Text("⚠", fontSize = 32.sp, color = MaterialTheme.colorScheme.error)
+private fun StepHeader(
+    step: Int,
+    total: Int,
+    title: String,
+    subtitle: String? = null,
+    compact: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(if (compact) 8.dp else 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                "Step $step of $total",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.weight(1f),
+            )
+            trailing?.invoke()
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            repeat(total) { i ->
+                Box(
+                    Modifier.weight(1f).height(3.dp).background(
+                        if (i < step) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant,
+                        CircleShape,
+                    ),
+                )
+            }
+        }
+        Text(title, style = if (compact) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineSmall)
+        subtitle?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    }
+}
+
+/**
+ * Every screen: content that scrolls, and an optional [bottom] area that stays put (the main
+ * button, or a keyboard and its buttons), under a hairline.
+ */
+@Composable
+private fun StepScreen(
+    scroll: ScrollState = rememberScrollState(),
+    scrollToTop: Boolean = true,
+    bottom: (@Composable ColumnScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val actionsDone = LocalActionsDone.current
+    LaunchedEffect(actionsDone) { if (scrollToTop) scroll.animateScrollTo(0) }
+    Column(Modifier.fillMaxSize()) {
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(horizontal = Gutter, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            content = content,
+        )
+        if (bottom != null) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Column(
+                Modifier.fillMaxWidth().padding(horizontal = Gutter, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                content = bottom,
+            )
+        }
+    }
 }
 
 @Composable
-private fun WarningTitle(text: String) {
-    Text(text, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+private fun PrimaryButton(text: String, onClick: () -> Unit, enabled: Boolean = true) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(52.dp), enabled = enabled) { Text(text) }
 }
+
+@Composable
+private fun SecondaryButton(text: String, onClick: () -> Unit, enabled: Boolean = true) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        enabled = enabled,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+    ) { Text(text, color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant) }
+}
+
+/** Permanent or destructive: outlined in red, unlike every other button. */
+@Composable
+private fun DangerButton(text: String, onClick: () -> Unit) {
+    OutlinedButton(
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth().height(52.dp),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+    ) { Text(text) }
+}
+
+/** Big status mark, title and one line under it: the top of a result screen. */
+@Composable
+private fun Hero(tone: Tone, title: String, subtitle: String) {
+    val t = colorsOf(tone)
+    Column(
+        Modifier.fillMaxWidth().padding(top = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Box(Modifier.size(72.dp).background(t.container, CircleShape), contentAlignment = Alignment.Center) {
+            Icon(iconOf(tone), null, tint = t.accent, modifier = Modifier.size(36.dp))
+        }
+        Text(title, style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center)
+        Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+    }
+}
+
+/** Label / value lines in one quiet card. [Fact.tone] colours the value (null: plain). */
+private class Fact(val label: String, val value: String, val tone: Tone? = null, val mono: Boolean = false)
+
+@Composable
+private fun Facts(facts: List<Fact>) {
+    Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.surfaceContainerLow) {
+        Column {
+            facts.forEachIndexed { i, f ->
+                if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(f.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        f.value,
+                        style = if (f.mono) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyLarge,
+                        fontFamily = if (f.mono) FontFamily.Monospace else null,
+                        color = when (f.tone) {
+                            Tone.Caution -> MaterialTheme.colorScheme.error
+                            Tone.Success -> LocalExtra.current.success
+                            else -> MaterialTheme.colorScheme.onSurface
+                        },
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** A numbered list of short steps. */
+@Composable
+private fun Steps(steps: List<String>) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        steps.forEachIndexed { i, s ->
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(Modifier.size(24.dp).background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape), contentAlignment = Alignment.Center) {
+                    Text("${i + 1}", style = MaterialTheme.typography.labelMedium)
+                }
+                Text(s, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/**
+ * What to know before a procedure, as one checklist: going offline (live airplane-mode state),
+ * having the tag ready, reading carefully, the procedure's own point, and the disclaimer.
+ */
+@Composable
+private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
+    val restart = "close SeedTag and restart the phone before it goes back online: some spyware doesn't survive a " +
+        "restart, and loses whatever it caught."
+    val offline = if (LocalAirplaneMode.current) {
+        Item(
+            Tone.Info,
+            "Airplane mode is on",
+            "Check that Wi-Fi and Bluetooth are off too: they can be switched on in airplane mode.",
+            "When you're done, $restart",
+        )
+    } else {
+        Item(
+            Tone.Caution,
+            "Go offline first",
+            "SeedTag can't go online, but other apps on this phone can, and malware could send what you type or see here.",
+            "The safest way to use this application is on a spare phone that's never online. Otherwise restart the phone, turn on airplane mode and check " +
+                "that Wi-Fi and Bluetooth are off (NFC normally stays on). When you're done, $restart",
+        )
+    }
+    val items = buildList {
+        add(
+            Item(
+                Tone.Caution,
+                "Read every screen carefully",
+                "Each one says exactly what to do. Read all of it before you tap, and open every Learn more: the " +
+                    "details matter. Some steps, such as overwriting or locking a tag, can't be undone.",
+            ),
+        )
+        if (flow == Flow.Restore) {
+            add(
+                Item(
+                    Tone.Caution,
+                    "Only do this in private",
+                    "The words will be on screen. Make sure nobody, and no camera, can see it.",
+                    "They're hidden again as soon as you leave the app.",
+                ),
+            )
+        }
+        add(offline)
+        add(
+            Item(
+                Tone.Info,
+                "Hold the tag to the phone only when asked",
+                (if (flow == Flow.Backup) "The app asks twice: now, to check the tag, and at the end, to write the backup. " else "The app asks once, after the password. ") +
+                    "You don't need to hold it while you read or type. When asked, hold it flat over the phone's NFC " +
+                    "spot and keep it still until the app says it's done: it only reads or writes the tag while it's " +
+                    "held there.",
+                "The spot is usually near the middle or the top of the back. A thick or metal case can block it. If " +
+                    "the tag moves away too early, nothing is lost: hold it there again. Small tags and rings have a small " +
+                    "NFC symbol on them: put that side right against the spot.",
+                "Find where to hold it" to { vm.page = Page.Antenna },
+            ),
+        )
+        add(
+            Item(
+                Tone.Info,
+                "Nothing is kept",
+                "Everything you type or decrypt is deleted as soon as you close or leave SeedTag, and nothing is ever " +
+                    "saved on the phone. If you leave halfway, you type it again.",
+            ),
+        )
+        if (flow == Flow.Verify) {
+            add(
+                Item(
+                    Tone.Info,
+                    "What Verify does",
+                    "It proves the tag reads, that your written password opens it and that it holds a valid seed, " +
+                        "without ever showing the words.",
+                    "Type the password from your written copy, not from memory: that checks the copy too. You get ✓ and " +
+                        "a fingerprint; right after a backup, it also says whether the tag holds the seed you just " +
+                        "wrote. Do it after every backup, before locking the tag, and again every now and then (say " +
+                        "once a year) to make sure the tag still reads.",
+                ),
+            )
+        }
+        if (flow == Flow.Backup) {
+            add(Item(Tone.Caution, "Use at your own risk", "No warranty, and make sure yourself there's no malware on this phone.", DISCLAIMER))
+        }
+    }
+    Checklist("Before you start", items)
+}
+
+private enum class Flow { Backup, Verify, Restore }
 
 /**
  * Dialogs are windows of their own, so the activity's guards don't cover them: drop touches that
@@ -319,16 +778,9 @@ private fun GuardDialogWindow() {
     }
 }
 
-@Composable
-private fun ScreenColumn(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        content = content,
-    )
-}
-
 // ============================================================= back up ===
+
+private const val BACKUP_STEPS = 4
 
 @Composable
 private fun BackupScreen(vm: SeedTagViewModel) {
@@ -347,80 +799,72 @@ private const val DISCLAIMER =
         "Before you enter a seed, make sure yourself that there's no malware on this phone. SeedTag defends against " +
         "some attacks by other apps, but it can't cover every possible one: if the phone is compromised, so may be your seed."
 
-/** Shown before the seed is typed, and on the About page. */
-@Composable
-private fun DisclaimerWarning() {
-    WarningCard("Use at your own risk", DISCLAIMER)
-}
-
-/** Shown at the start of every procedure (Back up, Verify, Restore). */
-@Composable
-private fun ReadCarefullyWarning() {
-    WarningCard(
-        "Read every instruction carefully",
-        "Each screen says exactly what to do. Read all of it before you tap: some steps, such as overwriting or " +
-            "locking a tag, can't be undone.",
-    )
-}
-
 @Composable
 private fun TagStep(vm: SeedTagViewModel) {
-    ScreenColumn {
-        ReadCarefullyWarning()
-        DisclaimerWarning()
-        OfflineAdvice()
-        PrepareTagInfo(writing = true)
-        Text("1 · Check the tag", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Before you type anything, hold the tag you'll use to the phone. SeedTag reads it (nothing is written) and " +
-                "tells you whether it works and how long a backup it can hold.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        val check = vm.tagCheck
-        if (check == null) {
-            Button(onClick = vm::scanToCheck, modifier = Modifier.fillMaxWidth()) { Text("Scan tag") }
-        } else {
-            TagCheckCard(check)
-            if (check.usable) {
-                Button(onClick = vm::continueAfterCheck, modifier = Modifier.fillMaxWidth()) { Text("Continue with this tag") }
+    val check = vm.tagCheck
+    StepScreen(
+        bottom = {
+            when {
+                check == null -> PrimaryButton("Scan tag", vm::scanToCheck)
+                check.usable -> {
+                    PrimaryButton("Continue with this tag", vm::continueAfterCheck)
+                    SecondaryButton("Check another tag", vm::scanToCheck)
+                }
+                else -> PrimaryButton("Check another tag", vm::scanToCheck)
             }
-            OutlinedButton(onClick = vm::scanToCheck, modifier = Modifier.fillMaxWidth()) { Text("Check another tag") }
+        },
+    ) {
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            StepHeader(
+                1, BACKUP_STEPS, "Check your tag",
+                "First, SeedTag scans the tag you'll use, to inspect it: whether it works, whether it already holds " +
+                    "data, and how long a backup it has room for. Nothing is written to it. Tap Scan tag, then hold it " +
+                    "to the phone.",
+            )
+            Link("Not sure where to hold it? Find your NFC spot") { vm.page = Page.Antenna }
         }
+        if (check != null) TagCheckResult(check)
+        Preflight(vm, Flow.Backup)
     }
 }
 
 /** The result of the first Back up step: can this tag take a backup, and how many words. */
 @Composable
-private fun TagCheckCard(c: TagCheck) {
-    val lines = buildList {
-        when {
-            !c.supported -> add(
-                "✗ SeedTag can't use this tag: it doesn't support NDEF, the standard way of storing data on an NFC tag. " +
-                    "Use another tag (an NTAG215 or NTAG216, for example).",
-            )
-            !c.writable -> add("✗ This tag is read-only: nothing can be written to it. Use another tag.")
-            else -> {
-                add(if (c.ndef) "✓ Read without problems." else "✓ Blank tag. SeedTag formats it when writing, then asks for a second tap to read it back.")
-                c.capacity?.let { add((if (c.tooSmall) "✗ " else "✓ ") + capacityText(it, c.estimated)) }
-                    ?: add("? Its size couldn't be found out. It's checked again when the backup is written.")
-                if (c.tooSmall) add("Use a bigger tag (an NTAG215 or NTAG216, for example).")
-                when (c.content) {
-                    TagContent.Backup -> add("⚠ It already holds a SeedTag backup. Writing a new one replaces it; the app asks first.")
-                    TagContent.Other -> add("⚠ It already holds other data, which the backup would replace; the app asks first.")
-                    TagContent.Empty -> Unit
-                }
-            }
-        }
+private fun TagCheckResult(c: TagCheck) {
+    val (title, hint) = when {
+        !c.supported -> "This tag can't be used" to
+            "It doesn't support NDEF, the standard way of storing data on an NFC tag. Use another tag (an NTAG215 or NTAG216, for example)."
+        !c.writable -> "This tag can't be used" to "It's read-only: nothing can be written to it. Use another tag."
+        c.tooSmall -> "This tag is too small" to "Use a bigger tag (an NTAG215 or NTAG216, for example)."
+        else -> "This tag works" to null
     }
-    Card(
-        colors = CardDefaults.cardColors(
-            containerColor = if (c.usable) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.errorContainer,
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(if (c.usable) "This tag can be used" else "This tag can't be used", fontWeight = FontWeight.SemiBold)
-            lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            val t = colorsOf(if (c.usable) Tone.Success else Tone.Caution)
+            Box(Modifier.size(40.dp).background(t.container, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(iconOf(if (c.usable) Tone.Success else Tone.Caution), null, tint = t.accent, modifier = Modifier.size(22.dp))
+            }
+            Text(title, style = MaterialTheme.typography.titleMedium)
+        }
+        hint?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (c.supported && c.writable) {
+            Facts(
+                buildList {
+                    add(
+                        Fact(
+                            "Room",
+                            c.capacity?.let { capacityText(it, c.estimated) } ?: "Unknown: it's checked again when the backup is written.",
+                            if (c.tooSmall) Tone.Caution else null,
+                        ),
+                    )
+                    add(Fact("State", if (c.ndef) "Read without problems" else "Blank: formatted when writing, then a second tap reads it back"))
+                    when (c.content) {
+                        TagContent.Backup -> add(Fact("Holds", "A SeedTag backup. A new one replaces it; the app asks first.", Tone.Caution))
+                        TagContent.Other -> add(Fact("Holds", "Other data, which the backup would replace; the app asks first.", Tone.Caution))
+                        TagContent.Empty -> add(Fact("Holds", "Nothing yet"))
+                    }
+                },
+            )
         }
     }
 }
@@ -438,73 +882,113 @@ private fun capacityText(bytes: Int, estimated: Boolean): String {
 
 @Composable
 private fun LengthStep(vm: SeedTagViewModel) {
-    ScreenColumn {
-        Text("2 · How many words is your recovery phrase?", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Pick the length written on your backup. The keypad then stops at that many words.",
-            style = MaterialTheme.typography.bodySmall,
-        )
-        Bip39.validWordCounts.sorted().forEach { n ->
-            // Can't pick fewer words than are already entered (after Back from the keypad), nor more
-            // than the checked tag holds.
-            val fits = vm.fitsTag(n)
-            OutlinedButton(
-                onClick = { vm.chooseLength(n) },
-                modifier = Modifier.fillMaxWidth(),
-                enabled = n >= vm.words.size && fits,
-            ) { Text(if (fits) "$n words" else "$n words (too long for this tag)") }
+    StepScreen(bottom = { SecondaryButton("Use another tag", vm::checkAnotherTag) }) {
+        StepHeader(2, BACKUP_STEPS, "How many words?", "Pick the length written on your recovery phrase. The keypad then stops at that many words.")
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Bip39.validWordCounts.sorted().forEach { n ->
+                // Can't pick fewer words than are already entered (after Back from the keypad), nor
+                // more than the checked tag holds.
+                LengthTile(n, enabled = n >= vm.words.size && vm.fitsTag(n), Modifier.weight(1f)) { vm.chooseLength(n) }
+            }
         }
-        vm.tagCheck?.capacity?.let { Text("Tag: " + capacityText(it, vm.tagCheck?.estimated == true), style = MaterialTheme.typography.bodySmall) }
-        TextButton(onClick = vm::checkAnotherTag, modifier = Modifier.fillMaxWidth()) { Text("Use another tag") }
+        vm.tagCheck?.let { c ->
+            val max = c.maxWords
+            Text(
+                when {
+                    max != null && max < 24 -> "This tag has room for up to $max words. Longer phrases need a bigger tag."
+                    c.capacity == null -> "This tag's size is checked again when the backup is written."
+                    else -> "This tag has room for any length."
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@Composable
+private fun LengthTile(n: Int, enabled: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = modifier.height(84.dp),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+    ) {
+        Column(
+            Modifier.alpha(if (enabled) 1f else 0.35f),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text("$n", style = MaterialTheme.typography.headlineSmall)
+            Text("words", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     }
 }
 
 @Composable
 private fun WordsStep(vm: SeedTagViewModel) {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Only the words scroll; suggestions, keypad and buttons stay fixed at the bottom.
-        val scroll = rememberScrollState()
-        // Keep the word being typed in view as the grid grows.
-        LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
-        Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+    val scroll = rememberScrollState()
+    // Keep the word being typed in view as the grid grows.
+    LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+    StepScreen(
+        scroll = scroll,
+        scrollToTop = false,
+        bottom = {
+            // Fixed height, so the keypad doesn't jump when the suggestions appear or disappear.
+            Suggestions(vm.suggestions, vm::pickWord)
+            Keypad(onLetter = vm::typeLetter, onBackspace = vm::backspace)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = vm::backToLength) { Text("Back") }
+                TextButton(onClick = vm::clearWords, enabled = vm.words.isNotEmpty()) { Text("Clear") }
+                Spacer(Modifier.weight(1f))
+                Button(onClick = vm::toPasswordStep, enabled = vm.mnemonicStatus is MnemonicStatus.Valid, modifier = Modifier.height(48.dp)) {
+                    Text("Next")
+                }
+            }
+        },
+    ) {
+        StepHeader(
+            3, BACKUP_STEPS, "Enter your ${vm.wordCount} words",
+            "Type on the keypad and tap the matching word. The system keyboard and clipboard are never used.",
+            compact = true,
         ) {
-            Text("3 · Enter your ${vm.wordCount} recovery words", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Type with the keypad below and tap the matching word. The system keyboard and clipboard are never used.",
-                style = MaterialTheme.typography.bodySmall,
+            Link(if (vm.hideWords) "Show words" else "Hide words") { vm.hideWords = !vm.hideWords }
+        }
+        WordGrid(vm.words, current = vm.prefix, hidden = vm.hideWords, max = vm.wordCount)
+        when (val s = vm.mnemonicStatus) {
+            is MnemonicStatus.Incomplete -> Text(
+                "${s.count} of ${vm.wordCount} words",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("Hide entered words", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                Switch(checked = vm.hideWords, onCheckedChange = { vm.hideWords = it })
-            }
-            WordGrid(vm.words, current = vm.prefix, hidden = vm.hideWords, max = vm.wordCount)
-
-            when (val s = vm.mnemonicStatus) {
-                is MnemonicStatus.Incomplete -> Text("${s.count} of ${vm.wordCount} words", style = MaterialTheme.typography.bodyMedium)
-                is MnemonicStatus.Invalid -> Text("✗ ${s.reason}", color = MaterialTheme.colorScheme.error)
-                is MnemonicStatus.Valid -> Text("✓ Valid ${s.count}-word mnemonic", color = MaterialTheme.colorScheme.primary)
-            }
+            is MnemonicStatus.Invalid -> Text(s.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            is MnemonicStatus.Valid -> Text(
+                "Valid ${s.count}-word phrase",
+                style = MaterialTheme.typography.bodyMedium,
+                color = LocalExtra.current.success,
+            )
         }
+    }
+}
 
-        // Fixed height, so the keypad doesn't jump when the suggestions appear or disappear.
-        Row(
-            Modifier.fillMaxWidth().height(48.dp).horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            vm.suggestions.forEach { w ->
-                SuggestionChip(onClick = { vm.pickWord(w) }, label = { Text(w) })
-            }
-        }
-        Keypad(onLetter = vm::typeLetter, onBackspace = vm::backspace)
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = vm::backToLength) { Text("Back") }
-            OutlinedButton(onClick = vm::clearWords, enabled = vm.words.isNotEmpty()) { Text("Clear") }
-            Spacer(Modifier.weight(1f))
-            Button(onClick = vm::toPasswordStep, enabled = vm.mnemonicStatus is MnemonicStatus.Valid) { Text("Next") }
+/** Completions above a keyboard; fixed height, so the keys don't jump. */
+@Composable
+private fun Suggestions(words: List<String>, onPick: (String) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().height(40.dp).horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        words.forEach { w ->
+            SuggestionChip(
+                onClick = { onPick(w) },
+                label = { Text(w, style = MaterialTheme.typography.bodyLarge) },
+                shape = MaterialTheme.shapes.small,
+                colors = SuggestionChipDefaults.suggestionChipColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+                border = null,
+            )
         }
     }
 }
@@ -512,21 +996,29 @@ private fun WordsStep(vm: SeedTagViewModel) {
 @Composable
 private fun WordGrid(words: List<String>, current: String? = null, hidden: Boolean = false, max: Int = 24) {
     // Same mask for every word, so it doesn't give away word lengths.
-    val cells = words.mapIndexed { i, w -> "${i + 1}. ${if (hidden) "••••••" else w}" } +
-        if (current != null && words.size < max) listOf("${words.size + 1}. $current▏") else emptyList()
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val cells = words.mapIndexed { i, w -> Triple(i + 1, if (hidden) "••••••" else w, false) } +
+        if (current != null && words.size < max) listOf(Triple(words.size + 1, "$current▏", true)) else emptyList()
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         cells.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                row.forEach { c ->
-                    Text(
-                        c,
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                row.forEach { (n, w, typing) ->
+                    Row(
                         Modifier.weight(1f)
-                            .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(6.dp))
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                    )
+                            .height(38.dp)
+                            .clip(MaterialTheme.shapes.small)
+                            .background(MaterialTheme.colorScheme.surfaceContainer)
+                            .then(if (typing) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
+                            .padding(horizontal = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "$n",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.width(20.dp),
+                        )
+                        Text(w, fontFamily = FontFamily.Monospace, fontSize = 14.sp, maxLines = 1)
+                    }
                 }
                 repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
@@ -539,151 +1031,173 @@ private fun Keypad(onLetter: (Char) -> Unit, onBackspace: () -> Unit) {
     val rows = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         rows.forEachIndexed { i, r ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 if (i == 1) Spacer(Modifier.weight(0.5f))
+                if (i == 2) Spacer(Modifier.weight(1.5f))
                 r.forEach { c -> Key(c.toString(), Modifier.weight(1f)) { onLetter(c) } }
                 if (i == 1) Spacer(Modifier.weight(0.5f))
-                if (i == 2) Key("⌫", Modifier.weight(1.5f), onClick = onBackspace)
+                if (i == 2) Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, onClick = onBackspace)
             }
         }
     }
 }
 
+private enum class KeyKind { Char, Function, Active }
+
 @Composable
-private fun Key(label: String, modifier: Modifier, active: Boolean = false, onClick: () -> Unit) {
-    val bg = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondaryContainer
-    val fg = if (active) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSecondaryContainer
+private fun Key(label: String, modifier: Modifier, kind: KeyKind = KeyKind.Char, onClick: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    val bg = when (kind) {
+        KeyKind.Char -> c.surfaceContainerHighest
+        KeyKind.Function -> c.surfaceContainerHigh
+        KeyKind.Active -> c.primary
+    }
+    val fg = if (kind == KeyKind.Active) c.onPrimary else c.onSurface
     val view = LocalView.current
     Box(
         modifier
-            .height(44.dp)
-            .background(bg, RoundedCornerShape(6.dp))
+            .height(46.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(bg)
             .clickable {
                 view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 onClick()
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontSize = 18.sp, color = fg, maxLines = 1)
+        Text(label, fontSize = if (label.length > 1 && kind != KeyKind.Char) 14.sp else 18.sp, color = fg, maxLines = 1)
     }
 }
 
 @Composable
 private fun PasswordStep(vm: SeedTagViewModel) {
     var field by remember { mutableStateOf(PwField.Password) }
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Only the top part scrolls; the keyboard and buttons stay fixed at the bottom.
-        Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text("4 · Choose the encryption password", style = MaterialTheme.typography.titleMedium)
-            WarningCard(
-                "This password is the only thing protecting your seed",
-                "Anyone who finds the tag can try passwords offline, without limit. A generated 7-word passphrase " +
-                    "(≈77 bits) is strongly recommended. Write it down, label it \"SeedTag password\" and store it apart from the tag.",
-            )
-            WarningCard(
-                "Lose this password and the seed is gone",
-                "Without it, nothing can decrypt the tag: not this app, not seedtag.py, not the developer, nobody. " +
-                    "There's no reset and no recovery. Keep the written copy safe, and keep another backup of the seed itself.",
-            )
-            OutlinedButton(onClick = vm::generatePassphrase, modifier = Modifier.fillMaxWidth()) {
-                Text("Generate 7-word passphrase")
+    StepScreen(
+        bottom = {
+            PasswordKeyboard(vm, field)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = vm::backToWords) { Text("Back") }
+                Spacer(Modifier.weight(1f))
+                Button(
+                    onClick = vm::encryptAndWrite,
+                    enabled = vm.passwordLength(PwField.Password) > 0 && vm.passwordsMatch,
+                    modifier = Modifier.height(48.dp),
+                ) { Text("Encrypt & write tag") }
             }
-            if (vm.generatedPassphrase) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-                    Column(Modifier.padding(12.dp)) {
-                        Text("Write this down now, labelled \"SeedTag password\":", style = MaterialTheme.typography.labelMedium)
-                        Text(vm.revealPassword(PwField.Password), fontFamily = FontFamily.Monospace, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            "It's made of the same kind of words as a seed phrase, but it isn't one. Label it so that " +
-                                "nobody, you or your heirs, mistakes one for the other, and keep it apart from the tag and the seed.",
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                    }
-                }
-            }
-            SecretDisplay("Password", vm, PwField.Password, vm.generatedPassphrase, active = field == PwField.Password) {
-                field = PwField.Password
-            }
-            SecretDisplay("Repeat password", vm, PwField.Repeat, vm.generatedPassphrase, active = field == PwField.Repeat) {
-                field = PwField.Repeat
-            }
-
-            if (vm.passwordLength(PwField.Password) > 0) {
-                val bits = vm.passwordBits
-                val (msg, color) = when {
-                    bits < 50 -> "Weak (≈$bits bits) – crackable offline. Use a passphrase." to MaterialTheme.colorScheme.error
-                    bits < 70 -> "Fair (≈$bits bits) – consider a longer passphrase." to Color(0xFFC77700)
-                    else -> "Strong (≈$bits bits)" to MaterialTheme.colorScheme.primary
-                }
-                Text(msg, color = color, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                if (vm.passwordSharesSeedWords) {
-                    WarningCard(
-                        "The password uses words from your seed",
-                        "Anyone who sees the password learns part of the seed. Choose different words.",
+        },
+    ) {
+        StepHeader(4, BACKUP_STEPS, "Set a password", compact = true)
+        Notice(
+            Tone.Caution,
+            "This password is the only key",
+            "Anyone who finds the tag can try passwords offline, without limit. And if you lose it, nothing can decrypt " +
+                "the tag: not this app, not seedtag.py, not the developer, nobody.",
+            "A generated 7-word passphrase (≈77 bits) is strongly recommended. Write it down, label it \"SeedTag " +
+                "password\" and store it apart from the tag. There's no reset and no recovery: keep the written copy " +
+                "safe, and keep another backup of the seed itself.",
+        )
+        FilledTonalButton(onClick = vm::generatePassphrase, modifier = Modifier.fillMaxWidth().height(48.dp)) {
+            Text("Generate a 7-word passphrase")
+        }
+        if (vm.generatedPassphrase) {
+            Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) {
+                Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "Write this down now, labelled \"SeedTag password\"",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Text(
+                        vm.revealPassword(PwField.Password),
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                    Text(
+                        "It's made of the same kind of words as a seed phrase, but it isn't one. Label it so that nobody, " +
+                            "you or your heirs, mistakes one for the other, and keep it apart from the tag and the seed.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
                     )
                 }
             }
-            if (vm.passwordLength(PwField.Repeat) > 0 && !vm.passwordsMatch) {
-                Text("Passwords don't match", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+        }
+        SecretField("Password", vm, PwField.Password, vm.generatedPassphrase, active = field == PwField.Password) {
+            field = PwField.Password
+        }
+        if (vm.passwordLength(PwField.Password) > 0) StrengthMeter(vm.passwordBits)
+        SecretField("Repeat password", vm, PwField.Repeat, vm.generatedPassphrase, active = field == PwField.Repeat) {
+            field = PwField.Repeat
+        }
+        if (vm.passwordLength(PwField.Repeat) > 0 && !vm.passwordsMatch) {
+            Text("The passwords don't match", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+        }
+        if (vm.passwordLength(PwField.Password) > 0 && vm.passwordSharesSeedWords) {
+            Notice(Tone.Caution, "The password uses words from your seed", "Anyone who sees the password learns part of the seed. Choose different words.")
+        }
+    }
+}
+
+/** Three bars and a word: weak, fair, strong. */
+@Composable
+private fun StrengthMeter(bits: Int) {
+    val x = LocalExtra.current
+    val (level, msg, color) = when {
+        bits < 50 -> Triple(1, "Weak · ≈$bits bits · crackable offline. Use a passphrase.", MaterialTheme.colorScheme.error)
+        bits < 70 -> Triple(2, "Fair · ≈$bits bits · consider a longer passphrase.", x.fair)
+        else -> Triple(3, "Strong · ≈$bits bits", x.success)
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            repeat(3) { i ->
+                Box(Modifier.weight(1f).height(4.dp).background(if (i < level) color else MaterialTheme.colorScheme.outlineVariant, CircleShape))
             }
         }
-
-        PasswordKeyboard(vm, field)
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = vm::backToWords) { Text("Back") }
-            Spacer(Modifier.weight(1f))
-            Button(
-                onClick = vm::encryptAndWrite,
-                enabled = vm.passwordLength(PwField.Password) > 0 && vm.passwordsMatch,
-            ) { Text("Encrypt & write tag") }
-        }
+        Text(msg, style = MaterialTheme.typography.bodySmall, color = color)
     }
 }
 
 @Composable
 private fun DoneStep(vm: SeedTagViewModel) {
-    ScreenColumn {
-        Text("✓ Written and read back", style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+    StepScreen(
+        bottom = {
+            PrimaryButton("Verify now", { vm.tab = Screen.Verify })
+            SecondaryButton("Back up another seed", vm::startOver)
+        },
+    ) {
+        Hero(Tone.Success, "Backup written", "Written to the tag and read back.")
         vm.backupFingerprint?.let {
-            Text("Fingerprint", style = MaterialTheme.typography.labelMedium)
-            Text(it, fontFamily = FontFamily.Monospace, fontSize = 22.sp)
-            Text(
-                "Not secret. Verify on this phone or with seedtag.py shows the same value if the backup is intact.",
-                style = MaterialTheme.typography.bodySmall,
-            )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Facts(listOf(Fact("Fingerprint", it, mono = true)))
+                Text(
+                    "Not secret. Verify on this phone or with seedtag.py shows the same value if the backup is intact.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
-        WarningCard(
+        Notice(
+            Tone.Caution,
             "Not finished yet",
             "Verify the tag with the password from your written copy before you rely on it or lock it. Keep another " +
                 "copy of the seed somewhere else: NFC chips can fail.",
         )
-        Text("Next steps", style = MaterialTheme.typography.titleSmall)
-        Text(
-            "1. Go to Verify and decrypt the tag by typing the password from your written copy.\n" +
-                "2. Optionally recover it on an offline computer with seedtag.py.\n" +
-                "3. Only then lock the tag (permanent, on the Verify tab) and keep another backup of the seed elsewhere.",
-            style = MaterialTheme.typography.bodyMedium,
+        SectionLabel("Next steps")
+        Steps(
+            listOf(
+                "Go to Verify and decrypt the tag by typing the password from your written copy.",
+                "Optionally recover it on an offline computer with seedtag.py.",
+                "Only then lock the tag (permanent, on the Verify tab), and keep another backup of the seed elsewhere.",
+            ),
         )
-        Button(onClick = { vm.tab = Screen.Verify }, modifier = Modifier.fillMaxWidth()) { Text("Verify now") }
-        TextButton(onClick = vm::startOver, modifier = Modifier.fillMaxWidth()) { Text("Back up another seed") }
     }
 }
 
-/** Permanent and irreversible, so it looks it: red, unlike every other button. */
+/** Permanent and irreversible, so it looks it: outlined in red, unlike every other button. */
 @Composable
 private fun LockButton(vm: SeedTagViewModel) {
-    Button(
-        onClick = vm::requestLock,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = MaterialTheme.colorScheme.error,
-            contentColor = MaterialTheme.colorScheme.onError,
-        ),
-        modifier = Modifier.fillMaxWidth(),
-    ) { Text("Make tag read-only", fontWeight = FontWeight.SemiBold) }
+    DangerButton("Make tag read-only", vm::requestLock)
 }
 
 // ===================================================== verify / restore ===
@@ -700,116 +1214,78 @@ private fun ReadScreen(vm: SeedTagViewModel, reveal: Boolean) {
 
 @Composable
 private fun ReadPasswordStep(vm: SeedTagViewModel, reveal: Boolean) {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        // Only the guidance scrolls; the password, keyboard and Scan button stay fixed at the bottom.
-        Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(
-                if (reveal) "Restore: decrypt and show the words" else "Verify: check the tag without showing the words",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            ReadCarefullyWarning()
-            if (reveal) {
-                WarningCard(
-                    "Only do this in private",
-                    "The words will be on screen. Make sure nobody, and no camera, can see it. They're hidden again as " +
-                        "soon as you leave the app.",
-                )
-            } else {
-                VerifyExplanation()
-            }
-            OfflineAdvice()
-            PrepareTagInfo(writing = false)
-            Text("1 · Type the password, then scan the tag", style = MaterialTheme.typography.titleSmall)
-        }
-        SecretDisplay("Password", vm, PwField.Read, revealDefault = false, active = true) {}
-        PasswordKeyboard(vm, PwField.Read)
-        Button(
-            onClick = if (reveal) vm::scanForRestore else vm::scanForVerify,
-            enabled = vm.passwordLength(PwField.Read) > 0,
-            modifier = Modifier.fillMaxWidth(),
-        ) { Text("Scan tag") }
+    // Only the guidance scrolls; the password, keyboard and Scan button stay fixed at the bottom.
+    StepScreen(
+        bottom = {
+            SecretField("Password", vm, PwField.Read, revealDefault = false, active = true) {}
+            PasswordKeyboard(vm, PwField.Read)
+            PrimaryButton("Scan tag", if (reveal) vm::scanForRestore else vm::scanForVerify, enabled = vm.passwordLength(PwField.Read) > 0)
+        },
+    ) {
+        StepHeader(
+            1, 2,
+            if (reveal) "Restore a seed" else "Verify a tag",
+            if (reveal) "Type the password, then scan the tag. The words will be shown." else
+                "Type the password from your written copy, then scan the tag. The words stay hidden.",
+        )
+        Preflight(vm, if (reveal) Flow.Restore else Flow.Verify)
     }
 }
 
 @Composable
 private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: VerifyResult) {
-    ScreenColumn {
-        Text(if (reveal) "2 · Restored" else "2 · Verified", style = MaterialTheme.typography.titleMedium)
-        val differs = result.matchesBackup == false
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = if (differs) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer,
-            ),
-        ) {
-            Column(Modifier.padding(12.dp)) {
-                Text("✓ Decrypted: ${result.wordCount}-word seed, checksum OK", fontWeight = FontWeight.SemiBold)
-                Text("Fingerprint: ${result.fingerprint}", fontFamily = FontFamily.Monospace)
-                passwordFixNote(result.passwordFix)?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+    val differs = result.matchesBackup == false
+    StepScreen(bottom = { SecondaryButton(if (reveal) "Restore another tag" else "Verify another tag", vm::readAnother) }) {
+        Hero(
+            if (differs) Tone.Caution else Tone.Success,
+            if (reveal) "Restored" else "Verified",
+            "Decrypted a ${result.wordCount}-word seed, checksum OK.",
+        )
+        Facts(
+            buildList {
+                add(Fact("Fingerprint", result.fingerprint, mono = true))
                 when (result.matchesBackup) {
-                    true -> Text("✓ Matches the backup you just wrote", fontWeight = FontWeight.SemiBold)
-                    false -> Text(
-                        "✗ A different seed from the backup you just wrote (${vm.backupFingerprint}). Check you scanned the right tag.",
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        fontWeight = FontWeight.SemiBold,
+                    true -> add(Fact("Backup from this session", "Same seed", Tone.Success))
+                    false -> add(
+                        Fact("Backup from this session", "A different seed (${vm.backupFingerprint}). Check you scanned the right tag.", Tone.Caution),
                     )
                     null -> Unit
                 }
-            }
-        }
+            },
+        )
+        passwordFixNote(result.passwordFix)?.let { Notice(Tone.Caution, "Check your written password", it) }
         if (reveal) {
             val words = vm.restoredWords
             if (words != null) {
                 WordGrid(words)
-                Button(
-                    onClick = vm::hideRestored,
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.fillMaxWidth(),
-                ) { Text("Hide words") }
+                DangerButton("Hide words", vm::hideRestored)
             } else {
                 Text(
                     "The words are hidden. To see them again, restore the tag again.",
                     style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
         } else {
-            VerifyResultExplanation(result)
-            LockButton(vm)
-        }
-        OutlinedButton(onClick = vm::readAnother, modifier = Modifier.fillMaxWidth()) {
-            Text(if (reveal) "Restore another tag" else "Verify another tag")
+            Notice(
+                Tone.Info,
+                "What this means",
+                "The tag reads correctly, and your password decrypts it to a valid ${result.wordCount}-word seed.",
+                "The fingerprint is the same for the same seed on any tag, with any password, and in seedtag.py; it " +
+                    "isn't secret and doesn't reveal the words. Compare it with the one shown after the backup: if they " +
+                    "match, this tag holds that seed.",
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionLabel("Lock the tag")
+                Text(
+                    "Once you're sure, you can make the tag read-only. That's permanent: it can never be rewritten or erased.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LockButton(vm)
+            }
         }
     }
-}
-
-/** What Verify does and why, before the user starts. */
-@Composable
-private fun VerifyExplanation() {
-    InfoCard(
-        "What Verify does",
-        "It proves the tag can be read back, that your written password decrypts it, and that it holds a valid " +
-            "seed, without ever showing the words.\n\n" +
-            "1. Type the password from your written copy, not from memory. That checks the copy too.\n" +
-            "2. Tap Scan tag and hold the tag to the phone. The app reads it, decrypts it and checks the seed's checksum.\n" +
-            "3. You get ✓ and a fingerprint. Right after a backup, it also says whether the tag holds the seed you just wrote.\n\n" +
-            "Do it after every backup, before locking the tag, and again every now and then (say once a year) to make " +
-            "sure the tag still reads.",
-    )
-}
-
-/** What a successful Verify means, and what to do with the fingerprint. */
-@Composable
-private fun VerifyResultExplanation(result: VerifyResult) {
-    InfoCard(
-        "What this means",
-        "The tag reads correctly, and the password you typed decrypts it to a valid ${result.wordCount}-word seed. " +
-            "The fingerprint is the same for the same seed on any tag, with any password, and in seedtag.py; it isn't " +
-            "secret and doesn't reveal the words. Compare it with the one shown after the backup: if they match, " +
-            "this tag holds that seed.\n\n" +
-            "Once you're sure, you can make the tag read-only below. That's permanent.",
-    )
 }
 
 /** Says what had to be ignored in the typed password, so the user can fix their written copy. */
@@ -828,7 +1304,7 @@ private fun passwordFixNote(fix: PasswordFix): String? {
  * can't open, so no keyboard app sees what's typed, and there's nothing to copy, paste or autofill.
  */
 @Composable
-private fun SecretDisplay(
+private fun SecretField(
     label: String,
     vm: SeedTagViewModel,
     field: PwField,
@@ -837,21 +1313,28 @@ private fun SecretDisplay(
     onSelect: () -> Unit,
 ) {
     var reveal by remember(revealDefault) { mutableStateOf(revealDefault) }
-    val accent = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
-    Row(
-        Modifier.fillMaxWidth()
-            .border(if (active) 2.dp else 1.dp, accent, RoundedCornerShape(6.dp))
-            .clickable(onClick = onSelect)
-            .padding(start = 12.dp, top = 6.dp, bottom = 6.dp, end = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = accent)
+    val c = MaterialTheme.colorScheme
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = if (active) c.primary else c.onSurfaceVariant)
+        Row(
+            Modifier.fillMaxWidth()
+                .clip(MaterialTheme.shapes.small)
+                .background(c.surfaceContainer)
+                .border(if (active) 1.5.dp else 1.dp, if (active) c.primary else c.outlineVariant, MaterialTheme.shapes.small)
+                .clickable(onClick = onSelect)
+                .padding(start = 14.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
             // Masked, only the length is read; the text itself only while it's shown.
             val shown = if (reveal) vm.revealPassword(field) else "•".repeat(vm.passwordLength(field))
-            Text(shown + if (active) "▏" else "", fontFamily = FontFamily.Monospace, fontSize = 16.sp)
+            Text(
+                shown + if (active) "▏" else "",
+                fontFamily = FontFamily.Monospace,
+                fontSize = 16.sp,
+                modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+            )
+            TextButton(onClick = { reveal = !reveal }) { Text(if (reveal) "Hide" else "Show") }
         }
-        TextButton(onClick = { reveal = !reveal }) { Text(if (reveal) "Hide" else "Show") }
     }
 }
 
@@ -861,16 +1344,7 @@ private fun SecretDisplay(
  */
 @Composable
 private fun PasswordKeyboard(vm: SeedTagViewModel, field: PwField) {
-    // Fixed height, so the keyboard doesn't jump when the suggestions appear or disappear.
-    Row(
-        Modifier.fillMaxWidth().height(48.dp).horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        vm.passwordSuggestions(field).forEach { w ->
-            SuggestionChip(onClick = { vm.completePasswordWord(field, w) }, label = { Text(w) })
-        }
-    }
+    Suggestions(vm.passwordSuggestions(field)) { w -> vm.completePasswordWord(field, w) }
     TextKeyboard(
         onChar = { c -> vm.typePassword(field, c) },
         onBackspace = { vm.backspacePassword(field) },
@@ -909,13 +1383,13 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit) {
     }
     @Composable
     fun ShiftKey(modifier: Modifier) {
-        Key(if (shift == Shift.Locked) "⇪" else "⇧", modifier, active = shift != Shift.Off) {
+        Key(if (shift == Shift.Locked) "⇪" else "⇧", modifier, kind = if (shift != Shift.Off) KeyKind.Active else KeyKind.Function) {
             shift = when (shift) { Shift.Off -> Shift.Once; Shift.Once -> Shift.Locked; Shift.Locked -> Shift.Off }
         }
     }
     @Composable
     fun LayerKey(label: String, target: KeyLayer, modifier: Modifier) {
-        Key(label, modifier) { layer = target }
+        Key(label, modifier, kind = KeyKind.Function) { layer = target }
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -927,7 +1401,7 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit) {
         }
         rows.forEachIndexed { i, r ->
             val lastRow = i == rows.lastIndex
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 if (lastRow) when (layer) {
                     KeyLayer.Letters, KeyLayer.Accents -> ShiftKey(Modifier.weight(1.5f))
                     KeyLayer.Symbols -> LayerKey("=\\<", KeyLayer.More, Modifier.weight(1.5f))
@@ -938,13 +1412,13 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit) {
                 if (r.length < 10 && !lastRow) Spacer(Modifier.weight((10 - r.length) / 2f))
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
             if (layer == KeyLayer.Letters) LayerKey("?123", KeyLayer.Symbols, Modifier.weight(1.5f))
             else LayerKey("ABC", KeyLayer.Letters, Modifier.weight(1.5f))
             if (layer == KeyLayer.Accents) LayerKey("?123", KeyLayer.Symbols, Modifier.weight(1.5f))
             else LayerKey("àé", KeyLayer.Accents, Modifier.weight(1.5f))
-            Key("space", Modifier.weight(5f)) { onChar(' ') }
-            Key("⌫", Modifier.weight(1.5f), onClick = onBackspace)
+            Key("space", Modifier.weight(5f), kind = KeyKind.Function) { onChar(' ') }
+            Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, onClick = onBackspace)
         }
     }
 }
@@ -952,60 +1426,110 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit) {
 // ======================================================= find NFC spot ===
 
 @Composable
-private fun AntennaPage(vm: SeedTagViewModel) {
+private fun AntennaPage(vm: SeedTagViewModel, nfcState: NfcState, openNfcSettings: () -> Unit) {
     DisposableEffect(vm) {
         vm.startProbe()
         onDispose { vm.stopProbe() }
     }
-    ScreenColumn {
-        Text("Find your phone's NFC spot", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Every phone reads tags at one small spot on its back. Find it now, so you know where to hold the tag " +
-                "when the app asks.\n\n" +
-                "Take your NFC tag, or any contactless card, and slide it slowly over the back of the phone. When the " +
-                "phone vibrates and the box below says Tag detected, you've found the spot. Nothing is written to the tag, " +
-                "and its contents aren't read.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        val p = vm.probe
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = if (p != null) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-            ),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                if (p == null) {
-                    Text("Waiting for a tag…", style = MaterialTheme.typography.titleMedium)
-                } else {
-                    Text(
-                        "✓ Tag detected" + if (p.count > 1) " (${p.count} times)" else "",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                    )
-                    Text("That's the spot. Lift the tag away and back to try again.", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        when {
-                            p.ndef && p.writable == false -> "This tag is read-only: SeedTag can read it but not write to it."
-                            p.ndef && p.ndefSize != null -> "NDEF tag, " + capacityText(p.ndefSize, estimated = false)
-                            p.ndef -> "This tag can hold NDEF data: SeedTag can use it."
-                            p.formatable -> "This tag is blank. Back up checks its size first and formats it on the first write."
-                            else -> "This isn't an NDEF tag: SeedTag can't use it, but it's fine for finding the spot."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+    StepScreen {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Find your phone's NFC spot", style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Every phone reads tags at one small spot on its back. Find it now, so you know where to hold the tag " +
+                    "when the app asks. Nothing is written to the tag, and its contents aren't read.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionLabel("1 · Check that NFC is on")
+            when (nfcState) {
+                NfcState.Ready -> Notice(Tone.Success, "NFC is on", "Go on to the next step.")
+                NfcState.Disabled -> Notice(Tone.Caution, "NFC is off", "Turn it on first: without it, no tag is detected.") {
+                    Link("Turn on NFC", onClick = openNfcSettings)
                 }
+                NfcState.Missing -> Notice(Tone.Caution, "This device has no NFC", "SeedTag can't read or write tags on it.")
             }
         }
-        InfoCard(
-            "Tips",
-            "• The spot is usually in the upper half of the back, near the camera, or in the middle. On some phones " +
-                "it's at the very top edge.\n" +
-                "• Hold the tag flat against the phone, not edge-on, and keep it still for a moment.\n" +
-                "• Thick or metal cases, magnetic mounts, ring holders and card wallets can block it: take them off.\n" +
-                "• Small tags and rings have small antennas and must sit right on the spot.\n" +
-                "• If nothing happens anywhere, check that NFC is turned on.",
-        )
+
+        val p = vm.probe
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionLabel("2 · Slide the tag over the back of the phone")
+            Text(
+                "Use your tag, or any contactless card. Move it slowly, flat against the phone, until the phone " +
+                    "vibrates and Tag detected appears below.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Detector(found = p != null)
+            if (p == null) {
+                Text("Waiting for a tag…", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                Text("Tag detected" + if (p.count > 1) " · ${p.count} times" else "", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "That's the spot. Lift the tag away and back to try again.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+        if (p != null) {
+            Facts(
+                listOf(
+                    Fact(
+                        "This tag",
+                        when {
+                            p.ndef && p.writable == false -> "Read-only: SeedTag can read it but not write to it."
+                            p.ndef && p.ndefSize != null -> "NDEF tag, " + capacityText(p.ndefSize, estimated = false)
+                            p.ndef -> "Can hold NDEF data: SeedTag can use it."
+                            p.formatable -> "Blank. Back up checks its size first and formats it on the first write."
+                            else -> "Not an NDEF tag: SeedTag can't use it, but it's fine for finding the spot."
+                        },
+                    ),
+                ),
+            )
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SectionLabel("Tips")
+            Steps(
+                listOf(
+                    "The spot is usually in the upper half of the back, near the camera, or in the middle. On some phones it's at the very top edge.",
+                    "Hold the tag flat against the phone, not edge-on, and keep it still for a moment.",
+                    "Small tags, stickers and rings have a small antenna and usually a small NFC symbol: put that " +
+                        "side directly against the phone's NFC spot.",
+                    "Thick or metal cases, magnetic mounts, ring holders and card wallets can block it: take them off.",
+                    "Later, the tag only needs to be there while the app asks for it, not the whole time.",
+                ),
+            )
+        }
+    }
+}
+
+/** A slowly pulsing ring while waiting; a green check once a tag has been seen. */
+@Composable
+private fun Detector(found: Boolean) {
+    val x = LocalExtra.current
+    val c = MaterialTheme.colorScheme
+    val pulse = rememberInfiniteTransition(label = "pulse")
+    val k by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(1600, easing = LinearEasing), RepeatMode.Restart), label = "k")
+    Box(Modifier.size(150.dp), contentAlignment = Alignment.Center) {
+        if (!found) {
+            Box(Modifier.size(150.dp).scale(0.6f + 0.4f * k).alpha(1f - k).border(2.dp, c.primary, CircleShape))
+        }
+        Box(
+            Modifier.size(96.dp).background(if (found) x.successContainer else c.surfaceContainerHigh, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (found) {
+                Icon(Icons.Outlined.CheckCircle, null, tint = x.success, modifier = Modifier.size(44.dp))
+            } else {
+                Text("NFC", style = MaterialTheme.typography.titleMedium, color = c.onSurfaceVariant)
+            }
+        }
     }
 }
 
@@ -1015,52 +1539,83 @@ private fun AntennaPage(vm: SeedTagViewModel) {
 private fun AboutPage() {
     val ctx = LocalContext.current
     val version = remember { runCatching { ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName }.getOrNull() }
-    ScreenColumn {
-        Text("SeedTag", style = MaterialTheme.typography.headlineSmall)
-        Text("Version ${version ?: "unknown"}", style = MaterialTheme.typography.bodyMedium)
-        Text(
-            "Stores a password-encrypted BIP39 seed phrase on an NFC tag, and reads it back: Back up writes it, " +
-                "Verify checks it without showing the words, Restore shows them.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        AboutSection(
-            "Privacy",
-            "SeedTag works entirely offline. It has no internet permission, so it can't send anything anywhere, " +
-                "and no analytics or crash reporting. Its only permissions are NFC and hiding other apps' overlays. " +
-                "It stores nothing on the phone: everything typed or decrypted is wiped when you leave the app.",
-        )
-        AboutSection(
-            "Protection on the phone",
-            "Seed words and passwords are typed on the app's own keyboards, never the system one. Screenshots and " +
-                "screen recording are blocked, other apps' overlays are hidden (Android 12+), and taps that come " +
-                "through another app's window are ignored.",
-        )
-        AboutSection(
-            "Encryption",
-            "Argon2id (64 MiB, 3 passes) turns the password into a key, and AES-256-GCM encrypts the seed's raw " +
-                "entropy. The format is documented and versioned. seedtag.py, a single-file Python tool, encrypts " +
-                "and decrypts the same format on any computer, so a backup doesn't depend on this app.",
-        )
-        DisclaimerWarning()
-        AboutSection(
-            "Licence",
-            "Free and open source under the GNU General Public License, version 3 or later: you may use, share and " +
-                "change it, but anything you distribute that's based on it must be released under the same licence, " +
-                "with its source. seedtag.py is under the BSD Zero Clause licence, so anyone can always use it to " +
-                "recover a tag. © 2026 zivke85.",
-        )
+    StepScreen {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("SeedTag", style = MaterialTheme.typography.headlineSmall)
+            Text("Version ${version ?: "unknown"}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                "Stores a password-encrypted BIP39 seed phrase on an NFC tag, and reads it back: Back up writes it, " +
+                    "Verify checks it without showing the words, Restore shows them.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Column {
+            AboutSection(
+                "Privacy",
+                "SeedTag works entirely offline. It has no internet permission, so it can't send anything anywhere, " +
+                    "and no analytics or crash reporting. Its only permissions are NFC and hiding other apps' overlays. " +
+                    "It stores nothing on the phone: everything typed or decrypted is wiped when you leave the app.",
+            )
+            AboutSection(
+                "Protection on the phone",
+                "Seed words and passwords are typed on the app's own keyboards, never the system one. Screenshots and " +
+                    "screen recording are blocked, other apps' overlays are hidden (Android 12+), and taps that come " +
+                    "through another app's window are ignored.",
+            )
+            AboutSection(
+                "Encryption",
+                "Argon2id (64 MiB, 3 passes) turns the password into a key, and AES-256-GCM encrypts the seed's raw " +
+                    "entropy. The format is documented and versioned. seedtag.py, a single-file Python tool, encrypts " +
+                    "and decrypts the same format on any computer, so a backup doesn't depend on this app.",
+            )
+            AboutSection(
+                "Licence",
+                "Free and open source under the GNU General Public License, version 3 or later: you may use, share and " +
+                    "change it, but anything you distribute that's based on it must be released under the same licence, " +
+                    "with its source. seedtag.py is under the BSD Zero Clause licence, so anyone can always use it to " +
+                    "recover a tag. © 2026 zivke85.",
+            )
+        }
+        Notice(Tone.Caution, "Use at your own risk", DISCLAIMER)
     }
 }
 
 @Composable
 private fun AboutSection(title: String, text: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        Text(text, style = MaterialTheme.typography.bodyMedium)
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 // ============================================================= dialogs ===
+
+/** Icon for dialogs that confirm something risky or permanent. */
+@Composable
+private fun WarningIcon() {
+    Icon(Icons.Outlined.Warning, null, tint = MaterialTheme.colorScheme.error)
+}
+
+@Composable
+private fun DangerText(text: String) {
+    Text(text, color = MaterialTheme.colorScheme.error)
+}
+
+/** A slowly pulsing dot: waiting for the tag. */
+@Composable
+private fun ScanPulse() {
+    val c = MaterialTheme.colorScheme
+    val pulse = rememberInfiniteTransition(label = "scan")
+    val k by pulse.animateFloat(0f, 1f, infiniteRepeatable(tween(1400, easing = LinearEasing), RepeatMode.Restart), label = "k")
+    Box(Modifier.size(88.dp), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(88.dp).scale(0.5f + 0.5f * k).alpha(1f - k).border(2.dp, c.primary, CircleShape))
+        Box(Modifier.size(40.dp).background(c.primaryContainer, CircleShape), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(12.dp).background(c.primary, CircleShape))
+        }
+    }
+}
 
 @Composable
 private fun Dialogs(vm: SeedTagViewModel) {
@@ -1072,7 +1627,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
             text = {
                 GuardDialogWindow()
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(Modifier.size(28.dp))
+                    CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 3.dp)
                     Spacer(Modifier.width(16.dp))
                     Text(msg)
                 }
@@ -1085,22 +1640,25 @@ private fun Dialogs(vm: SeedTagViewModel) {
         AlertDialog(
             onDismissRequest = vm::cancelScan,
             properties = DialogProperties(dismissOnClickOutside = false),
-            title = { Text("Ready to scan") },
+            title = { Text("Ready to scan", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
             text = {
                 GuardDialogWindow()
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    CircularProgressIndicator()
-                    Spacer(Modifier.height(16.dp))
-                    Text(p.title, textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
-                    Spacer(Modifier.height(8.dp))
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    ScanPulse()
+                    Text(p.title, textAlign = TextAlign.Center, style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Hold it flat against the back of the phone and keep it still until this window closes.",
+                        "Hold it flat over the phone's NFC spot and keep it still until this window closes: the app " +
+                            "only reads or writes the tag while it's held there.",
                         textAlign = TextAlign.Center,
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     p.error?.let {
-                        Spacer(Modifier.height(12.dp))
-                        Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                        Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             },
@@ -1115,7 +1673,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
         is Dialog.Error -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },
-            title = { WarningTitle("Error") },
+            title = { Text("Something went wrong") },
             text = {
                 GuardDialogWindow()
                 Text(d.message)
@@ -1134,7 +1692,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
         is Dialog.ConfirmOverwrite -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },
-            title = { WarningTitle("Tag is not empty") },
+            title = { Text("Tag is not empty") },
             text = {
                 GuardDialogWindow()
                 Text(
@@ -1142,15 +1700,13 @@ private fun Dialogs(vm: SeedTagViewModel) {
                     else "This tag already contains data. Overwriting replaces it. Continue?",
                 )
             },
-            confirmButton = {
-                TextButton(onClick = vm::confirmOverwrite) { Text("Overwrite", color = MaterialTheme.colorScheme.error) }
-            },
+            confirmButton = { TextButton(onClick = vm::confirmOverwrite) { DangerText("Overwrite") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
         )
         is Dialog.ConfirmWeakPassword -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },
-            title = { WarningTitle("Weak password") },
+            title = { Text("Weak password") },
             text = {
                 GuardDialogWindow()
                 val parts = buildList {
@@ -1167,15 +1723,13 @@ private fun Dialogs(vm: SeedTagViewModel) {
                 }
                 Text(parts.joinToString("\n\n"))
             },
-            confirmButton = {
-                TextButton(onClick = vm::confirmWeakPassword) { Text("Write anyway", color = MaterialTheme.colorScheme.error) }
-            },
+            confirmButton = { TextButton(onClick = vm::confirmWeakPassword) { DangerText("Write anyway") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Change password") } },
         )
         Dialog.ConfirmLock -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },
-            title = { WarningTitle("Make tag read-only?") },
+            title = { Text("Make tag read-only?") },
             text = {
                 GuardDialogWindow()
                 Text(
@@ -1183,9 +1737,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
                         "Only do it after you have successfully verified the backup with your written password.",
                 )
             },
-            confirmButton = {
-                TextButton(onClick = vm::confirmLock) { Text("Lock forever", color = MaterialTheme.colorScheme.error) }
-            },
+            confirmButton = { TextButton(onClick = vm::confirmLock) { DangerText("Lock forever") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
         )
     }

@@ -125,14 +125,17 @@ app see airplane mode without any permission, but not Wi-Fi or Bluetooth, so tho
 
 ## Using it
 
-**Read every instruction on screen carefully before you tap.** Some steps, such as overwriting or locking a
-tag, can't be undone.
+**Read every instruction on screen carefully before you tap**, including the *Learn more* details. Some steps,
+such as overwriting or locking a tag, can't be undone.
 
-**Have the NFC tag ready before you start.** When the app asks for it, hold the tag flat against the back of the
-phone, over its NFC spot (usually near the middle or the top), and keep it still until the app says it's done.
-A thick or metal case can block it. Not sure where the spot is? **NFC spot** in the top bar opens a finder: slide a tag
-or any contactless card over the back of the phone until it vibrates and says *Tag detected*, and for an NDEF tag
-how long a backup it has room for. It doesn't write to the tag or read its contents. The phone vibrates when the tag has been handled: a short confirmation when it
+**Have the NFC tag ready before you start, but hold it to the phone only when the app asks.** You don't need to
+hold it while you read or type: the app only reads or writes the tag while it's held there. When asked, hold it
+flat against the back of the phone, over its NFC spot (usually near the middle or the top), and keep it still until
+the app says it's done. If it moves away too early, just hold it there again. A thick or metal case can block it.
+Small tags and rings have a small NFC symbol on them: put that side right against the spot. Not sure where the spot
+is? **Find NFC spot** in the top bar opens a finder (*Where to hold the tag*): first it checks that NFC is on, then
+you slide a tag or any contactless card over the back of the phone until it vibrates and says *Tag detected*, and
+for an NDEF tag how long a backup it has room for. It doesn't write to the tag or read its contents. The phone vibrates when the tag has been handled: a short confirmation when it
 worked, a "rejected" buzz when something went wrong (it follows the phone's touch-feedback setting).
 
 1. **Back up**: first hold the tag you'll use to the phone. The app checks it (nothing is written): whether it
@@ -140,8 +143,8 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    backup needs 111 bytes of NDEF space, 12 words need 91. Then choose how many words your phrase has (12, 15, 18,
    21 or 24; lengths the tag can't hold are greyed out), enter them with the in-app keypad (tap a suggestion to
    accept each word), then set a password.
-   Words already entered are hidden by default; turn off **Hide entered words** to check them.
-   **Generate 7-word passphrase** is recommended (≈77 bits). Write it down and label it *SeedTag password*: it's made of
+   Words already entered are hidden by default; tap **Show words** to check them.
+   **Generate a 7-word passphrase** is recommended (≈77 bits). Write it down and label it *SeedTag password*: it's made of
    the same BIP39 words as a seed phrase, so an unlabelled copy is easy to mistake for one, by you or by your heirs. Tap
    *Encrypt & write*, then hold the tag to the phone.
    The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
@@ -163,9 +166,10 @@ Verify and Restore are two steps, like Back up: type the password and scan, then
 been decrypted, the password field and keyboard are gone; **Verify another tag** or **Restore another tag** starts
 again from an empty password.
 
-Leaving the app (home button, Recents, screen off) wipes everything typed or decrypted.
+Leaving or closing the app (home button, Recents, screen off) deletes everything typed or decrypted; nothing is
+ever saved on the phone.
 
-**About** in the top bar shows the version, what the app does with your data (nothing leaves the phone), the
+**ⓘ** (About) in the top bar shows the version, what the app does with your data (nothing leaves the phone), the
 encryption used and the licence.
 
 ## Choosing a tag
