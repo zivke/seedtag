@@ -3,7 +3,12 @@
 
 package rs.zivke.seedtag
 
+import android.content.Context
 import android.os.Build
+import android.os.VibrationAttributes
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.view.HapticFeedbackConstants
 import android.view.View
 import androidx.activity.compose.BackHandler
@@ -101,7 +106,6 @@ import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
 import rs.zivke.seedtag.core.SeedBox
-import kotlinx.coroutines.delay
 
 // ============================================================== theme ===
 //
@@ -219,19 +223,36 @@ private val Haptic.constant: Int
         Haptic.Found -> HapticFeedbackConstants.LONG_PRESS
     }
 
+/** Plays [h]: [Haptic.Found] as a real vibration, the rest as the system's own touch feedback. */
+private fun View.play(h: Haptic) {
+    if (h == Haptic.Found && foundBuzz(context)) return
+    performHapticFeedback(h.constant)
+}
+
 /**
- * Plays [h]. Apps can't set a vibration's length or strength without the VIBRATE permission, which
- * SeedTag doesn't have, so [Haptic.Found] is three of the strongest standard buzzes back to back.
+ * Two firm pulses, 150 ms and 250 ms at full strength (where the motor can vary it), so a found tag
+ * is felt through the hand holding the phone. Played as touch feedback, so it follows the phone's
+ * touch-vibration setting. False if the phone has no vibrator.
  */
-private suspend fun View.play(h: Haptic) {
-    if (h != Haptic.Found) {
-        performHapticFeedback(h.constant)
-        return
+private fun foundBuzz(context: Context): Boolean {
+    val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        context.getSystemService(VibratorManager::class.java)?.defaultVibrator
+    } else {
+        context.getSystemService(Vibrator::class.java)
     }
-    repeat(3) {
-        performHapticFeedback(h.constant)
-        delay(70)
+    if (vibrator == null || !vibrator.hasVibrator()) return false
+    val timings = longArrayOf(0, 150, 90, 250)
+    val effect = if (vibrator.hasAmplitudeControl()) {
+        VibrationEffect.createWaveform(timings, intArrayOf(0, 255, 0, 255), -1)
+    } else {
+        VibrationEffect.createWaveform(timings, -1)
     }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        vibrator.vibrate(effect, VibrationAttributes.createForUsage(VibrationAttributes.USAGE_TOUCH))
+    } else {
+        vibrator.vibrate(effect)
+    }
+    return true
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1554,7 +1575,7 @@ private fun AboutPage() {
             AboutSection(
                 "Privacy",
                 "SeedTag works entirely offline. It has no internet permission, so it can't send anything anywhere, " +
-                    "and no analytics or crash reporting. Its only permissions are NFC and hiding other apps' overlays. " +
+                    "and no analytics or crash reporting. Its only permissions are NFC, hiding other apps' overlays and vibrating. " +
                     "It stores nothing on the phone: everything typed or decrypted is wiped when you leave the app.",
             )
             AboutSection(

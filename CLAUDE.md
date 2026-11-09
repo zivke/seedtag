@@ -38,8 +38,9 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   (`seedtag-release-test.apk`), to try the R8 output on the phone.
 - Every build finishes with `tools/check-apk.sh`, which verifies the signature
   (skipped with `--unsigned`), prints the APK's SHA-256 and **fails if the APK
-  requests any permission except NFC and `HIDE_OVERLAY_WINDOWS`** (Android 12+
-  overlay hiding; no access to anything).
+  requests any permission except NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`**
+  (overlay hiding on Android 12+, and the NFC-spot finder's buzz; neither
+  gives access to anything).
 - `tools/sign-release.sh <keystore>` runs outside the container: signs
   `seedtag-unsigned.apk` into `seedtag.apk` and refuses any certificate but the
   one in `tools/release-cert.sha256`; it also writes `seedtag.apk.sha256`. `make install` / `make run` install that
@@ -108,7 +109,7 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
 
 - **No network.** The manifest removes `INTERNET` / `ACCESS_NETWORK_STATE`
   with `tools:node="remove"`, and `check-apk.sh` enforces it on every build.
-  The only permissions are NFC and `HIDE_OVERLAY_WINDOWS`. Don't add permissions, analytics, crash reporting or anything that phones home.
+  The only permissions are NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`. Don't add permissions, analytics, crash reporting or anything that phones home.
 - Never log, toast, persist or put on the clipboard any seed word, password,
   entropy, key or decrypted output. No `Log.*` with user data at all.
 - Keep `allowBackup="false"` and the data-extraction rules; store nothing on disk.

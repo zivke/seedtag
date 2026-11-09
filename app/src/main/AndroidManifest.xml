@@ -6,6 +6,9 @@
     <!-- Android 12+: hide other apps' overlays while SeedTag is on screen (Window.setHideOverlayWindows).
          A normal permission: granted at install, no prompt, no access to any data. -->
     <uses-permission android:name="android.permission.HIDE_OVERLAY_WINDOWS" />
+    <!-- A clear vibration when the NFC-spot finder detects a tag (length and strength need it).
+         A normal permission: granted at install, no prompt, no access to any data. -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
 
     <!-- Hard guarantee: no network access, even if a library tries to add it.

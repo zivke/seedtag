@@ -87,8 +87,9 @@ All notable user-visible changes to SeedTag. The format follows
   the tag*), and **Check your tag** in Back up links to it. Its first step
   checks that NFC is on; the tips explain that small tags and rings have an
   NFC symbol to put right against the spot. When it detects a tag, the phone
-  buzzes longer, three strong pulses (apps can't set the strength or length
-  of a vibration without an extra permission).
+  gives two firm, longer pulses, easy to feel through the hand holding it.
+  This adds the `VIBRATE` permission, granted at install without a prompt: it
+  only runs the vibration motor and gives no access to anything.
 - **Check your tag** explains what the scan is for: to inspect the tag before
   anything is typed, with nothing written.
 - The generated passphrase comes with a reminder to label it "SeedTag

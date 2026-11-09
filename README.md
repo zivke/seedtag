@@ -39,10 +39,10 @@ make help                         # all targets
 ```
 
 Every build ends with `tools/check-apk.sh`. It verifies the signature, prints the APK's SHA-256, and **fails the
-build if the APK requests any permission other than NFC and `HIDE_OVERLAY_WINDOWS`**, so a library can't quietly
-add network access.
-(`HIDE_OVERLAY_WINDOWS` is granted at install without a prompt and gives no access to anything: it only lets
-SeedTag hide other apps' overlays.)
+build if the APK requests any permission other than NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`**, so a library
+can't quietly add network access.
+(`HIDE_OVERLAY_WINDOWS` and `VIBRATE` are granted at install without a prompt and give no access to anything: one
+only lets SeedTag hide other apps' overlays, the other only runs the vibration motor.)
 
 ### Signing a release
 
