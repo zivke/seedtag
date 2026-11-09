@@ -10,7 +10,7 @@
         android:pivotY="54"
         android:scaleX="0.92"
         android:scaleY="0.92"
-        android:translateY="2">
+        android:translateY="-2.57">
 
         <!-- Fob outline -->
         <path

@@ -5,7 +5,7 @@
     </clipPath>
   </defs>
   <rect x="18" y="18" width="72" height="72" fill="#121418"/>
-  <g transform="translate(54 56) scale(0.92) translate(-54 -54)">
+  <g transform="translate(54 51.43) scale(0.92) translate(-54 -54)">
     <ellipse cx="60.58" cy="35.61" rx="7" ry="4.7" transform="rotate(-20 60.58 35.61)" fill="none" stroke="#8C929C" stroke-width="1.8"/>
     <path d="M47.94 34.5A7 7 0 0 1 60.06 34.5L71.32 54A20 20 0 1 1 36.68 54ZM57.5 38A3.5 3.5 0 1 0 50.5 38A3.5 3.5 0 1 0 57.5 38Z" fill="#2D50D0" fill-rule="evenodd"/>
     <ellipse cx="60.58" cy="35.61" rx="7" ry="4.7" transform="rotate(-20 60.58 35.61)" clip-path="url(#ringFront)" fill="none" stroke="#E3E6EB" stroke-width="1.8"/>
