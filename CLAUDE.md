@@ -77,7 +77,9 @@ Two Gradle modules plus the Python tool:
     `setAccessibilityDataSensitive(YES)` (only accessibility tools see it), and
     every version shows a banner naming non-system apps with accessibility
     access. Dialogs are separate windows and use `GuardDialogWindow()` in `Ui.kt`
-    for all of this.
+    for all of this. Airplane mode is read from `Settings.Global` (no
+    permission) for the offline advice; Wi-Fi / Bluetooth state would need
+    permissions, so they're only mentioned.
   - `SeedTagViewModel.kt`: all UI state and flows. Argon2 runs on
     `Dispatchers.Default`. The pending tag operation is an `AtomicReference`
     because the reader callback runs on a binder thread. A failed tag operation

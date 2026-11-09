@@ -30,6 +30,8 @@ class MainActivity : ComponentActivity() {
     private val vm: SeedTagViewModel by viewModels()
     private var adapter: NfcAdapter? = null
     private val nfcState = mutableStateOf(NfcState.Ready)
+    /** Airplane mode is on: a hint that the phone is offline, not proof (Wi-Fi and Bluetooth can be on). */
+    private val airplaneMode = mutableStateOf(false)
     /** The last touch came through another app's overlay and was dropped. */
     private val overlayDetected = mutableStateOf(false)
     /** The current gesture is being dropped because an overlay covered it. */
@@ -58,6 +60,7 @@ class MainActivity : ComponentActivity() {
                 SeedTagApp(
                     vm = vm,
                     nfcState = nfcState.value,
+                    airplaneMode = airplaneMode.value,
                     overlayDetected = overlayDetected.value,
                     openNfcSettings = { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) },
                     accessibilityApps = if (apps == accessibilityHidden.value) emptyList() else apps,
@@ -77,11 +80,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         val a = adapter
-        nfcState.value = when {
-            a == null -> NfcState.Missing
-            !a.isEnabled -> NfcState.Disabled
-            else -> NfcState.Ready
-        }
+        refreshRadios()
         accessibilityApps.value = enabledAccessibilityApps()
         // Reader mode for the whole time we're in the foreground: tags go to us only,
         // never to other apps (e.g. NFC Tools or the system tag viewer).
@@ -137,6 +136,24 @@ class MainActivity : ComponentActivity() {
         super.onWindowFocusChanged(hasFocus)
         // Coming back from a dialog, the shade or another app can bring the bars back.
         if (hasFocus) hideSystemBars()
+        // The quick-settings shade doesn't pause the activity, but airplane mode or NFC may have
+        // been switched there.
+        if (hasFocus) refreshRadios()
+    }
+
+    /**
+     * NFC on or off, and airplane mode. Reading the airplane-mode setting needs no permission; Wi-Fi
+     * and Bluetooth state would (ACCESS_WIFI_STATE, BLUETOOTH_CONNECT), so the app only reminds
+     * users to check those.
+     */
+    private fun refreshRadios() {
+        val a = adapter
+        nfcState.value = when {
+            a == null -> NfcState.Missing
+            !a.isEnabled -> NfcState.Disabled
+            else -> NfcState.Ready
+        }
+        airplaneMode.value = Settings.Global.getInt(contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
     }
 
     /** Full screen: no status or navigation bar. A swipe from the edge shows them briefly. */

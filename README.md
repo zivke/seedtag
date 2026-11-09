@@ -97,6 +97,32 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
 Not pinned: Claude Code's installer (`curl | bash` from claude.ai in `post-create.sh`) and Ubuntu's packages
 (signed by Ubuntu's apt keys). Neither is part of the app, and the release key isn't in the container.
 
+## Using it safely
+
+SeedTag can't go online: it has no internet permission. Other apps on the phone can, and malware could send out
+what you type or see in SeedTag. That matters for **Back up** (the seed is typed in), **Restore** (it's on screen)
+and **Verify** too: it never shows the words, but you type the password, and the password plus the tag is the
+seed. From safest down:
+
+1. **A spare phone that's never online**, used only for this: factory-reset it and never connect it to Wi-Fi or
+   mobile data. Copy the APK over by USB or SD card and check its SHA-256 first. An old phone is fine, though
+   Android 12+ hides other apps' overlays and Android 14+ shuts out accessibility services (see
+   [Warnings](#warnings-other-apps-on-the-phone)). Factory-reset it again before you give it away.
+2. **Your everyday phone, offline:**
+   - restart it before you start;
+   - turn on airplane mode, and check that Wi-Fi and Bluetooth are off too: they can be switched back on in
+     airplane mode. NFC normally stays on; if the app says NFC is off, switch NFC back on;
+   - when you're done, close SeedTag and **restart the phone before it goes back online**. Some spyware doesn't
+     survive a restart, so it loses whatever it caught before it could send it.
+
+   This stops anything that sends data live, such as remote-control malware, and spyware that doesn't survive a
+   restart. It doesn't stop malware that survives the restart and uploads later: only a phone that's never online
+   does.
+3. **Always:** a private room with no cameras, and a phone you have no reason to distrust.
+
+The Back up, Verify and Restore screens remind you of this, and say whether airplane mode is on. Android lets the
+app see airplane mode without any permission, but not Wi-Fi or Bluetooth, so those you have to check yourself.
+
 ## Using it
 
 **Read every instruction on screen carefully before you tap.** Some steps, such as overwriting or locking a
@@ -301,8 +327,8 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
   not the developer. There's no reset or recovery of any kind. Keep the written password safe, and keep a copy of
   the seed itself somewhere else.
 - **This is not your only backup.** NFC chips can fail. Keep a metal or paper copy of the seed somewhere separate.
-- The phone is still a general-purpose, normally online device. For maximum safety use it in airplane mode, or on a spare
-  phone that is never online.
+- The phone is still a general-purpose, normally online device. Use a spare phone that's never online, or at least
+  airplane mode with a restart before and after: see [Using it safely](#using-it-safely).
 - **Password characters.** The app's keyboard has letters, digits, all ASCII symbols and common Latin accented letters
   (č, ć, đ, š, ž, é, ö, ß …). A password with any other character, such as Cyrillic or emoji, set with an earlier version
   or with `seedtag.py`, can't be typed in the app: decrypt that tag with `seedtag.py`.

@@ -7,6 +7,12 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- Back up, Verify and Restore advise going offline before you start: safest
+  is a spare phone that's never online; otherwise restart the phone, turn on
+  airplane mode with Wi-Fi and Bluetooth off, and restart it again before it
+  goes back online. The card says whether airplane mode is on (Android shows
+  that without any permission; Wi-Fi and Bluetooth can't be checked without
+  one). The README has a new *Using it safely* section.
 - Back up starts by checking the tag, before anything is typed: hold it to the
   phone and the app says whether it works, whether it's read-only, blank or
   already holds data (a SeedTag backup or something else), and how long a

@@ -50,12 +50,14 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -107,6 +109,7 @@ private val Haptic.constant: Int
 fun SeedTagApp(
     vm: SeedTagViewModel,
     nfcState: NfcState,
+    airplaneMode: Boolean,
     overlayDetected: Boolean,
     openNfcSettings: () -> Unit,
     accessibilityApps: List<String> = emptyList(),
@@ -117,45 +120,50 @@ fun SeedTagApp(
     LaunchedEffect(vm) { vm.haptics.collect { view.performHapticFeedback(it.constant) } }
     val page = vm.page
     BackHandler(enabled = page != null) { vm.page = null }
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(page?.title ?: "SeedTag") },
-                navigationIcon = { if (page != null) TextButton(onClick = { vm.page = null }) { Text("‹ Back") } },
-                actions = {
-                    if (page == null) {
-                        Page.entries.forEach { p -> TextButton(onClick = { vm.page = p }) { Text(p.button) } }
-                    }
-                },
-            )
-        },
-    ) { pad ->
-        Column(Modifier.padding(pad).fillMaxSize()) {
-            if (page == null) {
-                TabRow(selectedTabIndex = vm.tab.ordinal) {
-                    Screen.entries.forEach { t ->
-                        Tab(selected = vm.tab == t, onClick = { vm.tab = t }, text = { Text(t.title) })
+    CompositionLocalProvider(LocalAirplaneMode provides airplaneMode) {
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text(page?.title ?: "SeedTag") },
+                    navigationIcon = { if (page != null) TextButton(onClick = { vm.page = null }) { Text("‹ Back") } },
+                    actions = {
+                        if (page == null) {
+                            Page.entries.forEach { p -> TextButton(onClick = { vm.page = p }) { Text(p.button) } }
+                        }
+                    },
+                )
+            },
+        ) { pad ->
+            Column(Modifier.padding(pad).fillMaxSize()) {
+                if (page == null) {
+                    TabRow(selectedTabIndex = vm.tab.ordinal) {
+                        Screen.entries.forEach { t ->
+                            Tab(selected = vm.tab == t, onClick = { vm.tab = t }, text = { Text(t.title) })
+                        }
                     }
                 }
-            }
-            NfcBanner(nfcState, openNfcSettings)
-            if (overlayDetected) OverlayBanner()
-            if (accessibilityApps.isNotEmpty()) {
-                AccessibilityBanner(accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
-            }
-            when (page) {
-                Page.Antenna -> AntennaPage(vm)
-                Page.About -> AboutPage()
-                null -> when (vm.tab) {
-                    Screen.Backup -> BackupScreen(vm)
-                    Screen.Verify -> ReadScreen(vm, reveal = false)
-                    Screen.Restore -> ReadScreen(vm, reveal = true)
+                NfcBanner(nfcState, openNfcSettings)
+                if (overlayDetected) OverlayBanner()
+                if (accessibilityApps.isNotEmpty()) {
+                    AccessibilityBanner(accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
+                }
+                when (page) {
+                    Page.Antenna -> AntennaPage(vm)
+                    Page.About -> AboutPage()
+                    null -> when (vm.tab) {
+                        Screen.Backup -> BackupScreen(vm)
+                        Screen.Verify -> ReadScreen(vm, reveal = false)
+                        Screen.Restore -> ReadScreen(vm, reveal = true)
+                    }
                 }
             }
         }
     }
     Dialogs(vm)
 }
+
+/** Whether airplane mode is on, for [OfflineAdvice]. */
+private val LocalAirplaneMode = compositionLocalOf { false }
 
 @Composable
 private fun NfcBanner(state: NfcState, openNfcSettings: () -> Unit) {
@@ -249,6 +257,27 @@ private fun InfoCard(title: String, text: String, modifier: Modifier = Modifier)
 
 /** Where the tag goes, said before any procedure asks for it. */
 @Composable
+private fun OfflineAdvice() {
+    val restart = "and restart the phone before it goes back online: some spyware doesn't survive a restart, and " +
+        "loses whatever it caught."
+    if (LocalAirplaneMode.current) {
+        InfoCard(
+            "Airplane mode is on",
+            "Check that Wi-Fi and Bluetooth are off too: they can be switched on in airplane mode. When you're done, " +
+                "close SeedTag $restart",
+        )
+    } else {
+        WarningCard(
+            "Go offline first",
+            "SeedTag itself can't go online, but other apps on this phone can, and malware could send what you type " +
+                "or see here. Safest is a spare phone that's never online. Otherwise restart the phone, turn on " +
+                "airplane mode and check that Wi-Fi and Bluetooth are off (NFC normally stays on). When you're done, " +
+                "close SeedTag $restart",
+        )
+    }
+}
+
+@Composable
 private fun PrepareTagInfo(writing: Boolean) {
     InfoCard(
         "Have your NFC tag ready",
@@ -339,6 +368,7 @@ private fun TagStep(vm: SeedTagViewModel) {
     ScreenColumn {
         ReadCarefullyWarning()
         DisclaimerWarning()
+        OfflineAdvice()
         PrepareTagInfo(writing = true)
         Text("1 · Check the tag", style = MaterialTheme.typography.titleMedium)
         Text(
@@ -690,6 +720,7 @@ private fun ReadPasswordStep(vm: SeedTagViewModel, reveal: Boolean) {
             } else {
                 VerifyExplanation()
             }
+            OfflineAdvice()
             PrepareTagInfo(writing = false)
             Text("1 · Type the password, then scan the tag", style = MaterialTheme.typography.titleSmall)
         }
