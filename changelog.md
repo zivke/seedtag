@@ -37,6 +37,8 @@ All notable user-visible changes to SeedTag. The format follows
   you'd confirmed, the next tag held to the phone was overwritten without
   asking, even a different one (another backup, say) after a failed tap. Now
   any other tag, or the same tag with different content, is asked about again.
+- If the tag moves away while it's being overwritten, the app now says that
+  its old content may already be gone, instead of only "moved away too early".
 
 ## [0.3.0] - 2026-11-09
 

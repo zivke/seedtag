@@ -145,7 +145,17 @@ object TagIo {
                     return TagResult.NotEmpty(text, OverwriteTarget(tag.id ?: ByteArray(0), existing.toByteArray()))
                 }
             }
-            it.writeNdefMessage(message)
+            val overwriting = existing != null && existing.records.any { r -> r.tnf != NdefRecord.TNF_EMPTY }
+            try {
+                it.writeNdefMessage(message)
+            } catch (e: IOException) {
+                if (!overwriting) throw e
+                // A Type 2 write goes page by page: the old content may already be partly overwritten.
+                return TagResult.Failed(
+                    "The tag moved away while it was being overwritten, so what it held before may already be gone. " +
+                        "Hold the same tag still and tap again to write the new backup.",
+                )
+            }
             // Read back over the same connection; getNdefMessage() re-reads the tag. Not the
             // cached message: that's what the tag held before this write.
             val back = it.ndefMessage ?: it.ndefMessage
