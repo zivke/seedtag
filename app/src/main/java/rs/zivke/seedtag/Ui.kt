@@ -1180,6 +1180,9 @@ private fun PasswordStep(vm: SeedTagViewModel) {
             field = PwField.Password
         }
         if (vm.passwordLength(PwField.Password) > 0) StrengthMeter(vm.passwordBits)
+        if (vm.passwordHasStraySpaces) {
+            Text(STRAY_SPACES, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+        }
         SecretField("Repeat password", vm, PwField.Repeat, vm.generatedPassphrase, active = field == PwField.Repeat) {
             field = PwField.Repeat
         }

@@ -75,6 +75,23 @@ object Passphrase {
         return bits.toInt()
     }
 
+    fun hasStraySpaces(password: CharArray): Boolean = hasStraySpaces(password, password.size)
+
+    /**
+     * True if `password[0 until length]` isn't already in the form [SeedBox.passwordVariants] retries:
+     * it starts or ends with whitespace, has two in a row, or has whitespace other than a plain space.
+     * A new password like that is refused, because a written copy rarely shows it and the forgiving
+     * retries only ever take spaces away. Same rule as has_stray_spaces() in seedtag.py.
+     */
+    fun hasStraySpaces(password: CharArray, length: Int): Boolean {
+        for (i in 0 until length) {
+            val c = password[i]
+            if (!c.isWhitespace()) continue
+            if (c != ' ' || i == 0 || i == length - 1 || password[i - 1].isWhitespace()) return true
+        }
+        return false
+    }
+
     fun sharesWords(password: CharArray, seedWords: Set<String>): Boolean =
         sharesWords(password, password.size, seedWords)
 

@@ -75,6 +75,10 @@ enum class Haptic { Tick, Success, Failure, Found }
 
 private enum class Purpose { Check, BackupWrite, Verify, Restore, Lock }
 
+const val STRAY_SPACES =
+    "The password starts or ends with a space, or has two spaces in a row. A written copy rarely shows that, " +
+        "and the tag could only be decrypted with exactly those spaces. Use single spaces between words only."
+
 /** Argon2id needs 64 MiB of heap at once; a low-memory phone may not have it. */
 private const val OUT_OF_MEMORY =
     "There wasn't enough free memory for the key derivation (Argon2id needs 64 MiB). Nothing was written or kept. " +
@@ -154,6 +158,9 @@ class SeedTagViewModel : ViewModel() {
     }
 
     val passwordsMatch: Boolean get() { passwordEdits; return password.contentEquals(passwordRepeat) }
+
+    /** The new password starts or ends with a space, or has two in a row: refused, see [Passphrase.hasStraySpaces]. */
+    val passwordHasStraySpaces: Boolean get() { passwordEdits; return password.use(Passphrase::hasStraySpaces) }
 
     private fun passwordChanged(f: PwField) {
         passwordEdits++
@@ -282,6 +289,7 @@ class SeedTagViewModel : ViewModel() {
     fun encryptAndWrite() {
         if (password.isEmpty()) return showError("Enter a password.")
         if (!password.contentEquals(passwordRepeat)) return showError("The passwords don't match.")
+        if (passwordHasStraySpaces) return showError(STRAY_SPACES)
         val bits = passwordBits
         val shares = passwordSharesSeedWords
         if (bits < Passphrase.MIN_BITS || shares) {

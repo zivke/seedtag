@@ -116,6 +116,16 @@ class PasswordVariants(unittest.TestCase):
             with self.assertRaises(seedtag.WrongPassword):
                 seedtag.open_forgiving(blob, wrong)
 
+    def test_stray_spaces(self):
+        for ok in ("", "x", "correct horse battery staple", "a b"):
+            self.assertFalse(seedtag.has_stray_spaces(ok), repr(ok))
+        for bad in (" x", "x ", "a  b", "a\tb", " ", "a\u00a0b"):
+            self.assertTrue(seedtag.has_stray_spaces(bad), repr(bad))
+        # exactly the passwords password_variants() would offer a spaces fix for
+        for pw in ("a b", " a", "a  b", "a\tb", "Ab"):
+            spaces = any(fix in ("Spaces", "SpacesAndCase") for fix, _ in seedtag.password_variants(pw))
+            self.assertEqual(spaces, seedtag.has_stray_spaces(pw), repr(pw))
+
     def test_bad_blob_is_not_retried(self):
         with self.assertRaises(ValueError) as cm:
             seedtag.open_forgiving(b"\x02" + bytes(76), " Pw ")

@@ -66,4 +66,21 @@ class PassphraseTest {
         assertFalse(Passphrase.sharesWords("zoo abandon ability able".toCharArray(), seed))
         assertFalse(Passphrase.sharesWords("legalese".toCharArray(), seed))
     }
+
+    @Test
+    fun straySpaces() {
+        for (ok in listOf("", "x", "correct horse battery staple", "a b")) {
+            assertFalse(ok, Passphrase.hasStraySpaces(ok.toCharArray()))
+        }
+        for (bad in listOf(" x", "x ", "a  b", "a\tb", " ", "a\u00a0b")) {
+            assertTrue(bad, Passphrase.hasStraySpaces(bad.toCharArray()))
+        }
+        // Only password[0 until length] counts: a trailing space beyond it doesn't.
+        assertFalse(Passphrase.hasStraySpaces("ab ".toCharArray(), 2))
+        // Exactly the passwords that passwordVariants would offer a Spaces fix for.
+        for (pw in listOf("a b", " a", "a  b", "a\tb", "Ab")) {
+            val spaces = SeedBox.passwordVariants(pw.toCharArray()).any { it.first == PasswordFix.Spaces || it.first == PasswordFix.SpacesAndCase }
+            assertEquals(pw, spaces, Passphrase.hasStraySpaces(pw.toCharArray()))
+        }
+    }
 }

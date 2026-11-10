@@ -149,6 +149,8 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    *Encrypt & write*, then hold the tag to the phone.
    The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
    A password estimated below 60 bits, or one that uses words of the seed, needs a confirmation before writing.
+   A password that starts or ends with a space, or has two spaces in a row, is refused: a written copy rarely shows
+   that, and only the exact spaces would decrypt the tag.
    If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted
    first and then needs a second tap so the app can read it back.
 2. **Verify**: type the password from your written copy (not from memory, so the copy is checked too) and scan.
@@ -291,7 +293,7 @@ python3 seedtag.py encrypt            # create a tag string on the computer inst
 ```
 
 Like the app, `decrypt` and `verify` retry a wrong password without extra spaces, then in lower case, and say so if
-that's what matched.
+that's what matched. `encrypt`, like Back up, refuses a password with leading, trailing or doubled spaces.
 
 To get the Base64 string off the tag without this app, read it with any NFC reader app (e.g. NFC Tools).
 It's ciphertext, so that's safe.

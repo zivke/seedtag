@@ -6,6 +6,13 @@ All notable user-visible changes to SeedTag. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Back up and `seedtag.py encrypt` refuse a new password that starts or ends
+  with a space, or has two spaces in a row. A written copy rarely shows them,
+  and Verify and Restore can only forgive spaces that were *added* when typing,
+  not ones that were part of the password when it was set, so such a backup
+  could be impossible to open from the written copy.
+
 ### Fixed
 - An unexpected error from the phone's NFC stack no longer leaves the scan
   window open and ignoring every tap: it's shown like any other tag error, and

@@ -330,6 +330,13 @@ def password_variants(password: str) -> list[tuple[str, str]]:
     return out
 
 
+def has_stray_spaces(password: str) -> bool:
+    """True if the password starts or ends with whitespace, has two in a row, or has whitespace other
+    than a plain space. encrypt refuses such a password: a written copy rarely shows it, and the
+    forgiving retries only take spaces away. Same rule as Passphrase.hasStraySpaces in the app."""
+    return " ".join(password.split()) != password
+
+
 def open_forgiving(blob: bytes, password: str) -> tuple[bytes, str | None]:
     """Like open_blob, but a wrong password is also tried without extra spaces, then lower-cased.
     Returns (entropy, fix), fix being None or a key of FIXES."""
@@ -369,6 +376,10 @@ def main(argv):
             pw = getpass.getpass("Password: ")
             if pw != getpass.getpass("Repeat password: "):
                 print("Passwords differ.", file=sys.stderr)
+                return 1
+            if has_stray_spaces(pw):
+                print("The password starts or ends with a space, or has two spaces (or a tab) in a row. "
+                      "Use single spaces between words only.", file=sys.stderr)
                 return 1
             blob = seal(entropy, pw)
             if open_blob(blob, pw) != entropy:  # not assert: survives python -O
