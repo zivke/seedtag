@@ -105,12 +105,12 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
   `make test build` for every pushed `v*` tag, or when started by hand (the Actions tab's "Run workflow", or
   `gh workflow run build.yml --ref <branch-or-tag>`), in an image built from the same `.devcontainer/Dockerfile`,
   and shows the APK's SHA-256 in the run's summary (the APK is attached too). Pass that hash to
-  `sign-release.sh --expect`. You
-  can also run `make build` in a fresh `git clone` on another machine. Build from a real clone, not a `git
-  worktree` or a source archive: the APK records the commit (`META-INF/version-control-info.textproto`), and
-  without a `.git` directory that file differs. The image's Ubuntu packages (the JDK among them) aren't pinned,
-  so a JDK update between two image builds could in principle change the output; if the hashes differ, unzip both
-  APKs and `diff -r` them to see why before signing anything.
+  `sign-release.sh --expect`. Its actions are pinned by commit SHA, which `make check-workflows` (part of
+  `make check`) enforces. You can also run `make build` in a fresh `git clone` on another machine. Build from a
+  real clone, not a `git worktree` or a source archive: the APK records the commit
+  (`META-INF/version-control-info.textproto`), and without a `.git` directory that file differs. The image's
+  Ubuntu packages (the JDK among them) aren't pinned, so a JDK update between two image builds could in principle
+  change the output; if the hashes differ, unzip both APKs and `diff -r` them to see why before signing anything.
 
 Not pinned: Claude Code's installer (`curl | bash` from claude.ai in `post-create.sh`) and Ubuntu's packages
 (signed by Ubuntu's apt keys). Neither is part of the app, and the release key isn't in the container.

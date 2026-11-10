@@ -18,7 +18,7 @@ switching between them on the device needs `make uninstall` first.
 ## What is in the image
 
 Ubuntu 24.04 (`mcr.microsoft.com/devcontainers/base`), OpenJDK 21, Python 3
-with `cryptography` and `argon2-cffi`, and an Android SDK in `/opt/android-sdk`
+with `cryptography`, `argon2-cffi` and PyYAML, and an Android SDK in `/opt/android-sdk`
 with `platform-tools` (adb), `platforms;android-35` and `build-tools;34.0.0`.
 The versions are `ARG`s at the top of the Dockerfile. Building the image
 accepts the Android SDK license agreements (`sdkmanager --licenses`).

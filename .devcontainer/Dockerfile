@@ -11,8 +11,9 @@ ARG DEBIAN_FRONTEND=noninteractive
 # Python + cryptography/argon2: tools/seedtag.py and its tests. Ubuntu's
 # python3-cryptography (41) has no Argon2id, so seedtag.py falls back to
 # python3-argon2 (argon2-cffi) — same algorithm, same bytes.
+# python3-yaml: tools/check-workflows.py.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      openjdk-21-jdk-headless python3 python3-cryptography python3-argon2 \
+      openjdk-21-jdk-headless python3 python3-cryptography python3-argon2 python3-yaml \
       make unzip zip \
     && rm -rf /var/lib/apt/lists/*
 

@@ -50,7 +50,9 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   other machine-specific data in the APK). `make install` / `make run` install that
   signed `seedtag.apk`; they never build or sign.
 - `make connect DEVICE_IP=… [ADB_PORT=…]`, `make run-test` / `make run-debug`,
-  `make logcat`, `make stop`, `make uninstall`, `make clean`, `make check` (+ lint).
+  `make logcat`, `make stop`, `make uninstall`, `make clean`, `make check` (+ lint, +
+  `make check-workflows`: the workflows parse, declare `permissions` and pin
+  every action by commit SHA; there's no way to run them in the container).
 
 There is no emulator and no instrumented tests: NFC needs a real phone and a
 real tag. Anything beyond `make test` and a successful build has to be checked

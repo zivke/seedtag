@@ -25,7 +25,7 @@ GRADLE    := ./gradlew --console=plain
 OUT       := app/build/outputs/apk
 
 .DEFAULT_GOAL := build
-.PHONY: build build-test debug test test-core test-py check deps-metadata check-deps wrapper-check \
+.PHONY: build build-test debug test test-core test-py check check-workflows deps-metadata check-deps wrapper-check \
         connect install install-test install-debug run run-test run-debug stop uninstall logcat clean help
 
 # Every Gradle run first checks the wrapper jar against its pinned SHA-256 (the official wrapper
@@ -66,9 +66,13 @@ test-core: wrapper-check
 test-py:
 	python3 tools/test_seedtag.py
 
-## check: tests, plus lint on the app
-check: test
+## check: tests, the workflow check, plus lint on the app
+check: test check-workflows
 	$(GRADLE) :app:lintDebug
+
+## check-workflows: the GitHub Actions files parse, declare permissions and pin every action by SHA
+check-workflows:
+	python3 tools/check-workflows.py
 
 ## deps-metadata: after changing a dependency, re-record every dependency's SHA-256, then cross-check it
 deps-metadata: wrapper-check
