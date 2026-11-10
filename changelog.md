@@ -29,6 +29,11 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- On Android 10 and 11, where other apps' overlays can't be hidden, taps are
+  also ignored while another app's window covers any part of SeedTag's (with
+  the red banner), not only when the tap itself lands under it. An overlay
+  could otherwise hide the warning of *Overwrite* or *Lock forever* while
+  leaving its button clear.
 - The letters of the seed word being typed are no longer kept as text: they
   live in a char array that's zeroed like the passwords, since four letters
   identify any BIP39 word. While the words are hidden (the default), the

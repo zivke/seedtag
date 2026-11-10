@@ -814,7 +814,8 @@ private enum class Flow { Backup, Verify, Restore }
 
 /**
  * Dialogs are windows of their own, so the activity's guards don't cover them: drop touches that
- * come through another app's overlay, hide overlays on Android 12+, and on Android 14+ keep
+ * come through another app's overlay (or, on Android 10–11, come while one covers part of the
+ * dialog), hide overlays on Android 12+, and on Android 14+ keep
  * accessibility services that aren't accessibility tools out, as MainActivity does.
  */
 @Composable
@@ -822,8 +823,14 @@ private fun GuardDialogWindow() {
     val view = LocalView.current
     DisposableEffect(view) {
         view.rootView.filterTouchesWhenObscured = true
+        val window = (view.parent as? DialogWindowProvider)?.window
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            (view.parent as? DialogWindowProvider)?.window?.setHideOverlayWindows(true)
+            window?.setHideOverlayWindows(true)
+        }
+        // Android 10–11 can't hide overlays: also drop touches while one covers part of the dialog.
+        if (Build.VERSION.SDK_INT in Build.VERSION_CODES.Q..Build.VERSION_CODES.R) {
+            val callback = window?.callback
+            if (callback != null && callback !is ObscuredTouchFilter) window.callback = ObscuredTouchFilter(callback)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             view.rootView.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)

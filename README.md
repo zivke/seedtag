@@ -345,7 +345,9 @@ SeedTag can only protect you from what happens inside its own window, and only f
   Android 12+.
 - **Tapjacking.** An overlay can let your taps through while hiding what's underneath, to make you confirm
   *Overwrite*, *Write anyway* or *Lock forever* without seeing it. SeedTag ignores every tap that comes through
-  another app's window, on every Android version, and shows a red banner saying so. Screen dimmers, blue-light
+  another app's window, on every Android version, and shows a red banner saying so. On **Android 10 and 11**, where
+  overlays can't be hidden, it also ignores taps while another app's window covers any part of SeedTag's, so an
+  overlay can't hide a warning while leaving its button clear. Screen dimmers, blue-light
   filters and chat bubbles trigger it too: turn them off while using SeedTag. If you can't tell which app it is,
   don't enter your seed.
 - **Accessibility services.** A service with accessibility access can read everything on screen, including the
