@@ -29,6 +29,9 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- A Type 5 tag (ICODE, ST25TV) that already holds data is no longer
+  formatted, wiping it without asking, when a too-quick tap made Android miss
+  its data: as with NTAG and Ultralight tags, the app asks you to hold it again.
 - On Android 10 and 11, where other apps' overlays can't be hidden, taps are
   also ignored while another app's window covers any part of SeedTag's (with
   the red banner), not only when the tap itself lands under it. An overlay

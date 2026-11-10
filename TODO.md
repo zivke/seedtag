@@ -48,7 +48,7 @@
 - [x] **#10 (Low): `TagIo.perform` must never throw.** Final catch-all with a generic message; catch
   `OutOfMemoryError` around Argon2.
 - [ ] **#11 (Low): overwrite safety at the edges.**
-  - [ ] A format guard for non-Type-2 tags.
+  - [x] A format guard for Type 5 tags (on `review-fixes-needs-device-test`; MIFARE Classic isn't covered).
   - [x] A message that says an interrupted overwrite may have destroyed the old content.
 - [ ] **#12 (Low): maintenance.**
   - [ ] Update AGP, Kotlin, Compose and Bouncy Castle; check the Play target-API requirement.

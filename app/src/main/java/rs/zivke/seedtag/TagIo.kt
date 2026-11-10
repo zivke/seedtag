@@ -11,6 +11,7 @@ import android.nfc.TagLostException
 import android.nfc.tech.MifareUltralight
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
+import android.nfc.tech.NfcV
 import rs.zivke.seedtag.core.NdefText
 import rs.zivke.seedtag.core.SeedBox
 import java.io.IOException
@@ -245,15 +246,25 @@ object TagIo {
 
     /**
      * Android offers only NdefFormatable when its NDEF check at discovery failed, which a too-quick
-     * tap can cause on a tag that already holds data. On a Type 2 tag (MIFARE Ultralight / NTAG),
-     * byte 0 of page 3, the capability container, is 0xE1 once the tag is NDEF-formatted.
+     * tap can cause on a tag that already holds data. The capability container says whether it's
+     * NDEF-formatted: on a Type 2 tag (MIFARE Ultralight / NTAG), byte 0 of page 3 is E1h; on a
+     * Type 5 tag (ICODE, ST25TV), byte 0 of block 0 is E1h or E2h. Other tag types can't be checked
+     * and are formatted as before (MIFARE Classic, which the README says to avoid).
      */
     private fun looksNdefFormatted(tag: Tag): Boolean {
-        val ul = MifareUltralight.get(tag) ?: return false
-        ul.use {
+        MifareUltralight.get(tag)?.use {
             it.connect()
             return (it.readPages(3)[0].toInt() and 0xFF) == 0xE1
         }
+        NfcV.get(tag)?.use {
+            it.connect()
+            // READ SINGLE BLOCK 0, unaddressed, high data rate. Reply: flags, then the block.
+            val r = it.transceive(byteArrayOf(0x02, 0x20, 0x00))
+            if (r.size < 2 || (r[0].toInt() and 0x01) != 0) throw IOException("block 0 not readable")
+            val cc0 = r[1].toInt() and 0xFF
+            return cc0 == 0xE1 || cc0 == 0xE2
+        }
+        return false
     }
 
     /** UIDs (not secret) of blank tags that didn't answer the size probe: they're formatted without one. */
