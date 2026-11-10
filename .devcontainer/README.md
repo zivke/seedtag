@@ -81,6 +81,12 @@ yours, so every Android project of yours shares it, and the Gradle cache only
 holds public artifacts. There's deliberately no volume with signing keys. Claude's volume is
 `${devcontainerId}`-scoped, so sessions stay per project.
 
+The shared adb identity means anything that runs in *any* of those containers (build scripts, dependencies, an AI
+agent) can reach every phone that authorized it: install or replace apps, change settings, turn on accessibility
+services. That's fine for a test phone, and the reason a phone that holds real seeds must never be authorized here
+(see *Using it safely* in the main README). For a separate identity per project, use
+`source=android-adb-${devcontainerId}` in `devcontainer.json` and authorize the phone again.
+
 ## Claude Code
 
 - **Auto-start**: `.vscode/tasks.json` has a `folderOpen` task running

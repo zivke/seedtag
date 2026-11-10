@@ -24,6 +24,9 @@ All notable user-visible changes to SeedTag. The format follows
   could still lock it against reading. The app and README now say so, and
   advise keeping the tag out of strangers' reach (a metal box or shielding
   sleeve) and keeping other copies.
+- The README's *Using it safely* says to turn off USB and wireless debugging
+  and revoke debugging authorizations on the phone used for real seeds, and
+  not to use a development phone for them.
 
 ### Fixed
 - The letters of the seed word being typed are no longer kept as text: they

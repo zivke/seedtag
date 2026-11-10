@@ -38,6 +38,9 @@ make run-debug                    # install the debug APK and open it
 make help                         # all targets
 ```
 
+Develop and test on a phone you'll never enter a real seed on: a phone with adb access can have its apps replaced
+without notice (see [Using it safely](#using-it-safely)).
+
 Every build ends with `tools/check-apk.sh`. It verifies the signature, prints the APK's SHA-256, and **fails the
 build if the APK requests any permission other than NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`**, so a library
 can't quietly add network access.
@@ -119,6 +122,11 @@ seed. From safest down:
    restart. It doesn't stop malware that survives the restart and uploads later: only a phone that's never online
    does.
 3. **Always:** a private room with no cameras, and a phone you have no reason to distrust.
+4. **No debugging on that phone.** Turn off USB debugging and wireless debugging (*Settings › System › Developer
+   options*, the path varies by phone), and tap *Revoke USB debugging authorizations*. Anything with adb access to
+   the phone, such as a computer or dev container it was ever paired with, can silently swap SeedTag for a
+   look-alike (SeedTag keeps no data, so you wouldn't notice) or turn on an accessibility service. Don't enter a
+   real seed on a phone you develop or test apps with.
 
 The Back up, Verify and Restore screens remind you of this, and say whether airplane mode is on. Android lets the
 app see airplane mode without any permission, but not Wi-Fi or Bluetooth, so those you have to check yourself.
