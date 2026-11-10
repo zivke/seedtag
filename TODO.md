@@ -27,33 +27,35 @@
   - [x] Corrected wording in the app and README.
   - [ ] Lock read-back (#11's first step): after the `tag-write-password` branch, which already detects the
     chip type.
-- [ ] **#2 (Medium): check that the signed APK was built from this source.** Build again in an
+- [x] **#2 (Medium): check that the signed APK was built from this source.** Build again in an
   independent environment (CI or the signing machine), compare, and make `sign-release.sh` refuse an
   unsigned APK whose SHA-256 doesn't match the expected one.
-- [ ] **#3 (Medium): bind a confirmed overwrite to the tag that was confirmed.** Carry its UID and
+- [x] **#3 (Medium): bind a confirmed overwrite to the tag that was confirmed.** Carry its UID and
   existing text in the request, as `Lock` does, so a different tag gets a fresh "not empty" check.
-- [ ] **#4 (Medium): adb and the phone used for real seeds.** README: no real seed on a phone with USB or
-  wireless debugging enabled or authorised; revoke authorisations first. Consider a per-project adb
-  volume.
-- [ ] **#5 (Medium-Low): stray spaces in a new password.** Refuse or confirm leading, trailing or repeated
+- [x] **#4 (Medium): adb and the phone used for real seeds.** README: no real seed on a phone with USB or
+  wireless debugging enabled or authorised; revoke authorisations first. The shared adb volume is kept;
+  `.devcontainer/README.md` explains the risk and how to scope it per project.
+- [x] **#5 (Medium-Low): stray spaces in a new password.** Refuse or confirm leading, trailing or repeated
   whitespace when the password is set, in the app and in `seedtag.py encrypt`.
-- [ ] **#6 (Medium-Low): the strength estimate over-credits typed BIP39 phrases.** Full 11 bits per word
+- [x] **#6 (Medium-Low): the strength estimate over-credits typed BIP39 phrases.** Full 11 bits per word
   only for the generated passphrase; discount typed word phrases and flag runs of adjacent list indexes.
-- [ ] **#7 (Medium-Low): `seedtag.py` KDF fallback.** Also fall back on `UnsupportedAlgorithm`, test the
+- [x] **#7 (Medium-Low): `seedtag.py` KDF fallback.** Also fall back on `UnsupportedAlgorithm`, test the
   vectors with every installed backend, and say which backend was used.
 - [ ] **#8 (Low): drop touches with `FLAG_WINDOW_IS_PARTIALLY_OBSCURED`** (Android 10–11), at least on the
   confirm buttons, in the activity and in `GuardDialogWindow`.
-- [ ] **#9 (Low): zeroable keypad prefix.** Keep it in a `CharArray`, show bullets while words are
+- [x] **#9 (Low): zeroable keypad prefix.** Keep it in a `CharArray`, show bullets while words are
   hidden, and make the README say plainly what's left in memory.
-- [ ] **#10 (Low): `TagIo.perform` must never throw.** Final catch-all with a generic message; catch
+- [x] **#10 (Low): `TagIo.perform` must never throw.** Final catch-all with a generic message; catch
   `OutOfMemoryError` around Argon2.
-- [ ] **#11 (Low): overwrite safety at the edges.** A format guard for non-Type-2 tags, and a message that
-  says an interrupted overwrite may have destroyed the old content.
+- [ ] **#11 (Low): overwrite safety at the edges.**
+  - [ ] A format guard for non-Type-2 tags.
+  - [x] A message that says an interrupted overwrite may have destroyed the old content.
 - [ ] **#12 (Low): maintenance.**
   - [ ] Update AGP, Kotlin, Compose and Bouncy Castle; check the Play target-API requirement.
   - [x] CI running `make test`, `make build` and `check-apk` (`.github/workflows/build.yml`).
-  - [ ] Split `Ui.kt` by screen.
-  - [ ] Move the tag-flow logic into a pure-Kotlin state machine with tests.
+  - [ ] Split `Ui.kt` by screen, after `tag-write-password` is merged (it changes `Ui.kt` a lot).
+  - [ ] Move the tag-flow logic into a pure-Kotlin state machine with tests, after `tag-write-password` is
+    merged (it changes the view model and `TagIo`).
   - [x] Clarify the wrapper wording (8.14 jar, 8.11.1 distribution: both were right); remove the unused
     `Bip39.normalize(String)`.
 
