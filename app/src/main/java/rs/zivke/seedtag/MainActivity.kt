@@ -12,6 +12,7 @@ import android.os.Bundle
 import android.provider.Settings
 import android.view.MotionEvent
 import android.view.View
+import android.view.Window
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityManager
 import androidx.activity.ComponentActivity
@@ -24,6 +25,25 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 
 enum class NfcState { Ready, Disabled, Missing }
+
+/**
+ * True if this touch came through another app's window, or while one covers part of ours.
+ *
+ * FLAG_WINDOW_IS_OBSCURED: the touch point itself is under another window (all versions).
+ * FLAG_WINDOW_IS_PARTIALLY_OBSCURED (Android 10+): another window covers some of ours, e.g. an
+ * overlay that hides a warning but leaves its button clear. That one only counts on Android 10–11:
+ * 8–9 don't report it, and 12+ hides other apps' overlays, where it would only catch harmless windows.
+ */
+fun MotionEvent.isObscured(): Boolean {
+    if (flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED != 0) return true
+    return Build.VERSION.SDK_INT in Build.VERSION_CODES.Q..Build.VERSION_CODES.R &&
+        flags and MotionEvent.FLAG_WINDOW_IS_PARTIALLY_OBSCURED != 0
+}
+
+/** A dialog window's callback that drops touches [isObscured] flags, before the dialog sees them. */
+class ObscuredTouchFilter(private val inner: Window.Callback) : Window.Callback by inner {
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean = event.isObscured() || inner.dispatchTouchEvent(event)
+}
 
 class MainActivity : ComponentActivity() {
 
@@ -95,12 +115,13 @@ class MainActivity : ComponentActivity() {
 
     /**
      * Tapjacking guard for every Android version: a touch that reaches us through another app's
-     * window (FLAG_WINDOW_IS_OBSCURED) never gets to the UI, and the app says why. If an overlay
+     * window (or, on Android 10–11, while one covers part of ours: [isObscured]) never gets to the
+     * UI, and the app says why. If an overlay
      * shows up in the middle of a gesture, what the UI saw so far is canceled, so a tap can't land.
      * Dialogs are windows of their own; they filter touches in Ui.kt (GuardDialogWindow).
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        val obscured = ev.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED != 0
+        val obscured = ev.isObscured()
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             droppingGesture = false
             overlayDetected.value = obscured
