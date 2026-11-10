@@ -12,7 +12,6 @@ All notable user-visible changes to SeedTag. The format follows
   and Verify and Restore can only forgive spaces that were *added* when typing,
   not ones that were part of the password when it was set, so such a backup
   could be impossible to open from the written copy.
-
 - The password strength estimate no longer rates BIP39 words you choose
   yourself like randomly generated ones: they count about 6 bits each instead
   of 11, and words that follow each other in the list (abandon ability able…)
@@ -21,6 +20,11 @@ All notable user-visible changes to SeedTag. The format follows
   counts 11 bits per word (≈77 bits).
 
 ### Fixed
+- The letters of the seed word being typed are no longer kept as text: they
+  live in a char array that's zeroed like the passwords, since four letters
+  identify any BIP39 word. While the words are hidden (the default), the
+  letters being typed are shown as dots too; the suggestions still show the
+  matching words.
 - `seedtag.py` falls back to `argon2-cffi` also when `cryptography` is
   recent enough but was built without Argon2id (OpenSSL older than 3.2),
   instead of stopping with a traceback. If neither is available, it says what

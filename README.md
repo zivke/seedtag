@@ -345,10 +345,12 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
   or with `seedtag.py`, can't be typed in the app: decrypt that tag with `seedtag.py`.
 - **What's wiped from memory.** Passwords are kept in one char array that's edited in place and zeroed after use, never
   as text. Entropy, password bytes and the derived key are zeroed too. Seed words, typed or restored, point at the app's
-  built-in word list instead of being copied. On the JVM some things can't be wiped:
+  built-in word list instead of being copied, and the letters of the word being typed on the keypad are kept in a
+  zeroed char array too (four letters are enough to identify any BIP39 word). On the JVM some things can't be wiped:
   - the password as text while **Show** is on, the generated passphrase while it's on screen, and a password with
     non-ASCII characters for a moment while it's normalised;
-  - the few letters of the word being typed on the keypad;
+  - the letters of the word being typed, as text, while **Show words** is on (while the words are hidden, those
+    letters are hidden too);
   - copies of the AES key inside Android's crypto code. SeedTag keeps Android's AES on purpose: it's
     hardware-accelerated and resistant to timing attacks, unlike a pure-Java AES whose key could be wiped;
   - text Compose has already drawn on screen.

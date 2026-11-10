@@ -1009,7 +1009,9 @@ private fun WordsStep(vm: SeedTagViewModel) {
         ) {
             Link(if (vm.hideWords) "Show words" else "Hide words") { vm.hideWords = !vm.hideWords }
         }
-        WordGrid(vm.words, current = vm.prefix, hidden = vm.hideWords, max = vm.wordCount)
+        // While the words are hidden, so are the letters being typed (the suggestions show the candidates).
+        val current = if (vm.hideWords) "•".repeat(vm.prefixLength) else vm.revealPrefix()
+        WordGrid(vm.words, current = current, hidden = vm.hideWords, max = vm.wordCount)
         when (val s = vm.mnemonicStatus) {
             is MnemonicStatus.Incomplete -> Text(
                 "${s.count} of ${vm.wordCount} words",

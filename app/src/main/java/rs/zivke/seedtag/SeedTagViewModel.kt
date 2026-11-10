@@ -94,8 +94,17 @@ class SeedTagViewModel : ViewModel() {
 
     // ---- back up --------------------------------------------------------------
     val words = mutableStateListOf<String>()
-    var prefix by mutableStateOf("")
-        private set
+    /**
+     * Letters of the word being typed, in a zeroable buffer rather than a String: the first four
+     * letters identify any BIP39 word, so String copies of them would add up to the seed.
+     */
+    private val prefixBuf = SecretChars(8)
+    /** Bumped on every prefix change, so Compose redraws what depends on the buffer. */
+    private var prefixEdits by mutableIntStateOf(0)
+    val prefixLength: Int get() { prefixEdits; return prefixBuf.length }
+    /** The letters typed as text, only for showing them while Show words is on. */
+    fun revealPrefix(): String { prefixEdits; return prefixBuf.reveal() }
+    private fun clearPrefix() { prefixBuf.clear(); prefixEdits++ }
     /** Mask the words already entered (on by default, back on after wipeAll). */
     var hideWords by mutableStateOf(true)
     var step by mutableStateOf(BackupStep.Tag)
@@ -206,7 +215,7 @@ class SeedTagViewModel : ViewModel() {
 
     // =========================================================== word entry ===
 
-    val suggestions: List<String> get() = Bip39.suggest(prefix, 6)
+    val suggestions: List<String> get() { prefixEdits; return prefixBuf.use { c, n -> Bip39.suggest(c, 0, n, 6) } }
 
     val mnemonicStatus: MnemonicStatus
         get() {
@@ -221,23 +230,23 @@ class SeedTagViewModel : ViewModel() {
         }
 
     fun typeLetter(c: Char) {
-        if (words.size >= wordCount || prefix.length >= 8) return
-        val next = prefix + c
-        if (Bip39.suggest(next, 1).isNotEmpty()) prefix = next // ignore keys that lead nowhere
+        if (words.size >= wordCount || !prefixBuf.append(c.lowercaseChar())) return
+        // Ignore keys that lead nowhere.
+        if (prefixBuf.use { b, n -> Bip39.suggest(b, 0, n, 1) }.isEmpty()) prefixBuf.removeLast() else prefixEdits++
     }
 
     fun backspace() {
         when {
-            prefix.isNotEmpty() -> prefix = prefix.dropLast(1)
+            !prefixBuf.isEmpty() -> { prefixBuf.removeLast(); prefixEdits++ }
             words.isNotEmpty() -> words.removeAt(words.lastIndex)
         }
     }
 
     fun pickWord(w: String) {
-        if (words.size < wordCount && Bip39.isWord(w)) { words += w; prefix = "" }
+        if (words.size < wordCount && Bip39.isWord(w)) { words += w; clearPrefix() }
     }
 
-    fun clearWords() { words.clear(); prefix = "" }
+    fun clearWords() { words.clear(); clearPrefix() }
 
     /** Word counts the checked tag has room for (all of them if its size is unknown). */
     fun fitsTag(n: Int): Boolean = tagCheck?.maxWords?.let { n <= it } ?: true
@@ -253,7 +262,7 @@ class SeedTagViewModel : ViewModel() {
 
     /** "Check another tag" / "Change tag": back to the first step. */
     fun checkAnotherTag() {
-        tagCheck = null; prefix = ""; step = BackupStep.Tag
+        tagCheck = null; clearPrefix(); step = BackupStep.Tag
     }
 
     fun chooseLength(n: Int) {
@@ -261,10 +270,10 @@ class SeedTagViewModel : ViewModel() {
         wordCount = n; step = BackupStep.Words
     }
 
-    fun backToLength() { prefix = ""; step = BackupStep.Length }
+    fun backToLength() { clearPrefix(); step = BackupStep.Length }
 
     fun toPasswordStep() {
-        if (mnemonicStatus is MnemonicStatus.Valid) { prefix = ""; step = BackupStep.Password }
+        if (mnemonicStatus is MnemonicStatus.Valid) { clearPrefix(); step = BackupStep.Password }
     }
 
     fun backToWords() { step = BackupStep.Words; clearPasswords(PwField.Password, PwField.Repeat); generatedPassphrase = false }
@@ -504,7 +513,7 @@ class SeedTagViewModel : ViewModel() {
     // ============================================================== hygiene ===
 
     private fun wipeBackup() {
-        words.clear(); prefix = ""; clearPasswords(PwField.Password, PwField.Repeat); hideWords = true; wordCount = 24
+        words.clear(); clearPrefix(); clearPasswords(PwField.Password, PwField.Repeat); hideWords = true; wordCount = 24
         generatedPassphrase = false; pendingText = null; overwriteTarget = null
     }
 

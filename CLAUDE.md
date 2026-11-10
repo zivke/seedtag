@@ -117,7 +117,9 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   Passwords live in `SecretChars` buffers in the view model, edited in place
   by the keyboard: never turn one into a `String` (`reveal()` is only for
   showing it on screen). Seed words, typed or restored, are the wordlist's own
-  `String` objects, not copies. `wipeAll()` clears all of it.
+  `String` objects, not copies; the letters of the word being typed are a
+  `SecretChars` buffer too (four letters identify any BIP39 word). `wipeAll()`
+  clears all of it.
 - The AES key stays in the platform cipher (hardware-accelerated,
   constant-time) even though `SecretKeySpec` copies it; don't swap in a Java
   AES just to be able to zero the key.
