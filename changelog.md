@@ -11,6 +11,10 @@ All notable user-visible changes to SeedTag. The format follows
   window open and ignoring every tap: it's shown like any other tag error, and
   tapping again retries. Running out of memory during Argon2id (on phones with
   little RAM) now shows a message instead of closing the app.
+- **Overwrite** only applies to the tag you were asked about. Before, once
+  you'd confirmed, the next tag held to the phone was overwritten without
+  asking, even a different one (another backup, say) after a failed tap. Now
+  any other tag, or the same tag with different content, is asked about again.
 
 ## [0.3.0] - 2026-11-09
 

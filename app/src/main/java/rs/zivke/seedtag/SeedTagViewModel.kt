@@ -107,6 +107,8 @@ class SeedTagViewModel : ViewModel() {
     var backupFingerprint by mutableStateOf<String?>(null)
         private set
     private var pendingText: String? = null
+    /** The non-empty tag the overwrite dialog asked about: Overwrite applies to it alone. */
+    private var overwriteTarget: OverwriteTarget? = null
     /** Tag text (Base64 blob, no secret) last written or decrypted: the only tag Lock will touch. */
     private var lockTarget: String? = null
 
@@ -343,7 +345,8 @@ class SeedTagViewModel : ViewModel() {
     fun confirmOverwrite() {
         dialog = null
         val text = pendingText ?: return
-        arm(TagRequest.Write(text, allowOverwrite = true), Purpose.BackupWrite, "Hold the tag again to overwrite it")
+        val target = overwriteTarget ?: return
+        arm(TagRequest.Write(text, target), Purpose.BackupWrite, "Hold the same tag again to overwrite it")
     }
 
     fun scanForVerify() = scanForRead(Purpose.Verify)
@@ -432,6 +435,7 @@ class SeedTagViewModel : ViewModel() {
                 if (stale) return
                 scanPrompt = null
                 _haptics.tryEmit(Haptic.Failure)
+                overwriteTarget = r.target
                 dialog = Dialog.ConfirmOverwrite(TagIo.looksLikeBackup(r.existing))
             }
             is TagResult.WrittenUnchecked -> {
@@ -493,7 +497,7 @@ class SeedTagViewModel : ViewModel() {
 
     private fun wipeBackup() {
         words.clear(); prefix = ""; clearPasswords(PwField.Password, PwField.Repeat); hideWords = true; wordCount = 24
-        generatedPassphrase = false; pendingText = null
+        generatedPassphrase = false; pendingText = null; overwriteTarget = null
     }
 
     /** Called when the app leaves the foreground: drop every secret from the UI state. */

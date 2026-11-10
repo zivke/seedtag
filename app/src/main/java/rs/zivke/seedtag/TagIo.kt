@@ -20,13 +20,26 @@ import java.util.concurrent.ConcurrentHashMap
 sealed interface TagRequest {
     /** First Back up step: find out whether the tag can take a backup, and how big. Writes nothing. */
     data object Check : TagRequest
-    /** Write [text]; refuses to overwrite a non-empty tag unless [allowOverwrite]. */
-    data class Write(val text: String, val allowOverwrite: Boolean = false) : TagRequest
+    /** Write [text]; refuses to overwrite a non-empty tag unless it's the [overwrite] the user confirmed. */
+    data class Write(val text: String, val overwrite: OverwriteTarget? = null) : TagRequest
     /** Read the tag back and compare with [expected] (second tap after formatting a blank tag). */
     data class CheckWritten(val expected: String) : TagRequest
     data object Read : TagRequest
     /** Make the tag read-only, but only if it holds exactly [expected]. */
     data class Lock(val expected: String) : TagRequest
+}
+
+/**
+ * The non-empty tag the user agreed to overwrite: its UID and the NDEF message it held (not secret,
+ * it's what anyone can read from the tag). Any other tag, or this one with different content, has
+ * to be confirmed again.
+ */
+class OverwriteTarget(private val uid: ByteArray, private val message: ByteArray) {
+    fun matches(tag: Tag, current: NdefMessage): Boolean {
+        // Random UIDs (ISO 14443-3 NUIDs start with 08h) change on every tap: only the content can tell.
+        val uidStable = uid.isNotEmpty() && !(uid.size == 4 && uid[0] == 0x08.toByte())
+        return current.toByteArray().contentEquals(message) && (!uidStable || tag.id.contentEquals(uid))
+    }
 }
 
 enum class TagContent { Empty, Backup, Other }
@@ -58,8 +71,8 @@ sealed interface TagResult {
     data class WrittenUnchecked(val text: String) : TagResult
     data class Read(val text: String) : TagResult
     data object Locked : TagResult
-    /** Tag already holds data; [existing] is its text if it was a Text record. */
-    data class NotEmpty(val existing: String?) : TagResult
+    /** Tag already holds data; [existing] is its text if it was a Text record; [target] identifies it. */
+    data class NotEmpty(val existing: String?, val target: OverwriteTarget) : TagResult
     data class Failed(val message: String) : TagResult
 }
 
@@ -123,11 +136,13 @@ object TagIo {
             if (message.byteArrayLength > it.maxSize) {
                 return TagResult.Failed(tooSmall(req.text, message.byteArrayLength, it.maxSize, estimated = false))
             }
-            if (!req.allowOverwrite) {
-                // Overwriting without asking is only OK if every read says the tag is empty.
-                val existing = readMessage(it)
-                if (existing != null && existing.records.any { r -> r.tnf != NdefRecord.TNF_EMPTY }) {
-                    return TagResult.NotEmpty(firstText(existing))
+            // Overwriting without asking is only OK if every read says the tag is empty, and with the
+            // user's OK only on the very tag, with the very content, that they were asked about.
+            val existing = readMessage(it)
+            if (existing != null && existing.records.any { r -> r.tnf != NdefRecord.TNF_EMPTY }) {
+                if (req.overwrite?.matches(tag, existing) != true) {
+                    val text = runCatching { firstText(existing) }.getOrNull()
+                    return TagResult.NotEmpty(text, OverwriteTarget(tag.id ?: ByteArray(0), existing.toByteArray()))
                 }
             }
             it.writeNdefMessage(message)
