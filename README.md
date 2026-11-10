@@ -55,7 +55,7 @@ only the Android build-tools (`apksigner`, `aapt2`) installed:
 
 ```sh
 make build                                    # in the container: seedtag-unsigned.apk, prints its SHA-256
-# the same commit's GitHub Actions run shows the SHA-256 of its own build (see Build integrity)
+# push the vX.Y.Z tag: its GitHub Actions run shows the SHA-256 of its own build (see Build integrity)
 tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # on the signing machine: writes seedtag.apk
 make run                                      # back in the container: install seedtag.apk and open it
 ```
@@ -102,8 +102,10 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
 
 - **Independent build:** the release build is reproducible: two clones of the same commit build byte-identical
   unsigned APKs, wherever they're checked out. The GitHub Actions workflow (`.github/workflows/build.yml`) runs
-  `make test build` on every push, in an image built from the same `.devcontainer/Dockerfile`, and shows the
-  APK's SHA-256 in the run's summary (the APK is attached too). Pass that hash to `sign-release.sh --expect`. You
+  `make test build` for every pushed `v*` tag, or when started by hand (the Actions tab's "Run workflow", or
+  `gh workflow run build.yml --ref <branch-or-tag>`), in an image built from the same `.devcontainer/Dockerfile`,
+  and shows the APK's SHA-256 in the run's summary (the APK is attached too). Pass that hash to
+  `sign-release.sh --expect`. You
   can also run `make build` in a fresh `git clone` on another machine. Build from a real clone, not a `git
   worktree` or a source archive: the APK records the commit (`META-INF/version-control-info.textproto`), and
   without a `.git` directory that file differs. The image's Ubuntu packages (the JDK among them) aren't pinned,

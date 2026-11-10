@@ -5,11 +5,13 @@
 # Android SDK and JDK), on a machine that has nothing to do with the dev container. Its SHA-256 is the
 # independent build that tools/sign-release.sh --expect compares against before signing.
 # No secrets are used: nothing here can sign anything.
+# It runs only for release tags (vX.Y.Z) and when started by hand (Actions tab, or
+# `gh workflow run build.yml --ref <branch-or-tag>`).
 name: build
 
 on:
   push:
-  pull_request:
+    tags: ['v*']
   workflow_dispatch:
 
 permissions:
