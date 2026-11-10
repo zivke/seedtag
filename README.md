@@ -92,8 +92,9 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
   wrapper jar of Gradle 8.14) before every Gradle run; the wrapper downloads the Gradle version set in
   `gradle-wrapper.properties` (8.11.1) and checks it against `distributionSha256Sum`.
 - **Dependencies:** Gradle checks every library and plugin file against `gradle/verification-metadata.xml`.
-  After adding or updating a dependency, run `make deps-metadata`: it records the new checksums and then
-  cross-checks all of them against what Maven Central, Google's Maven repository and the Gradle Plugin Portal
+  After adding or updating a dependency, run `make deps-metadata`: it downloads everything again into an empty,
+  temporary Gradle home (so it records every file a fresh machine like CI fetches, not just what's missing from
+  the local cache), records the new checksums and then cross-checks all of them against what Maven Central, Google's Maven repository and the Gradle Plugin Portal
   publish (`tools/check-deps.py`, also `make check-deps`), so a bad download isn't simply trusted. Review the
   diff of the XML before committing it. Source and javadoc jars, which only the IDE downloads to show library
   code, aren't checked: they're never compiled into the app.

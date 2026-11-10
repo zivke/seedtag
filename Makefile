@@ -36,8 +36,10 @@ wrapper-check:
 	@sha256sum --quiet -c gradle/wrapper/gradle-wrapper.jar.sha256
 
 ## build: unsigned release seedtag-unsigned.apk (R8 on); sign it outside the container with tools/sign-release.sh
+# Always from scratch, as in CI: an incremental build on top of output from another Gradle home once
+# produced a different classes.dex, which would fail sign-release.sh --expect.
 build: wrapper-check
-	$(GRADLE) :app:assembleRelease
+	$(GRADLE) clean :app:assembleRelease
 	cp $(OUT)/release/app-release-unsigned.apk $(UNSIGNED_APK)
 	tools/check-apk.sh --unsigned $(UNSIGNED_APK)
 
@@ -75,9 +77,13 @@ check-workflows:
 	python3 tools/check-workflows.py
 
 ## deps-metadata: after changing a dependency, re-record every dependency's SHA-256, then cross-check it
+# It runs in an empty Gradle home (downloading everything again), because a warm cache hides files a
+# fresh machine needs: with a cached .pom, Gradle never fetches the .module that CI then fetches.
 deps-metadata: wrapper-check
-	$(GRADLE) --write-verification-metadata sha256 help :core:test :app:assembleDebug :app:assembleRelease :app:lintDebug
-	python3 tools/check-deps.py
+	@home="$$(mktemp -d)"; trap 'rm -rf "$$home"' EXIT; \
+	GRADLE_USER_HOME="$$home" $(GRADLE) --no-daemon --write-verification-metadata sha256 \
+	    help :core:test :app:assembleDebug :app:assembleRelease :app:lintDebug && \
+	GRADLE_USER_HOME="$$home" python3 tools/check-deps.py
 
 ## check-deps: cross-check gradle/verification-metadata.xml against the repositories (needs network)
 check-deps:

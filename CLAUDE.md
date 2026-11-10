@@ -33,7 +33,8 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
 - `make test`: `:core:test` (JUnit, plain JVM) and `tools/test_seedtag.py`
   against the same vector files. No device, no Android classes.
 - `make debug`: `seedtag-debug.apk`, Android debug key.
-- `make build`: unsigned release `seedtag-unsigned.apk` (R8 on).
+- `make build`: unsigned release `seedtag-unsigned.apk` (R8 on), always a clean
+  build, as in CI.
   `make build-test`: the same, signed with the debug key
   (`seedtag-release-test.apk`), to try the R8 output on the phone.
 - Every build finishes with `tools/check-apk.sh`, which verifies the signature
@@ -146,7 +147,8 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
 - Every download is pinned: the wrapper jar (`gradle-wrapper.jar.sha256`, checked by `make`), the
   Gradle distribution (`distributionSha256Sum`), every dependency (`gradle/verification-metadata.xml`),
   and in the Dockerfile the base image digest and the command-line tools SHA-256. After changing a
-  dependency, run `make deps-metadata` (records and cross-checks the checksums) and commit the XML.
+  dependency, run `make deps-metadata` (records, from an empty Gradle home, and cross-checks the checksums;
+  Gradle drops the XML's comment, so put it back) and commit the XML.
   Never hand-edit checksums or turn verification off to get a build through.
 - Four-space indent for Kotlin, XML, shell and Python (`.editorconfig`).
 - For any user-visible change: add an entry under `## [Unreleased]` in

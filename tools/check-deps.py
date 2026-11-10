@@ -9,6 +9,8 @@ repository publishes (the .sha1 next to it, or the file itself when there's no .
 poisoned cache or a bad download is caught before the checksums are committed.
 
     python3 tools/check-deps.py     # needs network access; exits 1 on any mismatch
+
+It reads the cache in $GRADLE_USER_HOME (default ~/.gradle), like Gradle.
 """
 import hashlib
 import json
@@ -22,7 +24,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 NS = "{https://schema.gradle.org/dependency-verification}"
 META = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "gradle", "verification-metadata.xml")
-CACHE = os.path.expanduser("~/.gradle/caches/modules-2/files-2.1")
+GRADLE_HOME = os.environ.get("GRADLE_USER_HOME") or os.path.expanduser("~/.gradle")
+CACHE = os.path.join(GRADLE_HOME, "caches", "modules-2", "files-2.1")
 REPOS = [  # the repositories in settings.gradle.kts
     "https://dl.google.com/dl/android/maven2/",
     "https://repo.maven.apache.org/maven2/",
