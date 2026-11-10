@@ -59,6 +59,48 @@
   - [x] Clarify the wrapper wording (8.14 jar, 8.11.1 distribution: both were right); remove the unused
     `Bip39.normalize(String)`.
 
+## Expert review (open items from [the 2026-11-10 expert review](reports/2026-11-10-expert-review.md))
+
+- [ ] **#1 (Medium): the strength meter rates well-known weak passwords "Strong".** Only the generated
+  passphrase earns "Strong"; always confirm a typed password. If an estimate stays, fold case before the
+  BIP39 lookup, split on any non-letter and count repeats once. Add the report's examples to the tests.
+- [ ] **#2 (Medium): a generated passphrase is never checked against the written copy.** Leave Repeat
+  empty and have the user type it back from paper; confirm before Generate replaces one.
+- [ ] **#3 (Medium): `--expect` proves the build, not the source, and the container can push to GitHub.**
+  - [ ] Sign from a fresh clone on the signing machine, and review `git diff <last tag>..<new tag>` there
+    (README).
+  - [ ] Signed release tags (`git tag -s`, key outside the container), checked by `sign-release.sh`.
+  - [ ] Make `--expect` mandatory, with an explicit `--no-expect`.
+  - [ ] No push credentials in the container (turn off VS Code's credential forwarding); protect `v*`
+    tags on GitHub.
+- [ ] **#4 (Medium-Low): recovery needs third-party packages.**
+  - [ ] Catch `ImportError` in `seedtag.py` and say what to install; state the minimum Python version.
+  - [ ] README and Done screen: keep a copy of `seedtag.py` with the written password.
+  - [ ] Pure-Python decrypt-only fallback (Argon2id and AES-GCM), tested against the vectors.
+- [ ] **#5 (Low): the `cryptography` Argon2id backend is never tested.** CI step with a hash-pinned
+  `cryptography` ≥ 44 that fails on a skipped backend; add 18- and 21-word vectors.
+- [ ] **#6 (Low): Argon2's 64 MiB on the Java heap.** `android:largeHeap="true"`, tried on an old phone.
+- [ ] **#7 (Low): screen timeout or Back wipes everything mid-entry.** Keep the screen on while secrets
+  are shown, with the app's own idle timeout; map Back to the step's Back button.
+- [ ] **#8 (Low): an old app meeting a newer format.** "Written by a newer version" message, and treat any
+  plausible SeedTag blob version as a backup in the overwrite warning, in the app and `seedtag.py`.
+- [ ] **#9 (Low): Lock says "now permanently read-only" for a tag that was already not writable.** Separate
+  result and message (can go to `main` now); test Lock on a Type 4 and a Type 5 tag and note it in the
+  README table.
+- [ ] **#10 (Low): no warning about adb.** Preflight item for USB / wireless debugging; listen for
+  accessibility changes while in the foreground.
+- [ ] **#11 (Low): a BIP39 passphrase ("25th word") isn't stored.** Say so on the Words step and in the
+  README; mention English phrases only.
+- [ ] **#12 (Low): late tag results can leave a scan armed with no prompt.** Close the prompt only when
+  nothing is pending; ignore a second Encrypt while busy. Pin it down with the tag-flow state machine,
+  extracted before `tag-write-password` is merged.
+- [ ] **#13 (Low): Kotlin and Python disagree on two password-variant edge cases.** Explicit whitespace
+  list in both, two new `password-variants.tsv` rows, wrap the encoder failure in a `SeedTagException`.
+- [ ] **#14 (Info): an unreadable tag is treated as empty.** Optional Type 2 hardening: check the NDEF TLV
+  length before writing without confirmation.
+- [ ] **#15 (Info): build checks.** `check-apk.sh` could reject `debuggable` / `testOnly` and extra
+  components; check the two action SHAs by hand against their release tags.
+
 ## App and docs
 
 - [x] Make the on-screen warnings more prominent.
