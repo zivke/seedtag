@@ -1336,7 +1336,9 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionLabel("Lock the tag")
                 Text(
-                    "Once you're sure, you can make the tag read-only. This is permanent – the tag can never be rewritten or erased.",
+                    "Once you're sure, you can make the tag read-only. That's permanent: its data can never be rewritten or " +
+                        "erased. It doesn't stop someone who gets hold of the tag from locking it against reading with a " +
+                        "password of their own, so keep it where strangers can't reach it, and keep other backups.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1821,7 +1823,9 @@ private fun Dialogs(vm: SeedTagViewModel) {
             text = {
                 GuardDialogWindow()
                 Text(
-                    "This is permanent – the tag can never be rewritten or erased. " +
+                    "This is permanent: the tag's data can never be rewritten or erased. On many chips it doesn't stop " +
+                        "someone who gets hold of the tag from making it unreadable, so keep the tag out of strangers' reach " +
+                        "and keep other backups. " +
                         "Only do this after you've successfully verified the backup with your written password.",
                 )
             },

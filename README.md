@@ -164,6 +164,8 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    worked, so you can correct your written copy.
 3. Optionally recover once with `seedtag.py` on an offline computer.
 4. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
+   It stops the backup from being overwritten or erased, but not, on most chips, from being locked against reading
+   by someone who gets hold of the tag (see [Choosing a tag](#choosing-a-tag)).
 5. **Restore**: same as Verify, but the words are shown.
 
 Verify and Restore are two steps, like Back up: type the password and scan, then the result. Once the tag has
@@ -219,7 +221,12 @@ copy among several, and verify it every now and then.
 ST25TV16K/64K for 40 y with 64-bit passwords (ST25TV16K is *not recommended for new designs*).
 
 SeedTag doesn't use any of these write protections yet: the payload is encrypted either way, and **Make tag
-read-only** is the only protection against overwriting. Only Ultralight C has been tested with SeedTag: try
+read-only** is the only protection against overwriting. It doesn't protect everything: Android's read-only lock
+freezes the data but, on NTAG21x and on Ultralight C tags formatted without NXP's Lock Control TLV, leaves the
+chip's own password settings open. Someone holding the tag for a few seconds can then set a read password of their
+own, and no phone can read the backup again. Nothing leaks, but that copy is lost. So keep the tag where strangers
+can't reach it (a metal box or a shielding sleeve also stops it being read from a distance), don't carry it
+around, and keep other copies of the seed. Only Ultralight C has been tested with SeedTag: try
 any other tag with your phone (write, verify, restore) before relying on it. A tag mounted on metal needs an
 on-metal version.
 

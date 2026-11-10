@@ -469,7 +469,11 @@ class SeedTagViewModel : ViewModel() {
             is TagResult.Locked -> {
                 scanPrompt = null
                 _haptics.tryEmit(Haptic.Success)
-                dialog = Dialog.Info("Tag locked", "The tag is now permanently read-only.")
+                dialog = Dialog.Info(
+                    "Tag locked",
+                    "The tag's data is now permanently read-only. Keep the tag where strangers can't reach it: on many " +
+                        "chips, someone holding it could still lock it against reading.",
+                )
             }
             is TagResult.Read -> {
                 if (stale) return

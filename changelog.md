@@ -18,6 +18,12 @@ All notable user-visible changes to SeedTag. The format follows
   count almost nothing. A phrase like the list's first six words used to pass
   as strong; it now asks for confirmation. The generated passphrase still
   counts 11 bits per word (≈77 bits).
+- **Make tag read-only** no longer claims more than it does. It stops the
+  backup from being overwritten or erased, but on NTAG21x and some Ultralight C
+  tags it leaves the chip's password settings open, so someone holding the tag
+  could still lock it against reading. The app and README now say so, and
+  advise keeping the tag out of strangers' reach (a metal box or shielding
+  sleeve) and keeping other copies.
 
 ### Fixed
 - The letters of the seed word being typed are no longer kept as text: they

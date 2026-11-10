@@ -15,7 +15,7 @@
 - [ ] **#11 (Medium): a "read-only" tag can still be locked against reading by a stranger.** Options are
   in [the tag write-protection report](reports/2026-11-07-tag-write-protection.md). In order:
   - [ ] After locking, read the lock and settings bytes back, and warn if the settings are still open.
-  - [ ] Correct the README's claim that locking protects the tag. Recommend a metal box or shielding
+  - [x] Correct the README's claim that locking protects the tag. Recommend a metal box or shielding
     sleeve, and not carrying the tag around.
   - [ ] Proper lock (settings frozen too) or a write password, on a separate branch, tested with spare
     tags.
@@ -23,8 +23,10 @@
 
 ## Project review (open items from [the 2026-11-10 project review](reports/2026-11-10-project-review.md))
 
-- [ ] **#1 (Medium): the Lock text promises more than the lock does.** Same issue as #11 above; its first
-  two steps (lock read-back, corrected wording in the app and README) are the fix.
+- [ ] **#1 (Medium): the Lock text promises more than the lock does.** Same issue as #11 above.
+  - [x] Corrected wording in the app and README.
+  - [ ] Lock read-back (#11's first step): after the `tag-write-password` branch, which already detects the
+    chip type.
 - [ ] **#2 (Medium): check that the signed APK was built from this source.** Build again in an
   independent environment (CI or the signing machine), compare, and make `sign-release.sh` refuse an
   unsigned APK whose SHA-256 doesn't match the expected one.
