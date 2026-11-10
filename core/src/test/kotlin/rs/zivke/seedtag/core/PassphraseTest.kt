@@ -13,7 +13,8 @@ class PassphraseTest {
     // Trezor test vector, never a real seed.
     private val seed = "legal winner thank year wave sausage worth useful legal winner thank yellow".split(" ").toSet()
 
-    private fun bits(s: String, avoid: Set<String> = emptySet()) = Passphrase.estimateBits(s.toCharArray(), avoid)
+    private fun bits(s: String, avoid: Set<String> = emptySet(), random: Boolean = false) =
+        Passphrase.estimateBits(s.toCharArray(), avoid, random)
 
     @Test
     fun generatedIsDistinctAndAvoidsTheSeed() {
@@ -22,20 +23,34 @@ class PassphraseTest {
             assertEquals(7, words.size)
             assertEquals(7, words.toSet().size)
             assertTrue(words.none { it in seed })
-            assertEquals(77, bits(words.joinToString(" "), seed))
+            assertEquals(77, bits(words.joinToString(" "), seed, random = true))
         }
     }
 
     @Test
     fun repeatedWordsCountOnce() {
-        assertEquals(11, bits("abandon abandon abandon abandon abandon abandon abandon"))
-        assertEquals(22, bits("zoo abandon zoo abandon"))
+        assertEquals(6, bits("abandon abandon abandon abandon abandon abandon abandon"))
+        assertEquals(12, bits("zoo abandon zoo abandon"))
+        assertEquals(11, bits("abandon abandon abandon abandon", random = true))
     }
 
     @Test
     fun seedWordsCountForNothing() {
         assertEquals(0, bits("legal winner thank year wave sausage worth", seed))
-        assertEquals(22, bits("legal winner zoo abandon", seed))
+        assertEquals(12, bits("legal winner zoo abandon", seed))
+        assertEquals(0, bits("legal winner thank year wave sausage worth", seed, random = true))
+    }
+
+    @Test
+    fun chosenWordsCountLessThanGeneratedOnes() {
+        val phrase = "happy family garden summer morning coffee"
+        assertEquals(36, bits(phrase))
+        assertEquals(66, bits(phrase, random = true))
+        // The list's own order: the first six words are next to each other.
+        assertEquals(6 + 5, bits("abandon ability able about above absent"))
+        assertTrue(bits("abandon ability able about above absent") < Passphrase.MIN_BITS)
+        // Ten unrelated words of your own are needed to reach the threshold.
+        assertTrue(bits("happy family garden summer morning coffee river lamp orbit wolf") >= Passphrase.MIN_BITS)
     }
 
     @Test
@@ -55,7 +70,7 @@ class PassphraseTest {
     fun lengthLimitsTheCheck() {
         // Only password[0 until length] counts: the rest of a buffer is ignored.
         val buf = "zoo abandon ability able legal winner".toCharArray()
-        assertEquals(44, Passphrase.estimateBits(buf, 24))
+        assertEquals(6 + 6 + 1 + 1, Passphrase.estimateBits(buf, 24))
         assertFalse(Passphrase.sharesWords(buf, 24, seed))
         assertTrue(Passphrase.sharesWords(buf, buf.size, seed))
     }

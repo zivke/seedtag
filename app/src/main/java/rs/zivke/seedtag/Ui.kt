@@ -1802,7 +1802,10 @@ private fun Dialogs(vm: SeedTagViewModel) {
                                 "tag can try passwords offline without limit, and a password this weak could be guessed.",
                         )
                     }
-                    add("A generated 7-word passphrase has about 77 bits.")
+                    add(
+                        "A generated 7-word passphrase has about 77 bits. Words you choose yourself count only about 6 bits " +
+                            "each, because people pick common words and phrases.",
+                    )
                 }
                 Text(parts.joinToString("\n\n"))
             },

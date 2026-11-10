@@ -278,7 +278,7 @@ class SeedTagViewModel : ViewModel() {
     }
 
     val passwordBits: Int
-        get() { passwordEdits; return password.use { c, n -> Passphrase.estimateBits(c, n, words.toSet()) } }
+        get() { passwordEdits; return password.use { c, n -> Passphrase.estimateBits(c, n, words.toSet(), random = generatedPassphrase) } }
 
     /** Words of the seed in the password: whoever sees the password learns part of the seed. */
     val passwordSharesSeedWords: Boolean

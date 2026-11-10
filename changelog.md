@@ -13,6 +13,13 @@ All notable user-visible changes to SeedTag. The format follows
   not ones that were part of the password when it was set, so such a backup
   could be impossible to open from the written copy.
 
+- The password strength estimate no longer rates BIP39 words you choose
+  yourself like randomly generated ones: they count about 6 bits each instead
+  of 11, and words that follow each other in the list (abandon ability able…)
+  count almost nothing. A phrase like the list's first six words used to pass
+  as strong; it now asks for confirmation. The generated passphrase still
+  counts 11 bits per word (≈77 bits).
+
 ### Fixed
 - An unexpected error from the phone's NFC stack no longer leaves the scan
   window open and ignoring every tap: it's shown like any other tag error, and

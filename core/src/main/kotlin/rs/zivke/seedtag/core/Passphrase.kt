@@ -36,24 +36,45 @@ object Passphrase {
         return out
     }
 
-    fun estimateBits(password: CharArray, avoid: Set<String> = emptySet()): Int =
-        estimateBits(password, password.size, avoid)
+    /** Bits per word of a passphrase from [generate]: one of 2048, picked at random. */
+    const val RANDOM_WORD_BITS = 11
+    /** Bits per word the user chose: people pick common words and natural phrases, far from random. */
+    const val CHOSEN_WORD_BITS = 6
+
+    fun estimateBits(password: CharArray, avoid: Set<String> = emptySet(), random: Boolean = false): Int =
+        estimateBits(password, password.size, avoid, random)
 
     /**
      * Rough strength estimate of `password[0 until length]`, used only for the UI warning and the
      * confirmation before writing.
      *
-     * Four or more BIP39 words count 11 bits each, as if picked at random, but only distinct ones
-     * and none from [avoid] (the seed being backed up). Anything else counts per character from the
-     * alphabets used, discounted for human patterns; a character that repeats or continues a run
-     * from the one before it (aa, 12, cb) counts 1 bit. There's no dictionary check.
+     * Four or more BIP39 words: only distinct ones count, and none from [avoid] (the seed being backed
+     * up). If [random] (the password is exactly what [generate] produced), each counts
+     * [RANDOM_WORD_BITS]. Words the user typed count [CHOSEN_WORD_BITS], and a word next to the one
+     * before it in the list (abandon ability able) counts 1 bit.
+     *
+     * Anything else counts per character from the alphabets used, discounted for human patterns; a
+     * character that repeats or continues a run from the one before it (aa, 12, cb) counts 1 bit.
+     * There's no dictionary check.
      */
-    fun estimateBits(password: CharArray, length: Int, avoid: Set<String> = emptySet()): Int {
+    fun estimateBits(password: CharArray, length: Int, avoid: Set<String> = emptySet(), random: Boolean = false): Int {
         if (length == 0) return 0
         val wordIndexes = wordIndexes(password, length, lowercase = false)
         if (wordIndexes != null && wordIndexes.size >= 4 && wordIndexes.all { it >= 0 }) {
             val avoided = avoid.map(Bip39::indexOf).toSet()
-            return (wordIndexes.toSet() - avoided).size * 11
+            if (random) return (wordIndexes.toSet() - avoided).size * RANDOM_WORD_BITS
+            val seen = HashSet<Int>()
+            var bits = 0
+            var prev = -2
+            for (i in wordIndexes) {
+                bits += when {
+                    i in avoided || !seen.add(i) -> 0
+                    i - prev == 1 || prev - i == 1 -> 1
+                    else -> CHOSEN_WORD_BITS
+                }
+                prev = i
+            }
+            return bits
         }
         var lower = false; var upper = false; var digit = false; var other = false
         for (i in 0 until length) {

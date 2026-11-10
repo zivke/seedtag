@@ -110,7 +110,7 @@ class SeedBoxTest {
     fun passphrase() {
         val p = Passphrase.generate()
         assertEquals(7, String(p).split(" ").size)
-        assertEquals(77, Passphrase.estimateBits(p))
+        assertEquals(77, Passphrase.estimateBits(p, random = true))
         assertTrue(Passphrase.estimateBits("hunter2".toCharArray()) < 40)
     }
 }
