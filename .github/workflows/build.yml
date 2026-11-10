@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 zivke
+#
+# Tests and builds the unsigned release APK in the dev container's own image (same pinned base image,
+# Android SDK and JDK), on a machine that has nothing to do with the dev container. Its SHA-256 is the
+# independent build that tools/sign-release.sh --expect compares against before signing.
+# No secrets are used: nothing here can sign anything.
+name: build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the dev container image
+        run: docker build -t seedtag-dev .devcontainer
+
+      - name: Test and build the unsigned release APK
+        run: |
+          # The image's user (vscode, uid 1000) builds; the checkout belongs to the runner's user.
+          chmod -R a+rwX .
+          docker run --rm -v "$PWD:/src" -w /src seedtag-dev make test build
+
+      - name: SHA-256
+        run: |
+          sum="$(sha256sum seedtag-unsigned.apk | cut -d' ' -f1)"
+          echo "$sum  seedtag-unsigned.apk" | tee seedtag-unsigned.apk.sha256
+          {
+            echo "### seedtag-unsigned.apk"
+            echo
+            echo "Commit \`$GITHUB_SHA\`, SHA-256:"
+            echo
+            echo "\`$sum\`"
+            echo
+            echo "Sign only if your own build matches: \`tools/sign-release.sh --expect $sum <keystore>\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: seedtag-unsigned-${{ github.sha }}
+          path: |
+            seedtag-unsigned.apk
+            seedtag-unsigned.apk.sha256
+          if-no-files-found: error

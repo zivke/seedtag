@@ -41,9 +41,13 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   requests any permission except NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`**
   (overlay hiding on Android 12+, and the NFC-spot finder's buzz; neither
   gives access to anything).
-- `tools/sign-release.sh <keystore>` runs outside the container: signs
-  `seedtag-unsigned.apk` into `seedtag.apk` and refuses any certificate but the
-  one in `tools/release-cert.sha256`; it also writes `seedtag.apk.sha256`. `make install` / `make run` install that
+- `tools/sign-release.sh [--expect <sha256>] <keystore>` runs outside the
+  container: refuses an unsigned APK that doesn't match the independent build
+  (`--expect`, the SHA-256 from the GitHub Actions run of the same commit),
+  signs `seedtag-unsigned.apk` into `seedtag.apk` and refuses any certificate
+  but the one in `tools/release-cert.sha256`; it also writes `seedtag.apk.sha256`.
+  The release build is reproducible; keep it that way (no timestamps, paths or
+  other machine-specific data in the APK). `make install` / `make run` install that
   signed `seedtag.apk`; they never build or sign.
 - `make connect DEVICE_IP=… [ADB_PORT=…]`, `make run-test` / `make run-debug`,
   `make logcat`, `make stop`, `make uninstall`, `make clean`, `make check` (+ lint).

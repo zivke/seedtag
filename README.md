@@ -54,12 +54,15 @@ agent) can read it and sign a fake update. Sign on the machine that holds the ke
 only the Android build-tools (`apksigner`, `aapt2`) installed:
 
 ```sh
-make build                                    # in the container: seedtag-unsigned.apk
-tools/sign-release.sh /path/to/your-key.jks   # on the signing machine: asks for the password, writes seedtag.apk
+make build                                    # in the container: seedtag-unsigned.apk, prints its SHA-256
+# the same commit's GitHub Actions run shows the SHA-256 of its own build (see Build integrity)
+tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # on the signing machine: writes seedtag.apk
 make run                                      # back in the container: install seedtag.apk and open it
 ```
 
-`sign-release.sh` checks the permissions, signs, and deletes the result unless it carries the release certificate:
+`sign-release.sh` refuses to sign unless the unsigned APK matches the independent build given with `--expect`
+(without it, it warns and signs anyway), checks the permissions, signs, and deletes the result unless it carries
+the release certificate:
 
 ```
 SHA-256 29370bf9dc6a272f18b3fbac01837c262bcec4035de162dad4fc5175291ae82c   (tools/release-cert.sha256)
@@ -73,8 +76,8 @@ Two caveats:
 - The container can write to the repository, scripts included. Before running `sign-release.sh` with your key,
   check it hasn't changed unexpectedly: `git log -p -- tools/sign-release.sh tools/check-apk.sh`.
 - Signing outside protects the key, not the build. If the container were compromised, the unsigned APK could
-  already be tampered with. For full assurance, also build on the signing machine from the release tag and
-  compare the two unsigned APKs.
+  already be tampered with, and the permission check wouldn't notice a weakened encryption. That's what
+  `--expect` is for: sign only an APK that's byte-for-byte the same as a build made somewhere else.
 
 Keep a backup of the key: without it no update can ever be installed over the app.
 
@@ -96,6 +99,16 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
   code, aren't checked: they're never compiled into the app.
 - **Dev container:** the base image is pinned by digest, and the Android command-line tools zip is checked against
   the SHA-256 Google publishes; `sdkmanager` checks the SDK packages itself.
+
+- **Independent build:** the release build is reproducible: two clones of the same commit build byte-identical
+  unsigned APKs, wherever they're checked out. The GitHub Actions workflow (`.github/workflows/build.yml`) runs
+  `make test build` on every push, in an image built from the same `.devcontainer/Dockerfile`, and shows the
+  APK's SHA-256 in the run's summary (the APK is attached too). Pass that hash to `sign-release.sh --expect`. You
+  can also run `make build` in a fresh `git clone` on another machine. Build from a real clone, not a `git
+  worktree` or a source archive: the APK records the commit (`META-INF/version-control-info.textproto`), and
+  without a `.git` directory that file differs. The image's Ubuntu packages (the JDK among them) aren't pinned,
+  so a JDK update between two image builds could in principle change the output; if the hashes differ, unzip both
+  APKs and `diff -r` them to see why before signing anything.
 
 Not pinned: Claude Code's installer (`curl | bash` from claude.ai in `post-create.sh`) and Ubuntu's packages
 (signed by Ubuntu's apt keys). Neither is part of the app, and the release key isn't in the container.
