@@ -285,7 +285,9 @@ next to a partly readable copy of the seed.
 
 ## Recovering on a computer
 
-`tools/seedtag.py` is self-contained (it embeds the official wordlist, SHA-256 `2f5eed53…dbda`). It only needs `cryptography` ≥ 44:
+`tools/seedtag.py` is self-contained (it embeds the official wordlist, SHA-256 `2f5eed53…dbda`). It only needs `cryptography` ≥ 44.
+If your `cryptography` is older, or was built without Argon2id, it uses `argon2-cffi` for the key derivation instead
+(same bytes; `pip install argon2-cffi`), and it says which one it used:
 
 ```bash
 pip install cryptography          # do this before going offline
@@ -362,7 +364,8 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
   (OpenSSL Argon2) must produce identical bytes. Also covers wrong password, tampering, malformed input, Unicode
   normalisation, and the 137-byte size budget.
 - `tools/test_seedtag.py`: the same vector files run through `seedtag.py`, plus a check that its embedded wordlist
-  matches the app's.
+  matches the app's. The vectors are run through each Argon2id backend (`cryptography`, `argon2-cffi`) on its own;
+  a backend that isn't installed is reported as skipped. The dev container only has `argon2-cffi`.
 
 NFC itself has no automated tests: there's no emulator support. Test on a real phone with a real tag, using a
 throwaway mnemonic.

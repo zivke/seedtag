@@ -20,8 +20,9 @@ seedtag.py - desktop companion / recovery tool for the SeedTag Android app.
 
 Encrypts a BIP39 mnemonic into the SeedTag v1 blob (the Base64 text stored on
 the NFC tag) and decrypts it back. Self-contained: the BIP39 English wordlist
-is embedded below. Only dependency: `cryptography` >= 44 (for Argon2id), or
-`argon2-cffi` as a fallback KDF provider.
+is embedded below. Needs `cryptography` (AES-GCM); Argon2id comes from
+`cryptography` >= 44 if it has it, otherwise from `argon2-cffi`. Both give the
+same bytes, and the tool says which one it used.
 
 Run it on an offline machine.
 
@@ -264,16 +265,56 @@ def normalize_words(s: str) -> list[str]:
 
 # ----------------------------------------------------------------- crypto ---
 
-def derive_key(password: str, salt: bytes) -> bytes:
-    pw = unicodedata.normalize("NFKD", password).encode("utf-8")
+class NoArgon2(ValueError):
+    pass
+
+
+class _Unavailable(Exception):
+    pass
+
+
+def _argon2_cryptography(pw: bytes, salt: bytes) -> bytes:
     try:
+        from cryptography.exceptions import UnsupportedAlgorithm
         from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
+    except ImportError:
+        raise _Unavailable("cryptography >= 44 isn't installed") from None
+    try:
         return Argon2id(salt=salt, length=KEY_LEN, iterations=ARGON_T,
                         lanes=ARGON_P, memory_cost=ARGON_M_KIB).derive(pw)
-    except ImportError:
+    except UnsupportedAlgorithm:
+        # cryptography >= 44 built against an OpenSSL without Argon2 (older than 3.2)
+        raise _Unavailable("this cryptography build has no Argon2id") from None
+
+
+def _argon2_cffi(pw: bytes, salt: bytes) -> bytes:
+    try:
         from argon2.low_level import Type, hash_secret_raw
-        return hash_secret_raw(pw, salt, time_cost=ARGON_T, memory_cost=ARGON_M_KIB,
-                               parallelism=ARGON_P, hash_len=KEY_LEN, type=Type.ID)
+    except ImportError:
+        raise _Unavailable("argon2-cffi isn't installed") from None
+    return hash_secret_raw(pw, salt, time_cost=ARGON_T, memory_cost=ARGON_M_KIB,
+                           parallelism=ARGON_P, hash_len=KEY_LEN, type=Type.ID)
+
+
+# Tried in this order; both give the same bytes.
+KDF_BACKENDS = (("cryptography", _argon2_cryptography), ("argon2-cffi", _argon2_cffi))
+kdf_used = None  # name of the backend the last derive_key() used, for the CLI to report
+
+
+def derive_key(password: str, salt: bytes) -> bytes:
+    global kdf_used
+    pw = unicodedata.normalize("NFKD", password).encode("utf-8")
+    why = []
+    for name, kdf in KDF_BACKENDS:
+        try:
+            key = kdf(pw, salt)
+        except _Unavailable as e:
+            why.append(f"{name}: {e}")
+            continue
+        kdf_used = name
+        return key
+    raise NoArgon2("no Argon2id available (" + "; ".join(why) + "). "
+                   "Install one: pip install 'cryptography>=44' or pip install argon2-cffi")
 
 
 def _aesgcm(key):
@@ -365,6 +406,8 @@ def _read_blob(argv) -> bytes:
 
 
 def main(argv):
+    global kdf_used
+    kdf_used = None
     if not argv or argv[0] not in ("encrypt", "decrypt", "verify"):
         print(__doc__)
         return 2
@@ -400,6 +443,9 @@ def main(argv):
     except ValueError as e:
         print(f"FAIL: {e}", file=sys.stderr)
         return 1
+    finally:
+        if kdf_used:
+            print(f"(Argon2id from {kdf_used})", file=sys.stderr)
     return 0
 
 

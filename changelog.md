@@ -21,6 +21,10 @@ All notable user-visible changes to SeedTag. The format follows
   counts 11 bits per word (≈77 bits).
 
 ### Fixed
+- `seedtag.py` falls back to `argon2-cffi` also when `cryptography` is
+  recent enough but was built without Argon2id (OpenSSL older than 3.2),
+  instead of stopping with a traceback. If neither is available, it says what
+  to install. It now prints which Argon2id implementation it used.
 - An unexpected error from the phone's NFC stack no longer leaves the scan
   window open and ignoring every tap: it's shown like any other tag error, and
   tapping again retries. Running out of memory during Argon2id (on phones with

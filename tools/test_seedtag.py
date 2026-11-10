@@ -11,6 +11,7 @@ import base64
 import pathlib
 import sys
 import unittest
+from unittest import mock
 
 HERE = pathlib.Path(__file__).resolve().parent
 VECTORS = HERE.parent / "core" / "src" / "test" / "resources"
@@ -91,6 +92,52 @@ class SeedBoxV1(unittest.TestCase):
         self.assertEqual(104, len(base64.b64encode(blob)))
         self.assertEqual(ent, seedtag.open_blob(blob, "pw"))
         self.assertNotEqual(blob, seedtag.seal(ent, "pw"))  # fresh salt + nonce
+
+
+class Argon2Backends(unittest.TestCase):
+    """Each Argon2id backend that's installed must reproduce the vectors on its own."""
+
+    def test_each_backend_matches_vectors(self):
+        vecs = rows("seedtag-v1-vectors.tsv")
+        for name, kdf in seedtag.KDF_BACKENDS:
+            with self.subTest(backend=name):
+                with mock.patch.object(seedtag, "KDF_BACKENDS", ((name, kdf),)):
+                    try:
+                        seedtag.derive_key("x", bytes(16))
+                    except seedtag.NoArgon2 as e:
+                        self.skipTest(f"{name} not available: {e}")
+                    for pw, ent, salt, nonce, b64, _ in vecs:
+                        pw = bytes.fromhex(pw).decode("utf-8")
+                        blob = seedtag.seal(bytes.fromhex(ent), pw, bytes.fromhex(salt), bytes.fromhex(nonce))
+                        self.assertEqual(b64, base64.b64encode(blob).decode())
+                    self.assertEqual(name, seedtag.kdf_used)
+
+    def test_unavailable_backend_falls_through(self):
+        def unsupported(pw, salt):
+            raise seedtag._Unavailable("this cryptography build has no Argon2id")
+        real = [b for b in seedtag.KDF_BACKENDS if self._works(b)]
+        if not real:
+            self.skipTest("no Argon2id backend installed")
+        with mock.patch.object(seedtag, "KDF_BACKENDS", (("cryptography", unsupported), real[0])):
+            seedtag.derive_key("x", bytes(16))
+            self.assertEqual(real[0][0], seedtag.kdf_used)
+
+    def test_none_available_is_a_clear_error(self):
+        def missing(pw, salt):
+            raise seedtag._Unavailable("not installed")
+        with mock.patch.object(seedtag, "KDF_BACKENDS", (("a", missing), ("b", missing))):
+            with self.assertRaises(seedtag.NoArgon2) as cm:
+                seedtag.derive_key("x", bytes(16))
+        self.assertIsInstance(cm.exception, ValueError)  # main() prints it as FAIL, no traceback
+        self.assertIn("pip install", str(cm.exception))
+
+    @staticmethod
+    def _works(backend):
+        try:
+            backend[1](b"x", bytes(16))
+            return True
+        except seedtag._Unavailable:
+            return False
 
 
 class PasswordVariants(unittest.TestCase):
