@@ -32,3 +32,6 @@ __pycache__/
 Thumbs.db
 *.swp
 *~
+
+# Other
+other/
