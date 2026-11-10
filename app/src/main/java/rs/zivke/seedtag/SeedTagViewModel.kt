@@ -74,6 +74,11 @@ sealed interface Dialog {
 enum class Haptic { Tick, Success, Failure, Found }
 
 private enum class Purpose { Check, BackupWrite, Verify, Restore, Lock }
+
+/** Argon2id needs 64 MiB of heap at once; a low-memory phone may not have it. */
+private const val OUT_OF_MEMORY =
+    "There wasn't enough free memory for the key derivation (Argon2id needs 64 MiB). Nothing was written or kept. " +
+        "Close other apps and try again."
 /** [id] tells a result for the current scan from one that arrives after Cancel or a new scan. */
 private data class Pending(val request: TagRequest, val purpose: Purpose, val id: Long)
 
@@ -319,6 +324,8 @@ class SeedTagViewModel : ViewModel() {
                 arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write the backup")
             } catch (e: SeedTagException) {
                 showError(e.message ?: "Encryption failed.")
+            } catch (e: OutOfMemoryError) {
+                showError(OUT_OF_MEMORY)
             } finally {
                 pw.fill(' ')
                 busy = null
@@ -473,6 +480,8 @@ class SeedTagViewModel : ViewModel() {
                 _haptics.tryEmit(Haptic.Success)
             } catch (e: SeedTagException) {
                 showError(e.message ?: "Decryption failed.")
+            } catch (e: OutOfMemoryError) {
+                showError(OUT_OF_MEMORY)
             } finally {
                 pw.fill(' ')
                 busy = null

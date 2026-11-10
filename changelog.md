@@ -4,6 +4,14 @@ All notable user-visible changes to SeedTag. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are the
 `versionName` in `app/build.gradle.kts`.
 
+## [Unreleased]
+
+### Fixed
+- An unexpected error from the phone's NFC stack no longer leaves the scan
+  window open and ignoring every tap: it's shown like any other tag error, and
+  tapping again retries. Running out of memory during Argon2id (on phones with
+  little RAM) now shows a message instead of closing the app.
+
 ## [0.3.0] - 2026-11-09
 
 ### Added

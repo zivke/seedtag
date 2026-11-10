@@ -86,6 +86,10 @@ object TagIo {
         TagResult.Failed("The tag is no longer in range. Try again.")
     } catch (e: rs.zivke.seedtag.core.SeedTagException) {
         TagResult.Failed(e.message ?: "Unreadable tag data.")
+    } catch (e: Exception) {
+        // Anything else (e.g. IllegalStateException from the NFC stack) must not escape to the
+        // binder thread: the scan would stay open and ignore every tap. Only the type is shown.
+        TagResult.Failed("Something went wrong talking to the tag (${e.javaClass.simpleName}). Try again.")
     }
 
     private fun write(tag: Tag, req: TagRequest.Write): TagResult {
