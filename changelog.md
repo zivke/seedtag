@@ -7,6 +7,8 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- Bouncy Castle, used only for Argon2id, updated from 1.78.1 to 1.86. The
+  key derivation is unchanged: the test vectors still match byte for byte.
 - Back up and `seedtag.py encrypt` refuse a new password that starts or ends
   with a space, or has two spaces in a row. A written copy rarely shows them,
   and Verify and Restore can only forgive spaces that were *added* when typing,

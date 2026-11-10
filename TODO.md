@@ -51,7 +51,10 @@
   - [x] A format guard for Type 5 tags (on `review-fixes-needs-device-test`; MIFARE Classic isn't covered).
   - [x] A message that says an interrupted overwrite may have destroyed the old content.
 - [ ] **#12 (Low): maintenance.**
-  - [ ] Update AGP, Kotlin, Compose and Bouncy Castle; check the Play target-API requirement.
+  - [x] Bouncy Castle 1.78.1 → 1.86 (on `review-fixes-needs-device-test`).
+  - [ ] Update AGP (8.7.3; 8.13.2 / 9.5.1 out), Kotlin (2.0.21; 2.4.21 out), the Compose BOM (2024.12.01;
+    2026.09.00 out), activity and lifecycle; check the Play target-API requirement. Needs a newer
+    platform and build-tools in the Dockerfile, so a container rebuild.
   - [x] CI running `make test`, `make build` and `check-apk` (`.github/workflows/build.yml`).
   - [ ] Split `Ui.kt` by screen, after `tag-write-password` is merged (it changes `Ui.kt` a lot).
   - [ ] Move the tag-flow logic into a pure-Kotlin state machine with tests, after `tag-write-password` is
