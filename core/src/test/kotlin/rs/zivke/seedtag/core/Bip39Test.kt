@@ -66,9 +66,4 @@ class Bip39Test {
         assertEquals(2048, Bip39.wordlist.map { it.take(4) }.toSet().size)
         Bip39.wordlist.forEach { assertEquals(it, Bip39.suggest(it.take(4), 1).single()) }
     }
-
-    @Test
-    fun normalize() {
-        assertEquals(listOf("abandon", "art"), Bip39.normalize("  Abandon\n\tART  "))
-    }
 }

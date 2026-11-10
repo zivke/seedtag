@@ -89,8 +89,8 @@ above with it, so others can check what they downloaded.
 Everything the build downloads is checked against a pinned checksum, so a tampered download fails the build:
 
 - **Gradle:** `make` checks the wrapper jar against `gradle/wrapper/gradle-wrapper.jar.sha256` (the official
-  Gradle 8.14 wrapper) before every Gradle run; the wrapper checks the Gradle download against
-  `distributionSha256Sum`.
+  wrapper jar of Gradle 8.14) before every Gradle run; the wrapper downloads the Gradle version set in
+  `gradle-wrapper.properties` (8.11.1) and checks it against `distributionSha256Sum`.
 - **Dependencies:** Gradle checks every library and plugin file against `gradle/verification-metadata.xml`.
   After adding or updating a dependency, run `make deps-metadata`: it records the new checksums and then
   cross-checks all of them against what Maven Central, Google's Maven repository and the Gradle Plugin Portal

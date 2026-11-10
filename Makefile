@@ -28,8 +28,9 @@ OUT       := app/build/outputs/apk
 .PHONY: build build-test debug test test-core test-py check deps-metadata check-deps wrapper-check \
         connect install install-test install-debug run run-test run-debug stop uninstall logcat clean help
 
-# Every Gradle run first checks the wrapper jar against its pinned SHA-256 (the official
-# Gradle 8.14 wrapper); the wrapper then checks the Gradle download (distributionSha256Sum)
+# Every Gradle run first checks the wrapper jar against its pinned SHA-256 (the official wrapper
+# jar of Gradle 8.14, which runs the 8.11.1 distribution set in gradle-wrapper.properties); the
+# wrapper then checks the Gradle download (distributionSha256Sum)
 # and Gradle checks every dependency (gradle/verification-metadata.xml).
 wrapper-check:
 	@sha256sum --quiet -c gradle/wrapper/gradle-wrapper.jar.sha256

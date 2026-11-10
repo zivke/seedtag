@@ -4,7 +4,6 @@
 package rs.zivke.seedtag.core
 
 import java.security.MessageDigest
-import java.text.Normalizer
 
 /**
  * Minimal BIP39 (English) encoder/decoder: mnemonic words <-> raw entropy.
@@ -101,13 +100,6 @@ object Bip39 {
         }
         return out
     }
-
-    /** Splits free-form input into normalized lower-case words. */
-    fun normalize(input: String): List<String> =
-        Normalizer.normalize(input, Normalizer.Form.NFKD)
-            .lowercase()
-            .split(Regex("\\s+"))
-            .filter { it.isNotEmpty() }
 
     fun entropyToWords(entropy: ByteArray): List<String> {
         require(entropy.size in validEntropyLengths) { "bad entropy length ${entropy.size}" }

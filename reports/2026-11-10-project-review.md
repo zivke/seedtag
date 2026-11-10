@@ -220,8 +220,9 @@ has been fixed. What's left isn't in the cryptography. It's in three places:
   pure-Kotlin state machine with `TagIo` behind an interface would make finding #3 and the earlier race
   fixes unit-testable without a phone.
 - **Doc nits:**
-  - The README and Makefile call the wrapper "Gradle 8.14", but the distribution is 8.11.1, so check
-    which is right.
+  - ~~The README and Makefile call the wrapper "Gradle 8.14", but the distribution is 8.11.1.~~ *Correction:*
+    both are right. The jar is the official wrapper jar of Gradle 8.14 (checked against
+    services.gradle.org), and it runs the 8.11.1 distribution. The wording now names both.
   - `Bip39.normalize(String)` is unused and makes String copies of seed input; delete it or mark it
     test-only.
 

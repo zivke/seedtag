@@ -51,10 +51,11 @@
   says an interrupted overwrite may have destroyed the old content.
 - [ ] **#12 (Low): maintenance.**
   - [ ] Update AGP, Kotlin, Compose and Bouncy Castle; check the Play target-API requirement.
-  - [ ] CI running `make test`, `make build` and `check-apk`.
+  - [x] CI running `make test`, `make build` and `check-apk` (`.github/workflows/build.yml`).
   - [ ] Split `Ui.kt` by screen.
   - [ ] Move the tag-flow logic into a pure-Kotlin state machine with tests.
-  - [ ] Fix the "Gradle 8.14" wrapper wording; remove or mark test-only `Bip39.normalize(String)`.
+  - [x] Clarify the wrapper wording (8.14 jar, 8.11.1 distribution: both were right); remove the unused
+    `Bip39.normalize(String)`.
 
 ## App and docs
 
