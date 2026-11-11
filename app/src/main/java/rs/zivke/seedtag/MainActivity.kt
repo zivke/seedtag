@@ -106,13 +106,18 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        val a = adapter
         refreshRadios()
         accessibilityApps.value = enabledAccessibilityApps()
         watchAccessibility(true)
-        // Reader mode for the whole time we're in the foreground: tags go to us only,
-        // never to other apps (e.g. NFC Tools or the system tag viewer).
-        a?.enableReaderMode(
+        enableReader()
+    }
+
+    /**
+     * Reader mode for the whole time we're in the foreground: tags go to us only, never to other
+     * apps (e.g. NFC Tools or the system tag viewer).
+     */
+    private fun enableReader() {
+        adapter?.enableReaderMode(
             this,
             { tag -> vm.onTagDiscovered(tag) },
             NfcAdapter.FLAG_READER_NFC_A or NfcAdapter.FLAG_READER_NFC_B or
@@ -198,8 +203,13 @@ class MainActivity : ComponentActivity() {
         // Coming back from a dialog, the shade or another app can bring the bars back.
         if (hasFocus) hideSystemBars()
         // The quick-settings shade doesn't pause the activity, but airplane mode or NFC may have
-        // been switched there.
-        if (hasFocus) refreshRadios()
+        // been switched there. NFC switched back on: reader mode again, in case turning NFC off
+        // dropped it (onResume, which normally turns it on, doesn't run for the shade).
+        if (hasFocus) {
+            val nfcWasReady = nfcState.value == NfcState.Ready
+            refreshRadios()
+            if (!nfcWasReady && nfcState.value == NfcState.Ready) enableReader()
+        }
     }
 
     /**

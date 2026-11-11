@@ -14,6 +14,7 @@ import android.nfc.tech.NdefFormatable
 import android.nfc.tech.NfcV
 import rs.zivke.seedtag.core.NdefText
 import rs.zivke.seedtag.core.SeedBox
+import rs.zivke.seedtag.core.Type2Tlv
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
@@ -142,6 +143,7 @@ object TagIo {
             // Overwriting without asking is only OK if every read says the tag is empty, and with the
             // user's OK only on the very tag, with the very content, that they were asked about.
             val existing = readMessage(it)
+            if (existing == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
             if (existing != null && existing.records.any { r -> r.tnf != NdefRecord.TNF_EMPTY }) {
                 if (req.overwrite?.matches(tag, existing) != true) {
                     val text = runCatching { firstText(existing) }.getOrNull()
@@ -174,6 +176,7 @@ object TagIo {
             ndef.use {
                 it.connect()
                 val msg = readMessage(it)
+                if (msg == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
                 val content = if (msg == null || msg.records.all { r -> r.tnf == NdefRecord.TNF_EMPTY }) {
                     TagContent.Empty
                 } else {
@@ -255,6 +258,24 @@ object TagIo {
      */
     private fun readMessage(ndef: Ndef): NdefMessage? =
         ndef.ndefMessage ?: ndef.ndefMessage ?: ndef.cachedNdefMessage
+
+    /**
+     * For a tag that every NDEF read called empty ([readMessage] null): on a Type 2 tag, read the TLVs
+     * from page 4 directly, and say whether an NDEF message is there after all. Then the reads failed
+     * rather than found nothing, and writing without asking could destroy a backup. Other tag types,
+     * and TLVs too odd to tell, count as empty, as before. [ndef] is closed for the raw read (one
+     * technology at a time) and connected again afterwards.
+     */
+    private fun type2HoldsData(tag: Tag, ndef: Ndef): Boolean {
+        val ul = MifareUltralight.get(tag) ?: return false
+        ndef.close()
+        try {
+            val data = ul.use { it.connect(); it.readPages(4) + it.readPages(8) } // pages 4 to 11
+            return (Type2Tlv.ndefLength(data) ?: 0) > 0
+        } finally {
+            ndef.connect()
+        }
+    }
 
     /**
      * Android offers only NdefFormatable when its NDEF check at discovery failed, which a too-quick

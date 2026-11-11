@@ -100,8 +100,9 @@
   extracted before `tag-write-password` is merged.
 - [x] **#13 (Low): Kotlin and Python disagree on two password-variant edge cases.** Explicit whitespace
   list in both, two new `password-variants.tsv` rows, wrap the encoder failure in a `SeedTagException`.
-- [ ] **#14 (Info): an unreadable tag is treated as empty.** Optional Type 2 hardening: check the NDEF TLV
-  length before writing without confirmation.
+- [x] **#14 (Info): an unreadable tag is treated as empty.** Optional Type 2 hardening: check the NDEF TLV
+  length before writing without confirmation. Also turn reader mode on again after NFC is switched on from
+  the quick-settings shade.
 - [ ] **#15 (Info): build checks.** `check-apk.sh` could reject `debuggable` / `testOnly` and extra
   components; check the two action SHAs by hand against their release tags.
 

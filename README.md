@@ -207,7 +207,9 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    punctuation.
    A password that starts or ends with a space, or has two spaces in a row, is refused: a written copy rarely shows
    that, and only the exact spaces would decrypt the tag.
-   If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted
+   If the tag already has data, the app asks before overwriting it (on NTAG and MIFARE Ultralight tags, a tag that
+   reads as empty is double-checked in its raw data first, so a bad read isn't taken for an empty tag). A blank,
+   unformatted tag is formatted
    first and then needs a second tap so the app can read it back.
 2. **Verify**: type the password from your written copy (not from memory, so the copy is checked too) and scan.
    The app reads the tag, decrypts it and checks the seed's checksum. You get ✓ plus a fingerprint, and the words

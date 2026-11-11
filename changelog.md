@@ -89,6 +89,12 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- A tag that can't be read properly is no longer taken for an empty one. If
+  every read of an NTAG or MIFARE Ultralight tag finds no message, the app
+  checks the tag's raw data before writing to it without asking, and asks
+  you to hold it still and try again if a message is there after all.
+- Switching NFC off and back on from the quick-settings panel while SeedTag
+  is open turns its tag reader on again.
 - A write or lock that finishes after you've started another scan no longer
   closes that scan's prompt while leaving it waiting for a tag. Canceling
   while a blank tag is being written no longer brings the scan prompt back by

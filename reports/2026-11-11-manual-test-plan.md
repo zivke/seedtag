@@ -154,8 +154,8 @@ during the other tests.
 | 3.4 | Generate tapped twice (finding 2) | Fixed on `main`: see 1.24. | ⬜ |
 | 3.5 | "Already read-only" tag (finding 9) | Fixed on `main`: Lock on a tag that's already read-only (verify it first) says "Already read-only", not "Tag locked". | ⬜ |
 | 3.6 | Late results (finding 12) | Fixed on `main`. Double-tap **Encrypt & write**: one encryption. Write to a blank tag and Cancel during the write: "Written, not checked", no prompt reappearing. Cancel right as a write finishes, then start a Verify scan: its prompt stays. | ⬜ |
-| 3.7 | Unreadable tag treated as empty (finding 14) | Hard to provoke: a tag with data at a marginal position, written without the overwrite prompt. | 🔍 |
-| 3.8 | NFC toggled from quick settings (finding 14) | Turn NFC off and on from the shade while SeedTag is open; tags must still reach the app. | 🔍 |
+| 3.7 | Unreadable tag treated as empty (finding 14) | Hardened on `main`: on a Type 2 tag that every read calls empty, the raw TLVs are checked before writing without asking. Check that nothing regressed: Back up to an NDEF-formatted empty NTAG / Ultralight C (written without a prompt, *Backup written*), and to one holding a backup (the overwrite prompt). The failure itself is hard to provoke: a tag with data at a marginal position. | ⬜ |
+| 3.8 | NFC toggled from quick settings (finding 14) | Reader mode is now turned on again when NFC comes back on with SeedTag in front. Turn NFC off and on from the shade while SeedTag is open, on Back up's tag check and on Verify; tags must still reach the app (and no other app's tag popup appears). | ⬜ |
 
 ## 4. Branch `tag-write-password` (before merging)
 
