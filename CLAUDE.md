@@ -99,8 +99,10 @@ Two Gradle modules plus the Python tool:
     `TagResult`, never throws.
   - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
 - **`tools/seedtag.py`**: single file, wordlist embedded, `encrypt` /
-  `decrypt` / `verify`. Python 3.8+; needs `cryptography` (AES-GCM, and
-  Argon2id from ≥ 44), with `argon2-cffi` as the Argon2id fallback.
+  `decrypt` / `verify`. Python 3.8+; uses `cryptography` (AES-GCM, and
+  Argon2id from ≥ 44), with `argon2-cffi` as the Argon2id fallback. Without
+  them, decrypt falls back to its built-in plain-Python Argon2id and AES-GCM
+  decryption (slow, standard library only); encrypt needs `cryptography`.
 
 ## Blob format v1 (do not change in place)
 

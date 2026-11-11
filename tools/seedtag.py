@@ -20,12 +20,14 @@ seedtag.py - desktop companion / recovery tool for the SeedTag Android app.
 
 Encrypts a BIP39 mnemonic into the SeedTag v1 blob (the Base64 text stored on
 the NFC tag) and decrypts it back. Self-contained: the BIP39 English wordlist
-is embedded below. Needs `cryptography` (AES-GCM); Argon2id comes from
-`cryptography` >= 44 if it has it, otherwise from `argon2-cffi`. Both give the
-same bytes, and the tool says which one it used.
+is embedded below. Uses `cryptography` (AES-GCM); Argon2id comes from
+`cryptography` >= 44 if it has it, otherwise from `argon2-cffi`. Without
+either, decrypt and verify use the built-in Argon2id and AES-GCM below, in
+plain Python: same bytes, about a minute per password tried. encrypt needs
+`cryptography`. The tool says which Argon2id it used.
 
 Needs Python 3.8 or later. Keep a copy of this file with your written password:
-it's all you need, apart from Python and the packages above, to recover a tag.
+with it and Python, you can recover a tag; the packages only make it faster.
 
 Run it on an offline machine.
 
@@ -49,7 +51,9 @@ from __future__ import annotations  # list[str], bytes | None: not evaluated, so
 import base64
 import getpass
 import hashlib
+import hmac
 import os
+import struct
 import sys
 import unicodedata
 
@@ -302,8 +306,15 @@ def _argon2_cffi(pw: bytes, salt: bytes) -> bytes:
                            parallelism=ARGON_P, hash_len=KEY_LEN, type=Type.ID)
 
 
-# Tried in this order; both give the same bytes.
-KDF_BACKENDS = (("cryptography", _argon2_cryptography), ("argon2-cffi", _argon2_cffi))
+def _argon2_builtin(pw: bytes, salt: bytes) -> bytes:
+    print("(no Argon2id package installed: using the slow built-in one, about a minute per try)",
+          file=sys.stderr, flush=True)
+    return argon2id_builtin(pw, salt, ARGON_T, ARGON_M_KIB, KEY_LEN)
+
+
+# Tried in this order; all give the same bytes.
+KDF_BACKENDS = (("cryptography", _argon2_cryptography), ("argon2-cffi", _argon2_cffi),
+                ("built-in", _argon2_builtin))
 kdf_used = None  # name of the backend the last derive_key() used, for the CLI to report
 
 
@@ -327,13 +338,16 @@ class NoAesGcm(ValueError):
     pass
 
 
-def _aesgcm():
-    """(AESGCM, InvalidTag) from `cryptography`, checked before the slow key derivation."""
+def _aesgcm(decrypt_only: bool = False):
+    """(AESGCM, InvalidTag) from `cryptography`, checked before the slow key derivation. For
+    decrypting, the built-in AES-GCM stands in if it isn't installed; encrypting needs it."""
     try:
         from cryptography.exceptions import InvalidTag
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
     except ImportError:
-        raise NoAesGcm("AES-GCM needs the cryptography package, which isn't installed. "
+        if decrypt_only:
+            return AesGcmBuiltin, InvalidTagBuiltin
+        raise NoAesGcm("encrypting needs the cryptography package (AES-GCM), which isn't installed. "
                        "Install it: pip install cryptography") from None
     return AESGCM, InvalidTag
 
@@ -366,7 +380,7 @@ def open_blob(blob: bytes, password: str) -> bytes:
     salt = blob[1:1 + SALT_LEN]
     nonce = blob[1 + SALT_LEN:1 + SALT_LEN + NONCE_LEN]
     ct = blob[1 + SALT_LEN + NONCE_LEN:]
-    aesgcm, InvalidTag = _aesgcm()
+    aesgcm, InvalidTag = _aesgcm(decrypt_only=True)
     try:
         return aesgcm(derive_key(password, salt)).decrypt(nonce, ct, blob[:1])
     except InvalidTag:
@@ -430,6 +444,212 @@ def open_forgiving(blob: bytes, password: str) -> tuple[bytes, str | None]:
 def fingerprint(entropy: bytes) -> str:
     """Short, non-secret-revealing check value (first 4 bytes of SHA-256)."""
     return hashlib.sha256(b"seedtag-fp" + entropy).hexdigest()[:8]
+
+
+# --------------------------------------------- built-in Argon2id, AES-GCM ---
+#
+# Last resort, for a machine where neither package can be installed: Argon2id (RFC 9106, one lane,
+# no secret or associated data) and AES-256-GCM decryption (FIPS 197, NIST SP 800-38D) in plain
+# Python. Decryption only: a tag is written by the app, or by encrypt with the packages installed.
+# Slow (about a minute per password tried, and 90 MB of memory) and not constant-time, which is
+# no concern for decrypting your own tag on an offline machine. Checked against the same vectors.
+
+_M32, _M64 = 0xFFFFFFFF, 0xFFFFFFFFFFFFFFFF
+_BLOCK = struct.Struct("<128Q")  # an Argon2 block: 1024 bytes, 128 little-endian 64-bit words
+
+
+def _blake2b_long(data: bytes, length: int) -> bytes:
+    """H' (RFC 9106 section 3.3): a hash of any length, built from BLAKE2b."""
+    data = struct.pack("<I", length) + data
+    if length <= 64:
+        return hashlib.blake2b(data, digest_size=length).digest()
+    r = (length + 31) // 32 - 2
+    v = hashlib.blake2b(data, digest_size=64).digest()
+    out = [v[:32]]
+    for _ in range(r - 1):
+        v = hashlib.blake2b(v, digest_size=64).digest()
+        out.append(v[:32])
+    out.append(hashlib.blake2b(v, digest_size=length - 32 * r).digest())
+    return b"".join(out)
+
+
+def _gb_indexes():
+    """The (a, b, c, d) word indexes of GB, in order, for the 8 row and then 8 column permutations
+    of the compression function G (RFC 9106 section 3.5), over a block as 128 words."""
+    rows = [[16 * i + k for k in range(16)] for i in range(8)]
+    cols = [[2 * i + 16 * k + h for k in range(8) for h in (0, 1)] for i in range(8)]
+    out = []
+    for v in rows + cols:
+        out += [(v[0], v[4], v[8], v[12]), (v[1], v[5], v[9], v[13]),
+                (v[2], v[6], v[10], v[14]), (v[3], v[7], v[11], v[15]),
+                (v[0], v[5], v[10], v[15]), (v[1], v[6], v[11], v[12]),
+                (v[2], v[7], v[8], v[13]), (v[3], v[4], v[9], v[14])]
+    return out
+
+
+_GB = _gb_indexes()
+
+
+def _compress(x: int, y: int) -> int:
+    """G(X, Y) on two blocks, each held as one 8192-bit little-endian int."""
+    r = x ^ y
+    v = list(_BLOCK.unpack(r.to_bytes(1024, "little")))
+    for a, b, c, d in _GB:
+        va, vb, vc, vd = v[a], v[b], v[c], v[d]
+        va = (va + vb + 2 * (va & _M32) * (vb & _M32)) & _M64
+        vd ^= va
+        vd = (vd >> 32) | ((vd << 32) & _M64)
+        vc = (vc + vd + 2 * (vc & _M32) * (vd & _M32)) & _M64
+        vb ^= vc
+        vb = (vb >> 24) | ((vb << 40) & _M64)
+        va = (va + vb + 2 * (va & _M32) * (vb & _M32)) & _M64
+        vd ^= va
+        vd = (vd >> 16) | ((vd << 48) & _M64)
+        vc = (vc + vd + 2 * (vc & _M32) * (vd & _M32)) & _M64
+        vb ^= vc
+        vb = (vb >> 63) | ((vb << 1) & _M64)
+        v[a], v[b], v[c], v[d] = va, vb, vc, vd
+    return int.from_bytes(_BLOCK.pack(*v), "little") ^ r
+
+
+def argon2id_builtin(pw: bytes, salt: bytes, t: int, m_kib: int, length: int) -> bytes:
+    """Argon2id v1.3 with parallelism 1, t passes over m_kib KiB, a length-byte tag."""
+    p, kind, version = 1, 2, 0x13
+    h0 = hashlib.blake2b(
+        struct.pack("<6I", p, length, m_kib, t, version, kind)
+        + struct.pack("<I", len(pw)) + pw + struct.pack("<I", len(salt)) + salt
+        + struct.pack("<II", 0, 0),  # no secret, no associated data
+        digest_size=64).digest()
+    q = 4 * (m_kib // 4)  # blocks in the one lane
+    if q < 8:
+        raise ValueError("Argon2id needs at least 8 KiB")
+    seg = q // 4
+    mem = [0] * q
+    for i in (0, 1):
+        mem[i] = int.from_bytes(_blake2b_long(h0 + struct.pack("<II", i, 0), 1024), "little")
+    for r in range(t):
+        for s in range(4):
+            independent = r == 0 and s < 2  # Argon2id: data-independent addressing here (3.4.1.2)
+            counter = 0
+            addresses = ()
+            for k in range(2 if r == 0 and s == 0 else 0, seg):
+                j = s * seg + k
+                prev = mem[j - 1]  # j - 1 is -1 only for j == 0: the last block, as it should be
+                if independent:
+                    if k % 128 == 0 or not addresses:
+                        counter += 1
+                        z = int.from_bytes(struct.pack("<7Q", r, 0, s, q, t, kind, counter), "little")
+                        addresses = _BLOCK.unpack(_compress(0, _compress(0, z)).to_bytes(1024, "little"))
+                    j1 = addresses[k % 128] & _M32
+                else:
+                    j1 = prev & _M32
+                # Which earlier block to mix in (3.4.2), the lane always being this one.
+                if r == 0:
+                    area, origin = j - 1, 0
+                else:
+                    area, origin = q - seg + k - 1, (s + 1) * seg % q
+                x = (j1 * j1) >> 32
+                ref = mem[(origin + area - 1 - ((area * x) >> 32)) % q]
+                new = _compress(prev, ref)
+                mem[j] = new if r == 0 else mem[j] ^ new
+    return _blake2b_long(mem[q - 1].to_bytes(1024, "little"), length)
+
+
+def _aes_tables():
+    exp, log = [0] * 255, [0] * 256  # powers of the generator 3 in GF(2^8)
+    a = 1
+    for i in range(255):
+        exp[i], log[a] = a, i
+        a ^= ((a << 1) ^ 0x11B) if a & 0x80 else a << 1
+    sbox = []
+    for a in range(256):
+        b = exp[(255 - log[a]) % 255] if a else 0  # multiplicative inverse
+        s = b
+        for i in range(1, 5):
+            s ^= ((b << i) | (b >> (8 - i))) & 0xFF
+        sbox.append(s ^ 0x63)
+    return sbox
+
+
+_SBOX = _aes_tables()
+
+
+def _xtime(a: int) -> int:
+    return ((a << 1) ^ 0x11B) if a & 0x80 else a << 1
+
+
+def _aes256_round_keys(key: bytes) -> list:
+    w = [list(key[i:i + 4]) for i in range(0, 32, 4)]
+    rcon = 1
+    for i in range(8, 60):
+        temp = w[i - 1]
+        if i % 8 == 0:
+            temp = [_SBOX[b] for b in temp[1:] + temp[:1]]
+            temp[0] ^= rcon
+            rcon = _xtime(rcon)
+        elif i % 8 == 4:
+            temp = [_SBOX[b] for b in temp]
+        w.append([a ^ b for a, b in zip(w[i - 8], temp)])
+    return [sum(w[4 * r:4 * r + 4], []) for r in range(15)]
+
+
+def _aes_encrypt_block(round_keys: list, block: bytes) -> bytes:
+    s = [b ^ k for b, k in zip(block, round_keys[0])]
+    for rnd in range(1, 15):
+        s = [_SBOX[b] for b in s]
+        s = [s[(4 * (c + r) + r) % 16] for c in range(4) for r in range(4)]  # ShiftRows (column-major)
+        if rnd < 14:  # MixColumns, not in the last round
+            mixed = []
+            for c in range(0, 16, 4):
+                a0, a1, a2, a3 = s[c:c + 4]
+                e = a0 ^ a1 ^ a2 ^ a3
+                mixed += [a0 ^ e ^ _xtime(a0 ^ a1), a1 ^ e ^ _xtime(a1 ^ a2),
+                          a2 ^ e ^ _xtime(a2 ^ a3), a3 ^ e ^ _xtime(a3 ^ a0)]
+            s = mixed
+        s = [b ^ k for b, k in zip(s, round_keys[rnd])]
+    return bytes(s)
+
+
+def _ghash(h: int, aad: bytes, ct: bytes) -> int:
+    def blocks(data):
+        data += bytes(-len(data) % 16)
+        return [int.from_bytes(data[i:i + 16], "big") for i in range(0, len(data), 16)]
+    y = 0
+    for x in blocks(aad) + blocks(ct) + [(8 * len(aad)) << 64 | 8 * len(ct)]:
+        x ^= y
+        y, v = 0, h  # y = x * h in GF(2^128), bit-reflected (SP 800-38D, algorithm 1)
+        for i in range(127, -1, -1):
+            if (x >> i) & 1:
+                y ^= v
+            v = (v >> 1) ^ (0xE1 << 120) if v & 1 else v >> 1
+    return y
+
+
+class InvalidTagBuiltin(Exception):
+    pass
+
+
+class AesGcmBuiltin:
+    """AES-256-GCM decryption, 12-byte nonce, 16-byte tag; same call as cryptography's AESGCM."""
+
+    def __init__(self, key: bytes):
+        if len(key) != 32:
+            raise ValueError("AES-256 needs a 32-byte key")
+        self._keys = _aes256_round_keys(key)
+
+    def decrypt(self, nonce: bytes, data: bytes, aad: bytes) -> bytes:
+        if len(nonce) != 12 or len(data) < 16:
+            raise ValueError("bad nonce or ciphertext length")
+        ct, tag = data[:-16], data[-16:]
+        h = int.from_bytes(_aes_encrypt_block(self._keys, bytes(16)), "big")
+        mask = int.from_bytes(_aes_encrypt_block(self._keys, nonce + b"\0\0\0\1"), "big")
+        if not hmac.compare_digest((mask ^ _ghash(h, aad, ct)).to_bytes(16, "big"), tag):
+            raise InvalidTagBuiltin()
+        out = bytearray()
+        for i in range(0, len(ct), 16):
+            stream = _aes_encrypt_block(self._keys, nonce + struct.pack(">I", 2 + i // 16))
+            out += bytes(a ^ b for a, b in zip(ct[i:i + 16], stream))
+        return bytes(out)
 
 
 # -------------------------------------------------------------------- CLI ---

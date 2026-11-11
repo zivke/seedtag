@@ -183,7 +183,7 @@ check the lock read-back after it.
 |---|---|---|---|
 | 5.1 | Recover with `seedtag.py`: read a tag with NFC Tools, run `verify` and `decrypt` on an offline computer | Same fingerprint and words as the app. | ❓ (README step 3; was it done?) |
 | 5.2 | `seedtag.py` with `cryptography` ≥ 44 only, and with `argon2-cffi` only | Both decrypt and say which Argon2id they used. 🔍 Expert review #5: the `cryptography` backend is never tested automatically. | ⬜ |
-| 5.3 | `seedtag.py` with neither library | A clear message. 🔍 Expert review #4: AES-GCM still gives a traceback without `cryptography`. | 🔍 |
+| 5.3 | `seedtag.py` with neither library (a fresh `python3 -m venv`, or a Python without packages): `verify` and `decrypt` a tag, then `encrypt` | `verify` / `decrypt` print the slow built-in note, take about a minute per password tried, then give the same fingerprint and words; `(Argon2id from built-in)`. `encrypt` fails with "needs the cryptography package", no traceback. Automated: CI decrypts a vector this way (`SEEDTAG_SLOW_TESTS=1`); still worth one run on your own recovery machine. | ⬜ |
 | 5.4 | First CI run (Actions tab, "Run workflow" on `main`) | Green; the summary shows the SHA-256, the same as a local `make build` of the same commit. | ⬜ |
 | 5.5 | CI on a `v*` tag | Starts by itself. | ⬜ |
 | 5.6 | `sign-release.sh --expect <wrong hash>` on the signing machine | Refuses, nothing signed. | ⬜ |

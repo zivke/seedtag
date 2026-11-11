@@ -76,10 +76,10 @@
   - [x] Make `--expect` mandatory, with an explicit `--no-expect`.
   - [ ] No push credentials in the container (turn off VS Code's credential forwarding); protect `v*`
     tags on GitHub. Documented in `.devcontainer/README.md`; it's a host setting, for the user to apply.
-- [ ] **#4 (Medium-Low): recovery needs third-party packages.**
+- [x] **#4 (Medium-Low): recovery needs third-party packages.**
   - [x] Catch `ImportError` in `seedtag.py` and say what to install; state the minimum Python version.
   - [x] README and Done screen: keep a copy of `seedtag.py` with the written password.
-  - [ ] Pure-Python decrypt-only fallback (Argon2id and AES-GCM), tested against the vectors.
+  - [x] Pure-Python decrypt-only fallback (Argon2id and AES-GCM), tested against the vectors.
 - [x] **#5 (Low): the `cryptography` Argon2id backend is never tested.** CI step with a hash-pinned
   `cryptography` ≥ 44 that fails on a skipped backend; add 18- and 21-word vectors.
 - [x] **#6 (Low): Argon2's 64 MiB on the Java heap.** `android:largeHeap="true"`, tried on an old phone.

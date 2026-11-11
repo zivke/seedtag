@@ -5,7 +5,8 @@
 
     python3 tools/test_seedtag.py      (or: make test-py)
 
-Standard library only, plus whatever seedtag.py itself needs.
+Standard library only, plus whatever seedtag.py itself needs. SEEDTAG_SLOW_TESTS=1 also decrypts a
+vector with the built-in Argon2id at the real parameters (about a minute).
 """
 import base64
 import os
@@ -115,6 +116,8 @@ class Argon2Backends(unittest.TestCase):
     def test_each_backend_matches_vectors(self):
         vecs = rows("seedtag-v1-vectors.tsv")
         for name, kdf in seedtag.KDF_BACKENDS:
+            if name == "built-in":
+                continue  # a minute per vector: BuiltinCrypto checks it
             with self.subTest(backend=name):
                 with mock.patch.object(seedtag, "KDF_BACKENDS", ((name, kdf),)):
                     try:
@@ -132,7 +135,7 @@ class Argon2Backends(unittest.TestCase):
     def test_unavailable_backend_falls_through(self):
         def unsupported(pw, salt):
             raise seedtag._Unavailable("this cryptography build has no Argon2id")
-        real = [b for b in seedtag.KDF_BACKENDS if self._works(b)]
+        real = [b for b in seedtag.KDF_BACKENDS if b[0] != "built-in" and self._works(b)]
         if not real:
             self.skipTest("no Argon2id backend installed")
         with mock.patch.object(seedtag, "KDF_BACKENDS", (("cryptography", unsupported), real[0])):
@@ -149,20 +152,12 @@ class Argon2Backends(unittest.TestCase):
         self.assertIn("pip install", str(cm.exception))
 
     def test_no_aes_gcm_is_a_clear_error(self):
-        blob = base64.b64decode(rows("seedtag-v1-vectors.tsv")[0][4])
-        real_import = __import__
-
-        def no_cryptography(name, *args, **kwargs):
-            if name.split(".")[0] == "cryptography":
-                raise ImportError(name)
-            return real_import(name, *args, **kwargs)
-        with mock.patch("builtins.__import__", no_cryptography), \
+        with without("cryptography"), \
                 mock.patch.object(seedtag, "derive_key", side_effect=AssertionError("Argon2 ran first")):
-            for call in (lambda: seedtag.open_blob(blob, "x"), lambda: seedtag.seal(bytes(16), "x")):
-                with self.assertRaises(seedtag.NoAesGcm) as cm:
-                    call()
-                self.assertIsInstance(cm.exception, ValueError)  # main() prints it as FAIL, no traceback
-                self.assertIn("pip install cryptography", str(cm.exception))
+            with self.assertRaises(seedtag.NoAesGcm) as cm:
+                seedtag.seal(bytes(16), "x")
+        self.assertIsInstance(cm.exception, ValueError)  # main() prints it as FAIL, no traceback
+        self.assertIn("pip install cryptography", str(cm.exception))
 
     @staticmethod
     def _works(backend):
@@ -171,6 +166,91 @@ class Argon2Backends(unittest.TestCase):
             return True
         except seedtag._Unavailable:
             return False
+
+
+def without(*packages):
+    """Imports of these packages fail, as if they weren't installed."""
+    real_import = __import__
+
+    def fake(name, *args, **kwargs):
+        if name.split(".")[0] in packages:
+            raise ImportError(name)
+        return real_import(name, *args, **kwargs)
+    return mock.patch("builtins.__import__", fake)
+
+
+class BuiltinCrypto(unittest.TestCase):
+    """The plain-Python Argon2id and AES-GCM decryption, for when neither package can be installed."""
+
+    # t, m (KiB), password, salt, tag: made with both cryptography 50 and argon2-cffi (lanes 1).
+    ARGON2ID = [
+        (1, 8, "", "0000000000000000",
+         "9f147c5923c505e876f831c165fbd5a261670c60f85bea5d8fed76941c60a24e"),
+        (3, 64, "70617373776f7264", "736f6d6573616c743132333435363738",
+         "bfbd88e639fa991331f6e10953221dbd873896e754050e45d3871dfbb08b75f3"),
+        (2, 260, "70c3a4737377c3b67264", "000102030405060708090a0b0c0d0e0f",
+         "e3904cc043f838338ca0150ffeb8ee8419739ca6dee3902c0a1966e33a997b62"),
+        (3, 1024, "78" * 70, "ff" * 16,
+         "c989fb9d9661ab2ec2009c4a7e081ab4084e0aba6c7360d8ab9312b64d1cab1470b9b97bf963833f67e0c8216c796f39"
+         "2ea3a8168b3e6d11ff27248fb730ba33b90aab48f26b2530ed57d810b6f61f7f203e49b53acbdc03b84524aa10a9945a"
+         "78684ac8"),
+        (4, 37, "61", "00" * 16,
+         "fa7ab79d8f8b6307ef430fb343d2b3dd47d8d793efd34448929e94deb78a67ce1b125c3975ecca449999dcc22c223a2d"
+         "9d1b431f3087ef7ca039786bc006c428"),
+    ]
+
+    def test_argon2id_known_answers(self):
+        for t, m, pw, salt, tag in self.ARGON2ID:
+            got = seedtag.argon2id_builtin(bytes.fromhex(pw), bytes.fromhex(salt), t, m, len(tag) // 2)
+            self.assertEqual(tag, got.hex(), msg=f"t={t} m={m}")
+
+    def test_aes_gcm_nist(self):
+        # The GCM specification's test case 16 (AES-256, 96-bit IV, with AAD).
+        key = bytes.fromhex("feffe9928665731c6d6a8f9467308308feffe9928665731c6d6a8f9467308308")
+        iv = bytes.fromhex("cafebabefacedbaddecaf888")
+        aad = bytes.fromhex("feedfacedeadbeeffeedfacedeadbeefabaddad2")
+        pt = bytes.fromhex("d9313225f88406e5a55909c5aff5269a86a7a9531534f7da2e4c303d8a318a72"
+                           "1c3c0c95956809532fcf0e2449a6b525b16aedf5aa0de657ba637b39")
+        ct = bytes.fromhex("522dc1f099567d07f47f37a32a84427d643a8cdcbfe5c0c97598a2bd2555d1aa"
+                           "8cb08e48590dbb3da7b08b1056828838c5f61e6393ba7a0abcc9f662"
+                           "76fc6ece0f4e1768cddf8853bb2d551b")
+        gcm = seedtag.AesGcmBuiltin(key)
+        self.assertEqual(pt, gcm.decrypt(iv, ct, aad))
+        for pos in (0, 59, 60, 75):
+            bad = bytearray(ct)
+            bad[pos] ^= 0x80
+            with self.assertRaises(seedtag.InvalidTagBuiltin):
+                gcm.decrypt(iv, bytes(bad), aad)
+        with self.assertRaises(seedtag.InvalidTagBuiltin):
+            gcm.decrypt(iv, ct, aad[:-1])
+
+    def test_open_without_cryptography(self):
+        """Every vector decrypts with the built-in AES-GCM (the key from a fast Argon2id, if any)."""
+        try:
+            keys = {(pw, salt): seedtag.derive_key(bytes.fromhex(pw).decode("utf-8"), bytes.fromhex(salt))
+                    for pw, _, salt, _, _, _ in rows("seedtag-v1-vectors.tsv")}
+        except seedtag.NoArgon2:
+            self.skipTest("no Argon2id package installed")
+        if seedtag.kdf_used == "built-in":
+            self.skipTest("no Argon2id package installed")
+        with without("cryptography"), \
+                mock.patch.object(seedtag, "derive_key", lambda pw, salt: keys[(pw.encode().hex(), salt.hex())]):
+            for pw, ent, _, _, b64, _ in rows("seedtag-v1-vectors.tsv"):
+                pw = bytes.fromhex(pw).decode("utf-8")
+                self.assertEqual(bytes.fromhex(ent), seedtag.open_blob(base64.b64decode(b64), pw))
+            pw, _, _, _, b64, _ = rows("seedtag-v1-vectors.tsv")[0]
+            blob = bytearray(base64.b64decode(b64))
+            blob[-1] ^= 1
+            with self.assertRaises(seedtag.WrongPassword):
+                seedtag.open_blob(bytes(blob), bytes.fromhex(pw).decode("utf-8"))
+
+    @unittest.skipUnless(os.environ.get("SEEDTAG_SLOW_TESTS") == "1", "set SEEDTAG_SLOW_TESTS=1 (about a minute)")
+    def test_open_without_any_package(self):
+        pw, ent, _, _, b64, _ = rows("seedtag-v1-vectors.tsv")[0]
+        with without("cryptography", "argon2"):
+            got = seedtag.open_blob(base64.b64decode(b64), bytes.fromhex(pw).decode("utf-8"))
+        self.assertEqual(bytes.fromhex(ent), got)
+        self.assertEqual("built-in", seedtag.kdf_used)
 
 
 class PasswordVariants(unittest.TestCase):

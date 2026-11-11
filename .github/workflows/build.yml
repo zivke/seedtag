@@ -27,11 +27,12 @@ jobs:
           persist-credentials: false
 
       # The dev container only has argon2-cffi; this tests the backend the README tells users to
-      # install. Hash-pinned (tools/requirements-ci.txt), and a skipped backend fails the run.
+      # install. Hash-pinned (tools/requirements-ci.txt), and a skipped backend fails the run. Also
+      # the slow test: decrypting with the built-in Argon2id and AES-GCM, no package at all.
       - name: seedtag.py with the cryptography package
         run: |
           python3 -m pip install --require-hashes --only-binary :all: --target "$RUNNER_TEMP/py" -r tools/requirements-ci.txt
-          PYTHONPATH="$RUNNER_TEMP/py" SEEDTAG_REQUIRE_BACKENDS=cryptography python3 tools/test_seedtag.py
+          PYTHONPATH="$RUNNER_TEMP/py" SEEDTAG_REQUIRE_BACKENDS=cryptography SEEDTAG_SLOW_TESTS=1 python3 tools/test_seedtag.py
 
       - name: Build the dev container image
         run: docker build -t seedtag-dev .devcontainer

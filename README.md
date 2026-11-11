@@ -352,13 +352,18 @@ next to a partly readable copy of the seed.
 `tools/seedtag.py` is a single file (it embeds the official wordlist, SHA-256 `2f5eed53…dbda`) and needs Python 3.8 or
 later and the `cryptography` package, for AES-GCM. Argon2id comes from `cryptography` ≥ 44; if yours is older, or
 was built without Argon2id, it uses `argon2-cffi` for the key derivation instead (same bytes; `pip install
-argon2-cffi`), and it says which one it used. Without `cryptography` it says what to install.
+argon2-cffi`), and it says which one it used.
 
-**Keep a copy of `seedtag.py` with your written password**, printed or on a USB stick, and the packages' installers
-if you can (`pip download cryptography`). With them, recovering a tag needs neither this app nor this website.
+Without either package, `decrypt` and `verify` still work with a built-in Argon2id and AES-GCM in plain Python,
+tested against the same vectors: about a minute per password tried (a password that needs the spaces or capitals
+retry takes two or three), and around 90 MB of memory. `encrypt` needs `cryptography`.
+
+**Keep a copy of `seedtag.py` with your written password**, printed or on a USB stick. With it and any Python 3.8
+or later, recovering a tag needs neither this app, nor this website, nor any package. The packages' installers
+(`pip download cryptography`) only make it faster.
 
 ```bash
-pip install cryptography          # do this before going offline
+pip install cryptography          # optional, much faster; before going offline
 python3 seedtag.py verify  <BASE64>   # OK + fingerprint, no words
 python3 seedtag.py decrypt <BASE64>   # prints the words
 python3 seedtag.py encrypt            # create a tag string on the computer instead
@@ -440,7 +445,9 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
   a backend that isn't installed is reported as skipped. The dev container only has `argon2-cffi`; CI also runs the
   tests with `cryptography` installed from the hash-pinned `tools/requirements-ci.txt`, and there a skipped
   `cryptography` backend fails the run (`SEEDTAG_REQUIRE_BACKENDS=cryptography`). The vectors cover all five
-  phrase lengths (12 to 24 words).
+  phrase lengths (12 to 24 words). The built-in Argon2id is checked against known answers from both packages and
+  the built-in AES-GCM against the GCM specification and every vector; `SEEDTAG_SLOW_TESTS=1` (set in CI) also
+  decrypts a vector with no package at all, at the real parameters (about a minute).
 
 NFC itself has no automated tests: there's no emulator support. Test on a real phone with a real tag, using a
 throwaway mnemonic.

@@ -12,14 +12,21 @@ All notable user-visible changes to SeedTag. The format follows
   can silently replace SeedTag or turn on an accessibility service. Android
   shows these settings without any permission.
 
+- `seedtag.py decrypt` and `verify` work without any package: when neither
+  `cryptography` nor `argon2-cffi` is installed, they use a built-in Argon2id
+  and AES-GCM written in plain Python (about a minute per password tried).
+  So a copy of `seedtag.py` and any Python 3.8 or later are enough to
+  recover a tag. `encrypt` still needs `cryptography`.
+
 ### Changed
 - CI also tests `seedtag.py` with the `cryptography` package (hash-pinned),
   the Argon2id implementation the README recommends, and the test vectors
   now cover 18- and 21-word phrases too.
 - Releasing: `tools/sign-release.sh` now requires `--expect` (or an explicit
-  `--no-expect`), and refuses to sign from a clone with uncommitted changes,
-  unless `HEAD` is a `vX.Y.Z` tag that `git verify-tag` accepts (or
-  `--no-verify-tag`), or if the APK was built from a different commit. The
+  `--no-expect`). It refuses to sign from a clone with uncommitted changes
+  or whose `HEAD` isn't a `vX.Y.Z` tag that `git verify-tag` accepts (that
+  check can be skipped with `--no-verify-tag`), and refuses an APK built from
+  a different commit. The
   README's signing steps now sign from a fresh clone of a signed tag, after
   reviewing the diff since the last release, and `.devcontainer/README.md`
   explains how to take GitHub push access away from the container.
