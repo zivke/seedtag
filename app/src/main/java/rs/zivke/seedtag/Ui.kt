@@ -752,8 +752,9 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
             Item(
                 Tone.Caution,
                 "Read every screen carefully",
-                "Each one says exactly what to do. Read all of it, including every Learn more, before you tap – the " +
-                    "details matter. Some steps, such as overwriting or locking a tag, can't be undone.",
+                "Each one says exactly what to do. Read all of it, including every Learn more, before you actually " +
+                    "do anything – the details matter. Some steps, such as overwriting or locking a tag, can't be " +
+                    "undone.",
             ),
         )
         if (flow == Flow.Restore) {

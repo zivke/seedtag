@@ -7,6 +7,8 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- *Read every screen carefully* now says to read everything before you
+  actually do anything, not just before you tap.
 - Bouncy Castle, used only for Argon2id, updated from 1.78.1 to 1.86. The
   key derivation is unchanged: the test vectors still match byte for byte.
 - Back up and `seedtag.py encrypt` refuse a new password that starts or ends

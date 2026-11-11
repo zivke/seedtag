@@ -149,8 +149,8 @@ app see airplane mode without any permission, but not Wi-Fi or Bluetooth, so tho
 
 ## Using it
 
-**Read every instruction on screen carefully before you tap**, including the *Learn more* details. Some steps,
-such as overwriting or locking a tag, can't be undone.
+**Read every instruction on screen carefully before you actually do anything**, including the *Learn more*
+details. Some steps, such as overwriting or locking a tag, can't be undone.
 
 **Have the NFC tag ready before you start, but hold it to the phone only when the app asks.** You don't need to
 hold it while you read or type: the app only reads or writes the tag while it's held there. When asked, hold it
