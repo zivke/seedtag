@@ -347,6 +347,7 @@ class SeedTagViewModel : ViewModel() {
     // ================================================================ flows ===
 
     fun encryptAndWrite() {
+        if (busy != null) return // a second tap before the busy dialog showed
         if (password.isEmpty()) return showError("Enter a password.")
         if (!password.contentEquals(passwordRepeat)) return showError("The passwords don't match.")
         if (passwordHasStraySpaces) return showError(STRAY_SPACES)
@@ -366,11 +367,12 @@ class SeedTagViewModel : ViewModel() {
     }
 
     private fun encrypt() {
+        if (busy != null) return // never two Argon2 runs of 64 MiB at once
         val snapshot = words.toList()
         val pw = password.copy()
         val wipesAtStart = wipes
+        busy = "Encrypting and checking… (Argon2id runs twice; this takes a few seconds)"
         viewModelScope.launch {
-            busy = "Encrypting and checking… (Argon2id runs twice; this takes a few seconds)"
             try {
                 val sealed = withContext(Dispatchers.Default) {
                     val entropy = Bip39.wordsToEntropy(snapshot)
@@ -483,8 +485,10 @@ class SeedTagViewModel : ViewModel() {
 
     private fun handle(p: Pending, r: TagResult) {
         // Canceled, left the app or started another scan while the tag was busy: drop results
-        // that only ask for more input. Writes and locks did happen, so those are still shown.
+        // that only ask for more input. Writes and locks did happen, so those are still shown, but
+        // without closing the prompt of a newer scan that's waiting for a tag.
         val stale = p.id != scanId
+        fun closePrompt() { if (!stale || pending.get() == null) scanPrompt = null }
         when (r) {
             is TagResult.Checked -> {
                 if (stale) return
@@ -508,17 +512,28 @@ class SeedTagViewModel : ViewModel() {
             }
             is TagResult.WrittenUnchecked -> {
                 _haptics.tryEmit(Haptic.Tick)
+                if (stale) {
+                    // Canceled: don't bring the scan prompt back by itself.
+                    closePrompt()
+                    dialog = Dialog.Info(
+                        "Written, not checked",
+                        "The backup was written to the blank tag, but the scan was canceled before it could be read back. " +
+                            "Tap Encrypt & write tag again and hold the same tag: the app asks before overwriting it, then " +
+                            "writes and checks it.",
+                    )
+                    return
+                }
                 arm(TagRequest.CheckWritten(r.text), Purpose.BackupWrite, "Written. Hold the tag to the phone once more to check it")
             }
             is TagResult.Written -> {
-                scanPrompt = null
+                closePrompt()
                 _haptics.tryEmit(Haptic.Success)
                 wipeBackup()
                 lockTarget = r.text
                 step = BackupStep.Done
             }
             is TagResult.Locked -> {
-                scanPrompt = null
+                closePrompt()
                 _haptics.tryEmit(Haptic.Success)
                 dialog = Dialog.Info(
                     "Tag locked",

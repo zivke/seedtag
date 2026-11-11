@@ -62,6 +62,11 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- A write or lock that finishes after you've started another scan no longer
+  closes that scan's prompt while leaving it waiting for a tag. Canceling
+  while a blank tag is being written no longer brings the scan prompt back by
+  itself: the app says the backup was written but not checked. A quick double
+  tap on **Encrypt & write tag** can't start two encryptions at once.
 - The banner naming apps with accessibility access now also updates while
   SeedTag is open, for example when a service is switched on over adb, not
   only when you come back to the app.

@@ -95,7 +95,7 @@
   accessibility changes while in the foreground.
 - [x] **#11 (Low): a BIP39 passphrase ("25th word") isn't stored.** Say so on the Words step and in the
   README; mention English phrases only.
-- [ ] **#12 (Low): late tag results can leave a scan armed with no prompt.** Close the prompt only when
+- [x] **#12 (Low): late tag results can leave a scan armed with no prompt.** Close the prompt only when
   nothing is pending; ignore a second Encrypt while busy. Pin it down with the tag-flow state machine,
   extracted before `tag-write-password` is merged.
 - [x] **#13 (Low): Kotlin and Python disagree on two password-variant edge cases.** Explicit whitespace
