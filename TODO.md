@@ -64,7 +64,7 @@
 
 ## Expert review (open items from [the 2026-11-10 expert review](reports/2026-11-10-expert-review.md))
 
-- [ ] **#1 (Medium): the strength meter rates well-known weak passwords "Strong".** Only the generated
+- [x] **#1 (Medium): the strength meter rates well-known weak passwords "Strong".** Only the generated
   passphrase earns "Strong"; always confirm a typed password. If an estimate stays, fold case before the
   BIP39 lookup, split on any non-letter and count repeats once. Add the report's examples to the tests.
 - [ ] **#2 (Medium): a generated passphrase is never checked against the written copy.** Leave Repeat

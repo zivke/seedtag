@@ -62,6 +62,39 @@ class PassphraseTest {
     }
 
     @Test
+    fun wellKnownPhrasesAreWeak() {
+        // From the 2026-11-10 expert review: all of these used to score 67-99 bits.
+        for (pw in listOf(
+            "correct horse battery staple",
+            "Correct Horse Battery Staple",
+            "password password password",
+            "the quick brown fox jumps",
+            "Abandon Abandon Abandon Abandon",
+            "abandon abandon abandon abandon.",
+            "Summer2026!Summer2026!",
+            "a1a1a1a1a1a1a1a1a1a1a1a1a1",
+            "iloveyouiloveyouiloveyou",
+        )) {
+            assertTrue("$pw: ${bits(pw)}", bits(pw) < Passphrase.MIN_BITS)
+        }
+    }
+
+    @Test
+    fun caseAndPunctuationDontHideWords() {
+        assertEquals(bits("abandon zoo"), bits("Abandon ZOO"))
+        assertTrue(bits("abandon.zoo") < bits("abandon zoo") + 5)
+        assertEquals(6, bits("abandon Abandon ABANDON"))
+        assertTrue(Passphrase.sharesWords("Legal1".toCharArray(), seed))
+        assertTrue(Passphrase.sharesWords("my-winner!".toCharArray(), seed))
+    }
+
+    @Test
+    fun repeatedPatternsCountOnce() {
+        assertEquals(bits("iloveyou"), bits("iloveyouiloveyou"))
+        assertEquals(bits("x7!q"), bits("x7!qx7!q"))
+    }
+
+    @Test
     fun randomLongPasswordIsStrong() {
         assertTrue(bits("q7#Lm!x2Vr9@kPz4&Wt8") >= Passphrase.MIN_BITS)
     }

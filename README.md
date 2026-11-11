@@ -173,9 +173,12 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    the same BIP39 words as a seed phrase, so an unlabeled copy is easy to mistake for one, by you or by your heirs. Tap
    *Encrypt & write*, then hold the tag to the phone.
    The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
-   A password estimated below 60 bits, or one that uses words of the seed, needs a confirmation before writing.
-   The generated passphrase counts 11 bits per word; BIP39 words you choose yourself count about 6 each (people pick
-   common words and phrases), and words that follow each other in the list count almost nothing.
+   Only the generated passphrase is rated *Strong*. A password you type yourself always needs a confirmation
+   before writing: SeedTag can't recognise a well-known phrase (`correct horse battery staple`, a quote, a name and
+   a date), so its estimate is only an upper bound, shown as "≈N bits at most". The generated passphrase counts 11
+   bits per word; BIP39 words you choose yourself count about 6 each, words that follow each other in the list
+   almost nothing, and repeats (a word, a token or the whole pattern) count once, whatever the case or
+   punctuation.
    A password that starts or ends with a space, or has two spaces in a row, is refused: a written copy rarely shows
    that, and only the exact spaces would decrypt the tag.
    If the tag already has data, the app asks before overwriting it. A blank, unformatted tag is formatted

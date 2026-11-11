@@ -7,6 +7,14 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- Only the generated passphrase is rated *Strong*. A password you type
+  yourself is shown as "≈N bits at most" and always needs a confirmation
+  before writing, since SeedTag can't recognise a well-known phrase. The
+  estimate also stopped over-crediting typed passwords: capitals and
+  punctuation no longer hide BIP39 words, and a repeated word, token or
+  pattern counts once (`correct horse battery staple` went from 86 to 43
+  bits, `password password password` from 84 to 20). A seed word is also
+  caught when it's joined to digits or punctuation (`legal1`).
 - Holding ⌫ keeps deleting, on the password keyboard and the word keypad.
   On the keypad it stops at the start of the word being typed: words already
   entered are still removed one tap at a time, so holding the key can't wipe

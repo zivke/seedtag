@@ -63,8 +63,14 @@ sealed interface Dialog {
     data class Info(val title: String, val message: String) : Dialog
     data class ConfirmOverwrite(val looksLikeSeedTag: Boolean) : Dialog
     data object ConfirmLock : Dialog
-    /** The password is below [Passphrase.MIN_BITS] or reuses words of the seed. */
-    data class ConfirmWeakPassword(val bits: Int, val sharesSeedWords: Boolean) : Dialog
+    /**
+     * A password the user typed (not the generated passphrase): the app can't rate it, so writing
+     * always needs a confirmation. [bits] is the estimate, an upper bound; [sharesSeedWords] if it
+     * reuses words of the seed.
+     */
+    data class ConfirmWeakPassword(val bits: Int, val sharesSeedWords: Boolean) : Dialog {
+        val weak: Boolean get() = bits < Passphrase.MIN_BITS || sharesSeedWords
+    }
 }
 
 /**
@@ -317,10 +323,10 @@ class SeedTagViewModel : ViewModel() {
         if (password.isEmpty()) return showError("Enter a password.")
         if (!password.contentEquals(passwordRepeat)) return showError("The passwords don't match.")
         if (passwordHasStraySpaces) return showError(STRAY_SPACES)
-        val bits = passwordBits
-        val shares = passwordSharesSeedWords
-        if (bits < Passphrase.MIN_BITS || shares) {
-            dialog = Dialog.ConfirmWeakPassword(bits, shares)
+        // Only the generated passphrase is known to be random; anything typed is confirmed, however
+        // long, since the estimate can't recognise a well-known phrase.
+        if (!generatedPassphrase) {
+            dialog = Dialog.ConfirmWeakPassword(passwordBits, passwordSharesSeedWords)
             return
         }
         encrypt()

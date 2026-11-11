@@ -64,6 +64,7 @@ Everything under `[Unreleased]` in `changelog.md`.
 | 1.18 | Out of memory (needs a low-RAM phone) | Back up or Verify on an old phone. | Either it works, or an out-of-memory message appears and the app stays open. It never crashes. | ⬜ |
 | 1.19 | Held ⌫ on the password keyboard | Type a long password, hold ⌫. Then tap ⌫ once. | After a short pause it keeps deleting, with a tick each time, and stops at an empty field. A tap deletes one character; releasing after a hold deletes nothing extra. | ⬜ |
 | 1.20 | Held ⌫ on the word keypad | Enter a few words and type part of the next one, then hold ⌫. Hold it again with no letters typed. Then tap it. | The hold deletes the letters and stops at the start of the word; entered words stay. The second hold removes one word, when released. Each tap removes one letter, or one word when no letters are typed. | ⬜ |
+| 1.21 | Typed password that scores high | Type `q7#Lm!x2Vr9@kPz4&Wt8`, then `correct horse battery staple`, and try to write each. | The first shows "≈78 bits at most" in amber, never *Strong*; writing asks "Use your own password?". The second is *Weak* (≈43 bits) and asks "Weak password". Only the generated passphrase shows *Strong* and writes without asking. | ⬜ |
 
 The NFC-stack catch-all (`TagIo` never throwing) can't be provoked on purpose. Note any odd error that appears
 during the other tests.

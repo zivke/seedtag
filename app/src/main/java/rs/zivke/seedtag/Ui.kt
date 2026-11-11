@@ -1231,7 +1231,7 @@ private fun PasswordStep(vm: SeedTagViewModel) {
         SecretField("Password", vm, PwField.Password, vm.generatedPassphrase, active = field == PwField.Password) {
             field = PwField.Password
         }
-        if (vm.passwordLength(PwField.Password) > 0) StrengthMeter(vm.passwordBits)
+        if (vm.passwordLength(PwField.Password) > 0) StrengthMeter(vm.passwordBits, vm.generatedPassphrase)
         if (vm.passwordHasStraySpaces) {
             Text(STRAY_SPACES, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
         }
@@ -1247,14 +1247,22 @@ private fun PasswordStep(vm: SeedTagViewModel) {
     }
 }
 
-/** Three bars and a word: weak, fair, strong. */
+/**
+ * Three bars and a line. Only the generated passphrase ([generated]) is called strong: for a typed
+ * password the estimate is an upper bound, since it can't recognise a well-known phrase.
+ */
 @Composable
-private fun StrengthMeter(bits: Int) {
+private fun StrengthMeter(bits: Int, generated: Boolean) {
     val x = LocalExtra.current
     val (level, msg, color) = when {
+        generated -> Triple(3, "Strong · ≈$bits bits · generated at random", x.success)
         bits < 50 -> Triple(1, "Weak · ≈$bits bits · can be cracked offline. Use a passphrase.", MaterialTheme.colorScheme.error)
-        bits < 70 -> Triple(2, "Fair · ≈$bits bits · a longer passphrase would be safer.", x.fair)
-        else -> Triple(3, "Strong · ≈$bits bits", x.success)
+        else -> Triple(
+            2,
+            "≈$bits bits at most · SeedTag can't rate a password you chose: well-known phrases, quotes, names " +
+                "and dates are much weaker than they look. The generated passphrase is safer.",
+            x.fair,
+        )
     }
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -1844,7 +1852,7 @@ private fun Dialogs(vm: SeedTagViewModel) {
         is Dialog.ConfirmWeakPassword -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },
-            title = { Text("Weak password") },
+            title = { Text(if (d.weak) "Weak password" else "Use your own password?") },
             text = {
                 GuardDialogWindow()
                 val parts = buildList {
@@ -1855,6 +1863,13 @@ private fun Dialogs(vm: SeedTagViewModel) {
                         add(
                             "This password's strength is estimated at only about ${d.bits} bits. Anyone who gets hold of the " +
                                 "tag can try passwords offline without limit, and a password this weak could be guessed.",
+                        )
+                    } else {
+                        add(
+                            "SeedTag can't tell how guessable a password you chose is: its estimate (≈${d.bits} bits at most) " +
+                                "only looks at length and characters. Well-known phrases, quotes, lyrics, names and dates are in " +
+                                "every cracking list, however long they are. Use your own password only if it's truly random, " +
+                                "for example from a password manager or dice.",
                         )
                     }
                     add(
