@@ -41,17 +41,17 @@
   only for the generated passphrase; discount typed word phrases and flag runs of adjacent list indexes.
 - [x] **#7 (Medium-Low): `seedtag.py` KDF fallback.** Also fall back on `UnsupportedAlgorithm`, test the
   vectors with every installed backend, and say which backend was used.
-- [ ] **#8 (Low): drop touches with `FLAG_WINDOW_IS_PARTIALLY_OBSCURED`** (Android 10–11), at least on the
-  confirm buttons, in the activity and in `GuardDialogWindow`.
+- [x] **#8 (Low): drop touches with `FLAG_WINDOW_IS_PARTIALLY_OBSCURED`** (Android 10–11), at least on the
+  confirm buttons, in the activity and in `GuardDialogWindow`. Still to try on an Android 10 or 11 phone.
 - [x] **#9 (Low): zeroable keypad prefix.** Keep it in a `CharArray`, show bullets while words are
   hidden, and make the README say plainly what's left in memory.
 - [x] **#10 (Low): `TagIo.perform` must never throw.** Final catch-all with a generic message; catch
   `OutOfMemoryError` around Argon2.
-- [ ] **#11 (Low): overwrite safety at the edges.**
-  - [x] A format guard for Type 5 tags (on `review-fixes-needs-device-test`; MIFARE Classic isn't covered).
+- [x] **#11 (Low): overwrite safety at the edges.**
+  - [x] A format guard for Type 5 tags (MIFARE Classic isn't covered). Still to try on a Type 5 tag.
   - [x] A message that says an interrupted overwrite may have destroyed the old content.
 - [ ] **#12 (Low): maintenance.**
-  - [x] Bouncy Castle 1.78.1 → 1.86 (on `review-fixes-needs-device-test`).
+  - [x] Bouncy Castle 1.78.1 → 1.86.
   - [ ] Update AGP (8.7.3; 8.13.2 / 9.5.1 out), Kotlin (2.0.21; 2.4.21 out), the Compose BOM (2024.12.01;
     2026.09.00 out), activity and lifecycle; check the Play target-API requirement. Needs a newer
     platform and build-tools in the Dockerfile, so a container rebuild.
