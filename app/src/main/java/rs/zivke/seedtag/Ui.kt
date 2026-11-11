@@ -1464,7 +1464,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                 when (result.matchesBackup) {
                     true -> add(Fact("Backup from this session", "Same seed", Tone.Success))
                     false -> add(
-                        Fact("Backup from this session", "A different seed (${vm.backupFingerprint}). Check that you scanned the right tag.", Tone.Caution),
+                        Fact("Backup from this session", "A different seed (${result.backupFingerprint}). Check that you scanned the right tag.", Tone.Caution),
                     )
                     null -> Unit
                 }

@@ -46,7 +46,8 @@ sealed interface MnemonicStatus {
 
 data class ScanPrompt(val title: String, val error: String? = null)
 /**
- * [matchesBackup]: compared with the backup written in this session, null if there was none.
+ * [matchesBackup]: compared with the backup written in this session ([backupFingerprint]), null if
+ * there was none.
  * [passwordFix]: what had to be ignored in the typed password before it matched.
  * [restored]: from Restore rather than Verify, so each tab shows only its own result.
  */
@@ -54,6 +55,7 @@ data class VerifyResult(
     val wordCount: Int,
     val fingerprint: String,
     val matchesBackup: Boolean? = null,
+    val backupFingerprint: String? = null,
     val passwordFix: PasswordFix = PasswordFix.None,
     val restored: Boolean = false,
 )
@@ -137,9 +139,12 @@ class SeedTagViewModel : ViewModel() {
         private set
     var generatedPassphrase by mutableStateOf(false)
         private set
+    /** Fingerprint of the backup last written and read back in this session. */
     var backupFingerprint by mutableStateOf<String?>(null)
         private set
     private var pendingText: String? = null
+    /** Fingerprint of [pendingText]: it becomes [backupFingerprint] only once the tag is written. */
+    private var pendingFingerprint: String? = null
     /** The non-empty tag the overwrite dialog asked about: Overwrite applies to it alone. */
     private var overwriteTarget: OverwriteTarget? = null
     /** Tag text (Base64 blob, no secret) last written or decrypted: the only tag Lock will touch. */
@@ -408,7 +413,7 @@ class SeedTagViewModel : ViewModel() {
                     )
                 }
                 val (text, fp) = sealed
-                backupFingerprint = fp
+                pendingFingerprint = fp
                 pendingText = text
                 arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write the backup")
             } catch (e: SeedTagException) {
@@ -545,6 +550,10 @@ class SeedTagViewModel : ViewModel() {
             is TagResult.Written -> {
                 closePrompt()
                 _haptics.tryEmit(Haptic.Success)
+                // A Verify or Restore from before this backup describes another tag, or compared
+                // with an older backup: clear it, and a password typed there.
+                backupFingerprint = pendingFingerprint
+                readAnother()
                 wipeBackup()
                 lockTarget = r.text
                 step = BackupStep.Done
@@ -591,7 +600,7 @@ class SeedTagViewModel : ViewModel() {
                     } finally { opened.entropy.fill(0) }
                 }
                 if (wipes != wipesAtStart) return@launch
-                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, fix, restored = reveal)
+                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix, restored = reveal)
                 lockTarget = text
                 if (reveal) restoredWords = words
                 clearPasswords(PwField.Read)
@@ -672,7 +681,7 @@ class SeedTagViewModel : ViewModel() {
 
     private fun wipeBackup() {
         words.clear(); clearPrefix(); clearPasswords(PwField.Password, PwField.Repeat); hideWords = true; wordCount = 24
-        generatedPassphrase = false; pendingText = null; overwriteTarget = null
+        generatedPassphrase = false; pendingText = null; pendingFingerprint = null; overwriteTarget = null
     }
 
     /** Called when the app leaves the foreground: drop every secret from the UI state. */

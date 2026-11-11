@@ -94,6 +94,11 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- A Verify or Restore result from before a new backup is cleared once the
+  backup is written, instead of staying on its tab and comparing with the
+  wrong backup. *Backup from this session* now only changes once a tag has
+  really been written, not already when a write was started and then
+  canceled or failed.
 - A tag that can't be read properly is no longer taken for an empty one. If
   every read of an NTAG or MIFARE Ultralight tag finds no message, the app
   checks the tag's raw data before writing to it without asking, and asks
