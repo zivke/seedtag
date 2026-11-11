@@ -743,7 +743,9 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
             Tone.Caution,
             "Go offline first",
             "SeedTag can't go online, but other apps on this phone can – and malware could send out whatever you type or see here.",
-            "The safest way to use this application is on a spare phone that's never online. Otherwise, restart the phone, turn on airplane mode and check " +
+            "The safest way to use this application is on a spare phone that's never online. If you don't have " +
+                "one, you can also use your everyday phone, but be aware that it carries a risk that can be reduced, " +
+                "not completely removed, by doing the following: restart the phone, turn on airplane mode and check " +
                 "that Wi-Fi and Bluetooth are off (NFC normally stays on). When you're done, $restart",
         )
     }

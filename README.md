@@ -127,7 +127,8 @@ seed. From safest down:
    mobile data. Copy the APK over by USB or SD card and check its SHA-256 first. An old phone is fine, though
    Android 12+ hides other apps' overlays and Android 14+ shuts out accessibility services (see
    [Warnings](#warnings-other-apps-on-the-phone)). Factory-reset it again before you give it away.
-2. **Your everyday phone, offline:**
+2. **Your everyday phone, offline**, if you don't have a spare one. Be aware that it carries a risk that the
+   following reduces, but can't completely remove:
    - restart it before you start;
    - turn on airplane mode, and check that Wi-Fi and Bluetooth are off too: they can be switched back on in
      airplane mode. NFC normally stays on; if the app says NFC is off, switch NFC back on;

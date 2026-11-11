@@ -7,6 +7,9 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- *Go offline first* says plainly that using your everyday phone, if you
+  don't have a spare one, carries a risk that restarting it and turning on
+  airplane mode reduce but can't completely remove.
 - *Read every screen carefully* now says to read everything before you
   actually do anything, not just before you tap.
 - Bouncy Castle, used only for Argon2id, updated from 1.78.1 to 1.86. The
