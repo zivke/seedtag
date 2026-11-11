@@ -526,6 +526,16 @@ class SeedTagViewModel : ViewModel() {
                         "chips, someone holding it could still lock it against reading.",
                 )
             }
+            is TagResult.AlreadyReadOnly -> {
+                if (stale) return
+                scanPrompt = null
+                _haptics.tryEmit(Haptic.Tick)
+                dialog = Dialog.Info(
+                    "Already read-only",
+                    "This tag was already read-only, so SeedTag didn't change it. It can't tell whether that's permanent: " +
+                        "some tags are only marked read-only and can still be rewritten with other tools.",
+                )
+            }
             is TagResult.Read -> {
                 if (stale) return
                 scanPrompt = null

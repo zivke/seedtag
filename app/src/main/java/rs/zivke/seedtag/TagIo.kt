@@ -72,6 +72,8 @@ sealed interface TagResult {
     data class WrittenUnchecked(val text: String) : TagResult
     data class Read(val text: String) : TagResult
     data object Locked : TagResult
+    /** Lock found the tag already not writable: nothing was changed, and it may not be permanent. */
+    data object AlreadyReadOnly : TagResult
     /** Tag already holds data; [existing] is its text if it was a Text record; [target] identifies it. */
     data class NotEmpty(val existing: String?, val target: OverwriteTarget) : TagResult
     data class Failed(val message: String) : TagResult
@@ -233,8 +235,15 @@ object TagIo {
             if (firstText(msg) != expected) {
                 return TagResult.Failed("This isn't the tag you last wrote or verified. Nothing was changed.")
             }
-            if (!it.isWritable) return TagResult.Locked
-            if (!it.canMakeReadOnly()) return TagResult.Failed("This tag can't be made read-only.")
+            // Android reports a tag as not writable from its capability container alone, which can be
+            // set without the lock bits: SeedTag made no change and can't tell whether it's permanent.
+            if (!it.isWritable) return TagResult.AlreadyReadOnly
+            if (!it.canMakeReadOnly()) {
+                return TagResult.Failed(
+                    "This tag can't be made read-only from this phone. Android usually only offers it for NFC Forum Type 1 " +
+                        "and 2 tags (NTAG, MIFARE Ultralight). Nothing was changed.",
+                )
+            }
             return if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Locking failed. The tag is unchanged.")
         }
     }

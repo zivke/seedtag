@@ -87,9 +87,10 @@
   are shown, with the app's own idle timeout; map Back to the step's Back button.
 - [x] **#8 (Low): an old app meeting a newer format.** "Written by a newer version" message, and treat any
   plausible SeedTag blob version as a backup in the overwrite warning, in the app and `seedtag.py`.
-- [ ] **#9 (Low): Lock says "now permanently read-only" for a tag that was already not writable.** Separate
-  result and message (can go to `main` now); test Lock on a Type 4 and a Type 5 tag and note it in the
-  README table.
+- [ ] **#9 (Low): Lock says "now permanently read-only" for a tag that was already not writable.**
+  - [x] Separate result and message; the "can't be made read-only" message and the README say that Android
+    usually only locks Type 1 and 2 tags.
+  - [ ] Test Lock on a Type 4 and a Type 5 tag, and note the result in the README table.
 - [ ] **#10 (Low): no warning about adb.** Preflight item for USB / wireless debugging; listen for
   accessibility changes while in the foreground.
 - [x] **#11 (Low): a BIP39 passphrase ("25th word") isn't stored.** Say so on the Words step and in the

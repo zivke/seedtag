@@ -259,8 +259,11 @@ chip's own password settings open. Someone holding the tag for a few seconds can
 own, and no phone can read the backup again. Nothing leaks, but that copy is lost. So keep the tag where strangers
 can't reach it (a metal box or a shielding sleeve also stops it being read from a distance), don't carry it
 around, and keep other copies of the seed. Only Ultralight C has been tested with SeedTag: try
-any other tag with your phone (write, verify, restore) before relying on it. A tag mounted on metal needs an
-on-metal version.
+any other tag with your phone (write, verify, restore) before relying on it. **Make tag read-only** uses Android's
+own lock, which phones usually only offer for Type 1 and 2 tags (NTAG, MIFARE Ultralight): on the Type 4 and 5 tags
+above (NTAG 424 DNA, DESFire, ICODE, ST25TV) expect it to be refused (untested). If a tag is already read-only, the
+app says so and doesn't call it locked, since it can't tell whether that's permanent. A tag mounted on metal needs
+an on-metal version.
 
 **Avoid:**
 

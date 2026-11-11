@@ -56,6 +56,11 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- **Make tag read-only** on a tag that was already read-only no longer says
+  it's "now permanently read-only": SeedTag changed nothing and can't tell
+  whether it's permanent, and now says so. On a tag Android can't lock, the
+  message says it's usually only possible for Type 1 and 2 tags (NTAG,
+  Ultralight); the README says the same.
 - Older and low-RAM phones are less likely to run out of memory during
   Argon2id, which needs 64 MiB at once: the app now asks Android for a larger
   heap (no permission involved).

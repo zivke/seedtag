@@ -148,7 +148,7 @@ during the other tests.
 | 3.2 | Screen timeout mid-entry (finding 7) | With a 30 s screen timeout, the screen goes off while you copy the passphrase or the restored words, and everything is wiped. | 🔍 |
 | 3.3 | Back gesture (finding 7) | A back swipe from the edge while typing on the keypad leaves the app and wipes the entry. | 🔍 |
 | 3.4 | Generate tapped twice (finding 2) | Fixed on `main`: see 1.24. | ⬜ |
-| 3.5 | "Already read-only" tag (finding 9) | Lock on a tag that was already not writable says "now permanently read-only". | 🔍 |
+| 3.5 | "Already read-only" tag (finding 9) | Fixed on `main`: Lock on a tag that's already read-only (verify it first) says "Already read-only", not "Tag locked". | ⬜ |
 | 3.6 | Late results (finding 12) | Double-tap **Encrypt & write**; Cancel right as a write finishes; look for a scan that's still armed with no prompt on screen. | 🔍 |
 | 3.7 | Unreadable tag treated as empty (finding 14) | Hard to provoke: a tag with data at a marginal position, written without the overwrite prompt. | 🔍 |
 | 3.8 | NFC toggled from quick settings (finding 14) | Turn NFC off and on from the shade while SeedTag is open; tags must still reach the app. | 🔍 |
