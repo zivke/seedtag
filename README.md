@@ -320,9 +320,13 @@ next to a partly readable copy of the seed.
 
 ## Recovering on a computer
 
-`tools/seedtag.py` is self-contained (it embeds the official wordlist, SHA-256 `2f5eed53…dbda`). It only needs `cryptography` ≥ 44.
-If your `cryptography` is older, or was built without Argon2id, it uses `argon2-cffi` for the key derivation instead
-(same bytes; `pip install argon2-cffi`), and it says which one it used:
+`tools/seedtag.py` is a single file (it embeds the official wordlist, SHA-256 `2f5eed53…dbda`) and needs Python 3.8 or
+later and the `cryptography` package, for AES-GCM. Argon2id comes from `cryptography` ≥ 44; if yours is older, or
+was built without Argon2id, it uses `argon2-cffi` for the key derivation instead (same bytes; `pip install
+argon2-cffi`), and it says which one it used. Without `cryptography` it says what to install.
+
+**Keep a copy of `seedtag.py` with your written password**, printed or on a USB stick, and the packages' installers
+if you can (`pip download cryptography`). With them, recovering a tag needs neither this app nor this website.
 
 ```bash
 pip install cryptography          # do this before going offline

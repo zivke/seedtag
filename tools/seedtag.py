@@ -24,6 +24,9 @@ is embedded below. Needs `cryptography` (AES-GCM); Argon2id comes from
 `cryptography` >= 44 if it has it, otherwise from `argon2-cffi`. Both give the
 same bytes, and the tool says which one it used.
 
+Needs Python 3.8 or later. Keep a copy of this file with your written password:
+it's all you need, apart from Python and the packages above, to recover a tag.
+
 Run it on an offline machine.
 
     python3 seedtag.py encrypt          # words + password -> Base64 blob
@@ -41,6 +44,8 @@ Format v1 (all multi-byte fields raw bytes):
     entropy= raw BIP39 entropy: 16/20/24/28/32 bytes for 12/15/18/21/24 words
     on tag = NDEF Text record, lang "en", UTF-8, standard Base64 with padding
 """
+from __future__ import annotations  # list[str], bytes | None: not evaluated, so Python 3.8 works
+
 import base64
 import getpass
 import hashlib
@@ -317,9 +322,19 @@ def derive_key(password: str, salt: bytes) -> bytes:
                    "Install one: pip install 'cryptography>=44' or pip install argon2-cffi")
 
 
-def _aesgcm(key):
-    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    return AESGCM(key)
+class NoAesGcm(ValueError):
+    pass
+
+
+def _aesgcm():
+    """(AESGCM, InvalidTag) from `cryptography`, checked before the slow key derivation."""
+    try:
+        from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    except ImportError:
+        raise NoAesGcm("AES-GCM needs the cryptography package, which isn't installed. "
+                       "Install it: pip install cryptography") from None
+    return AESGCM, InvalidTag
 
 
 def seal(entropy: bytes, password: str, salt: bytes | None = None,
@@ -329,7 +344,8 @@ def seal(entropy: bytes, password: str, salt: bytes | None = None,
     salt = salt if salt is not None else os.urandom(SALT_LEN)
     nonce = nonce if nonce is not None else os.urandom(NONCE_LEN)
     header = bytes([VERSION])
-    ct = _aesgcm(derive_key(password, salt)).encrypt(nonce, entropy, header)
+    aesgcm, _ = _aesgcm()
+    ct = aesgcm(derive_key(password, salt)).encrypt(nonce, entropy, header)
     return header + salt + nonce + ct
 
 
@@ -346,9 +362,9 @@ def open_blob(blob: bytes, password: str) -> bytes:
     salt = blob[1:1 + SALT_LEN]
     nonce = blob[1 + SALT_LEN:1 + SALT_LEN + NONCE_LEN]
     ct = blob[1 + SALT_LEN + NONCE_LEN:]
-    from cryptography.exceptions import InvalidTag
+    aesgcm, InvalidTag = _aesgcm()
     try:
-        return _aesgcm(derive_key(password, salt)).decrypt(nonce, ct, blob[:1])
+        return aesgcm(derive_key(password, salt)).decrypt(nonce, ct, blob[:1])
     except InvalidTag:
         raise WrongPassword("wrong password or corrupted blob") from None
 

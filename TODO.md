@@ -77,8 +77,8 @@
   - [ ] No push credentials in the container (turn off VS Code's credential forwarding); protect `v*`
     tags on GitHub.
 - [ ] **#4 (Medium-Low): recovery needs third-party packages.**
-  - [ ] Catch `ImportError` in `seedtag.py` and say what to install; state the minimum Python version.
-  - [ ] README and Done screen: keep a copy of `seedtag.py` with the written password.
+  - [x] Catch `ImportError` in `seedtag.py` and say what to install; state the minimum Python version.
+  - [x] README and Done screen: keep a copy of `seedtag.py` with the written password.
   - [ ] Pure-Python decrypt-only fallback (Argon2id and AES-GCM), tested against the vectors.
 - [ ] **#5 (Low): the `cryptography` Argon2id backend is never tested.** CI step with a hash-pinned
   `cryptography` ≥ 44 that fails on a skipped backend; add 18- and 21-word vectors.

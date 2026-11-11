@@ -1304,6 +1304,8 @@ private fun DoneStep(vm: SeedTagViewModel) {
             listOf(
                 "Go to Verify and decrypt the tag by typing the password from your written copy.",
                 "Optionally, recover it on an offline computer with seedtag.py.",
+                "Keep a copy of seedtag.py (printed, or on a USB stick) with your written password: with Python, " +
+                    "it's all anyone needs to recover the tag, even if SeedTag and its website are gone.",
                 "Only then lock the tag (on the Verify tab – it's permanent) and keep another backup of the seed somewhere else.",
             ),
         )

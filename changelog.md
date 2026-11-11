@@ -48,6 +48,12 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- `seedtag.py` says what to install when the `cryptography` package is
+  missing, instead of stopping with a traceback, and checks this before the
+  slow key derivation. It now runs on Python 3.8 and later (it needed 3.10).
+- The Done screen and the README advise keeping a copy of `seedtag.py` with
+  the written password, so a tag can be recovered even if SeedTag and its
+  website are gone.
 - A Type 5 tag (ICODE, ST25TV) that already holds data is no longer
   formatted, wiping it without asking, when a too-quick tap made Android miss
   its data: as with NTAG and Ultralight tags, the app asks you to hold it again.

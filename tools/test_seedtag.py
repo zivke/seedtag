@@ -131,6 +131,22 @@ class Argon2Backends(unittest.TestCase):
         self.assertIsInstance(cm.exception, ValueError)  # main() prints it as FAIL, no traceback
         self.assertIn("pip install", str(cm.exception))
 
+    def test_no_aes_gcm_is_a_clear_error(self):
+        blob = base64.b64decode(rows("seedtag-v1-vectors.tsv")[0][4])
+        real_import = __import__
+
+        def no_cryptography(name, *args, **kwargs):
+            if name.split(".")[0] == "cryptography":
+                raise ImportError(name)
+            return real_import(name, *args, **kwargs)
+        with mock.patch("builtins.__import__", no_cryptography), \
+                mock.patch.object(seedtag, "derive_key", side_effect=AssertionError("Argon2 ran first")):
+            for call in (lambda: seedtag.open_blob(blob, "x"), lambda: seedtag.seal(bytes(16), "x")):
+                with self.assertRaises(seedtag.NoAesGcm) as cm:
+                    call()
+                self.assertIsInstance(cm.exception, ValueError)  # main() prints it as FAIL, no traceback
+                self.assertIn("pip install cryptography", str(cm.exception))
+
     @staticmethod
     def _works(backend):
         try:
