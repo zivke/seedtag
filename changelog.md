@@ -56,6 +56,9 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- Older and low-RAM phones are less likely to run out of memory during
+  Argon2id, which needs 64 MiB at once: the app now asks Android for a larger
+  heap (no permission involved).
 - The app and `seedtag.py` now agree on every password edge case: both use
   the same explicit list of whitespace (the app missed U+0085), and the app
   lower-cases letters outside the Basic Multilingual Plane too. Neither can

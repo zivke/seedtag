@@ -144,7 +144,7 @@ during the other tests.
 
 | # | Test | What to look for | Status |
 |---|---|---|---|
-| 3.1 | Old low-RAM phone (finding 6) | Back up, Verify and Restore all run out of memory. Same as 1.18. | 🔍 |
+| 3.1 | Old low-RAM phone (finding 6) | `largeHeap` is now on: check 1.18 on the oldest phone available. | ⬜ |
 | 3.2 | Screen timeout mid-entry (finding 7) | With a 30 s screen timeout, the screen goes off while you copy the passphrase or the restored words, and everything is wiped. | 🔍 |
 | 3.3 | Back gesture (finding 7) | A back swipe from the edge while typing on the keypad leaves the app and wipes the entry. | 🔍 |
 | 3.4 | Generate tapped twice (finding 2) | Fixed on `main`: see 1.24. | ⬜ |
