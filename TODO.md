@@ -70,12 +70,12 @@
 - [x] **#2 (Medium): a generated passphrase is never checked against the written copy.** Leave Repeat
   empty and have the user type it back from paper; confirm before Generate replaces one.
 - [ ] **#3 (Medium): `--expect` proves the build, not the source, and the container can push to GitHub.**
-  - [ ] Sign from a fresh clone on the signing machine, and review `git diff <last tag>..<new tag>` there
+  - [x] Sign from a fresh clone on the signing machine, and review `git diff <last tag>..<new tag>` there
     (README).
-  - [ ] Signed release tags (`git tag -s`, key outside the container), checked by `sign-release.sh`.
-  - [ ] Make `--expect` mandatory, with an explicit `--no-expect`.
+  - [x] Signed release tags (`git tag -s`, key outside the container), checked by `sign-release.sh`.
+  - [x] Make `--expect` mandatory, with an explicit `--no-expect`.
   - [ ] No push credentials in the container (turn off VS Code's credential forwarding); protect `v*`
-    tags on GitHub.
+    tags on GitHub. Documented in `.devcontainer/README.md`; it's a host setting, for the user to apply.
 - [ ] **#4 (Medium-Low): recovery needs third-party packages.**
   - [x] Catch `ImportError` in `seedtag.py` and say what to install; state the minimum Python version.
   - [x] README and Done screen: keep a copy of `seedtag.py` with the written password.

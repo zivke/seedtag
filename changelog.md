@@ -13,6 +13,13 @@ All notable user-visible changes to SeedTag. The format follows
   shows these settings without any permission.
 
 ### Changed
+- Releasing: `tools/sign-release.sh` now requires `--expect` (or an explicit
+  `--no-expect`), and refuses to sign from a clone with uncommitted changes,
+  unless `HEAD` is a `vX.Y.Z` tag that `git verify-tag` accepts (or
+  `--no-verify-tag`), or if the APK was built from a different commit. The
+  README's signing steps now sign from a fresh clone of a signed tag, after
+  reviewing the diff since the last release, and `.devcontainer/README.md`
+  explains how to take GitHub push access away from the container.
 - A generated passphrase is now typed back from the written copy: *Repeat
   password* starts empty, and after **I've written it down** the passphrase
   is hidden while you type it, so a mistake in the copy is caught before the

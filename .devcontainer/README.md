@@ -15,6 +15,23 @@ Android's debug key, which lives in the `android-adb` volume.
 Debug-key and release-key builds can't be installed over each other, so
 switching between them on the device needs `make uninstall` first.
 
+## No push access from the container (recommended)
+
+VS Code forwards your host's git credentials into the container (a credential
+helper in `/etc/gitconfig` and `~/.gitconfig`), so anything running here can
+push commits and tags to GitHub as you. The CI build that `sign-release.sh
+--expect` relies on then proves nothing about the source: whatever the
+container pushed, CI builds and "confirms". To close that:
+
+1. In VS Code on the host, set `"dev.containers.gitCredentialHelperConfigLocation":
+   "none"` in your user settings, then rebuild the container. Commit here, but
+   push from the host (`git push` there, from the same repository folder).
+2. Create release tags only on the host, signed: `git tag -s vX.Y.Z`. The
+   signing machine checks them (`sign-release.sh` runs `git verify-tag`).
+3. Optionally add a tag ruleset on GitHub (Settings › Rules) that restricts
+   creating and moving `v*` tags. It only helps once the container has no
+   credentials, since otherwise it acts as you.
+
 ## What is in the image
 
 Ubuntu 24.04 (`mcr.microsoft.com/devcontainers/base`), OpenJDK 21, Python 3

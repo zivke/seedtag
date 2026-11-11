@@ -54,15 +54,30 @@ agent) can read it and sign a fake update. Sign on the machine that holds the ke
 only the Android build-tools (`apksigner`, `aapt2`) installed:
 
 ```sh
-make build                                    # in the container: seedtag-unsigned.apk, prints its SHA-256
-# push the vX.Y.Z tag: its GitHub Actions run shows the SHA-256 of its own build (see Build integrity)
-tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # on the signing machine: writes seedtag.apk
-make run                                      # back in the container: install seedtag.apk and open it
+make build                       # in the container: seedtag-unsigned.apk, prints its SHA-256
+git tag -s vX.Y.Z && git push origin vX.Y.Z    # on the host, not in the container: a signed tag
+# the tag's GitHub Actions run shows the SHA-256 of its own build (see Build integrity)
+
+# on the signing machine, in a fresh clone (not the container's working tree):
+git clone https://github.com/zivke/seedtag && cd seedtag && git checkout vX.Y.Z
+git diff vPREVIOUS..vX.Y.Z       # review what changed: the source, tools/ and .github/
+cp /path/to/seedtag-unsigned.apk .             # from the container, or the CI run's artifact
+tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # writes seedtag.apk
 ```
 
-`sign-release.sh` refuses to sign unless the unsigned APK matches the independent build given with `--expect`
-(without it, it warns and signs anyway), checks the permissions, signs, and deletes the result unless it carries
-the release certificate:
+Then install `seedtag.apk` with `make run` back in the container (copy it there), or `adb install` from the
+signing machine.
+
+`sign-release.sh` checks everything before the key is used, and refuses to sign if:
+- the unsigned APK doesn't match the independent build given with `--expect`. That's required: `--no-expect`
+  skips the comparison, with a warning;
+- the clone has uncommitted changes, so an edited script in a shared working tree can't run next to your key;
+- `HEAD` isn't exactly a `vX.Y.Z` tag, or `git verify-tag` doesn't accept its signature (`--no-verify-tag` skips
+  that check, with a warning);
+- the APK says it was built from a different commit (`META-INF/version-control-info.textproto`);
+- the APK asks for any other permission.
+
+Then it signs, and deletes the result unless it carries the release certificate:
 
 ```
 SHA-256 29370bf9dc6a272f18b3fbac01837c262bcec4035de162dad4fc5175291ae82c   (tools/release-cert.sha256)
@@ -71,13 +86,18 @@ SHA-256 29370bf9dc6a272f18b3fbac01837c262bcec4035de162dad4fc5175291ae82c   (tool
 That's also the digest to compare when you install an APK from elsewhere
 (`apksigner verify --print-certs seedtag.apk`).
 
-Two caveats:
+What each step protects against:
 
-- The container can write to the repository, scripts included. Before running `sign-release.sh` with your key,
-  check it hasn't changed unexpectedly: `git log -p -- tools/sign-release.sh tools/check-apk.sh`.
-- Signing outside protects the key, not the build. If the container were compromised, the unsigned APK could
-  already be tampered with, and the permission check wouldn't notice a weakened encryption. That's what
-  `--expect` is for: sign only an APK that's byte-for-byte the same as a build made somewhere else.
+- **Signing outside protects the key, not the build.** If the container were compromised, the unsigned APK could
+  already be tampered with, and the permission check wouldn't notice a weakened encryption. `--expect` catches
+  that: sign only an APK that's byte-for-byte the same as a build made somewhere else.
+- **`--expect` proves the build, not the source.** CI builds whatever commit the tag points at. The container can
+  write to the repository, and with VS Code's forwarded git credentials it can push commits and tags too. So: take
+  push access away from the container (see `.devcontainer/README.md`, "No push access from the container"),
+  create release tags only on the host with `git tag -s`, and **review `git diff vPREVIOUS..vX.Y.Z` on the signing
+  machine** before signing. That review is the only defence for the source itself.
+- **A fresh clone** on the signing machine means the script that runs next to your key is the one in the
+  reviewed tag, not one the container could have edited in its working tree.
 
 Keep a backup of the key: without it no update can ever be installed over the app.
 

@@ -42,11 +42,14 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   requests any permission except NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`**
   (overlay hiding on Android 12+, and the NFC-spot finder's buzz; neither
   gives access to anything).
-- `tools/sign-release.sh [--expect <sha256>] <keystore>` runs outside the
-  container: refuses an unsigned APK that doesn't match the independent build
-  (`--expect`, the SHA-256 from the GitHub Actions run of the same commit),
-  signs `seedtag-unsigned.apk` into `seedtag.apk` and refuses any certificate
-  but the one in `tools/release-cert.sha256`; it also writes `seedtag.apk.sha256`.
+- `tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] <keystore>`
+  runs outside the container, in a fresh clone at the release tag: refuses an
+  unsigned APK that doesn't match the independent build (`--expect`, the
+  SHA-256 from the GitHub Actions run of the tag), a clone with uncommitted
+  changes, a HEAD that isn't a `v*` tag accepted by `git verify-tag`, and an
+  APK whose recorded commit isn't HEAD. It signs `seedtag-unsigned.apk` into
+  `seedtag.apk`, refuses any certificate but the one in
+  `tools/release-cert.sha256`, and writes `seedtag.apk.sha256`.
   The release build is reproducible; keep it that way (no timestamps, paths or
   other machine-specific data in the APK). `make install` / `make run` install that
   signed `seedtag.apk`; they never build or sign.
@@ -162,8 +165,10 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   `Added` entry bumps MINOR; only fixes bump PATCH.
 - Releasing (only when asked): rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`,
   bump `versionCode` by 1 and set `versionName` to `X.Y.Z` in
-  `app/build.gradle.kts`, commit, then create the annotated tag `vX.Y.Z` and
-  run `make build`. The user signs `seedtag-unsigned.apk` outside the container.
+  `app/build.gradle.kts`, commit, and run `make build`. The user creates the
+  signed tag `vX.Y.Z` (`git tag -s`, with a key that isn't in the container),
+  pushes it and signs `seedtag-unsigned.apk`, all outside the container. Never
+  create or push a release tag from the container.
 - Branching: small fixes and changes go on the current branch; new features
   and bigger or more significant changes get a separate branch.
 - Never commit `*.p12` / `*.jks` / `*.keystore`, `.env` or an APK (`.gitignore`
