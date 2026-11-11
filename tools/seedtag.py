@@ -54,6 +54,7 @@ import sys
 import unicodedata
 
 VERSION = 0x01
+MAX_FUTURE_VERSION = 0x0F  # a first byte above VERSION up to this is a newer SeedTag format
 SALT_LEN, NONCE_LEN, TAG_LEN = 16, 12, 16
 ARGON_T, ARGON_M_KIB, ARGON_P, KEY_LEN = 3, 65536, 1, 32
 
@@ -355,7 +356,10 @@ class WrongPassword(ValueError):
 
 def open_blob(blob: bytes, password: str) -> bytes:
     if not blob or blob[0] != VERSION:
-        raise ValueError(f"unsupported blob version: {blob[:1].hex() or 'empty'}")
+        if blob and VERSION < blob[0] <= MAX_FUTURE_VERSION:
+            raise ValueError(f"this tag was written by a newer version of SeedTag (format {blob[0]}): "
+                             "use a current seedtag.py")
+        raise ValueError(f"not a SeedTag backup (unknown format {blob[:1].hex() or 'empty'})")
     ent_len = len(blob) - 1 - SALT_LEN - NONCE_LEN - TAG_LEN
     if ent_len not in (16, 20, 24, 28, 32):
         raise ValueError(f"bad blob length {len(blob)}")

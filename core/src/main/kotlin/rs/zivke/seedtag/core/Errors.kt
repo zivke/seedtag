@@ -14,8 +14,14 @@ sealed class SeedTagException(message: String) : Exception(message) {
     class BadChecksum :
         SeedTagException("Checksum mismatch – one or more words are wrong or in the wrong order.")
 
-    class UnsupportedVersion(version: Int) :
-        SeedTagException("Unsupported tag format version 0x%02x.".format(version))
+    class UnsupportedVersion(version: Int) : SeedTagException(
+        if (version in SeedBox.VERSION + 1..SeedBox.MAX_FUTURE_VERSION) {
+            "This tag was written by a newer version of SeedTag (format $version). Update the app, or use a " +
+                "current seedtag.py."
+        } else {
+            "The tag data isn't a SeedTag backup (unknown format 0x%02x).".format(version)
+        },
+    )
 
     class Malformed(detail: String) :
         SeedTagException("The tag data isn't a valid SeedTag backup ($detail).")

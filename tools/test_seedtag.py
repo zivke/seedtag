@@ -85,6 +85,16 @@ class SeedBoxV1(unittest.TestCase):
             with self.assertRaises(ValueError, msg=f"pos {pos}"):
                 seedtag.open_blob(bytes(blob), pw)
 
+    def test_newer_format_says_so(self):
+        pw, _, _, _, b64, _ = self.vecs[0]
+        blob = bytearray(base64.b64decode(b64))
+        blob[0] = 0x02
+        with self.assertRaisesRegex(ValueError, "newer version of SeedTag"):
+            seedtag.open_blob(bytes(blob), pw)
+        blob[0] = 0x80
+        with self.assertRaisesRegex(ValueError, "not a SeedTag backup"):
+            seedtag.open_blob(bytes(blob), pw)
+
     def test_random_round_trip_fits_tag(self):
         ent = bytes(range(32))
         blob = seedtag.seal(ent, "pw")

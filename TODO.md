@@ -85,7 +85,7 @@
 - [ ] **#6 (Low): Argon2's 64 MiB on the Java heap.** `android:largeHeap="true"`, tried on an old phone.
 - [ ] **#7 (Low): screen timeout or Back wipes everything mid-entry.** Keep the screen on while secrets
   are shown, with the app's own idle timeout; map Back to the step's Back button.
-- [ ] **#8 (Low): an old app meeting a newer format.** "Written by a newer version" message, and treat any
+- [x] **#8 (Low): an old app meeting a newer format.** "Written by a newer version" message, and treat any
   plausible SeedTag blob version as a backup in the overwrite warning, in the app and `seedtag.py`.
 - [ ] **#9 (Low): Lock says "now permanently read-only" for a tag that was already not writable.** Separate
   result and message (can go to `main` now); test Lock on a Type 4 and a Type 5 tag and note it in the

@@ -928,6 +928,14 @@ private fun TagCheckResult(c: TagCheck) {
                     add(Fact("State", if (c.ndef) "Read without problems" else "Blank – it's formatted when the backup is written, then a second tap reads it back"))
                     when (c.content) {
                         TagContent.Backup -> add(Fact("Holds", "A SeedTag backup. A new backup would replace it (the app asks first).", Tone.Caution))
+                        TagContent.NewerBackup -> add(
+                            Fact(
+                                "Holds",
+                                "A backup from a newer version of SeedTag, which this version can't read. A new backup " +
+                                    "would replace it (the app asks first). Update the app to read it.",
+                                Tone.Caution,
+                            ),
+                        )
                         TagContent.Other -> add(Fact("Holds", "Other data, which the backup would replace (the app asks first).", Tone.Caution))
                         TagContent.Empty -> add(Fact("Holds", "Nothing yet"))
                     }

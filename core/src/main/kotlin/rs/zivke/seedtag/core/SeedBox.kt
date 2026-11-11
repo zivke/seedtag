@@ -198,6 +198,28 @@ object SeedBox {
 
     fun toBase64(blob: ByteArray): String = Base64.getEncoder().encodeToString(blob)
 
+    /**
+     * First bytes a future SeedTag might write: any version above [VERSION] up to this is taken for a
+     * newer backup, so an old app warns before overwriting one and says why it can't read it.
+     */
+    const val MAX_FUTURE_VERSION = 0x0F
+
+    /** Blob sizes a backup could have: the smallest v1 blob, up to a margin for a future format. */
+    private val BACKUP_SIZES = (OVERHEAD + 16)..200
+
+    enum class Kind { Current, Newer, NotBackup }
+
+    /** What a tag's [text] looks like, from its first byte and size only: nothing is decrypted. */
+    fun kindOf(text: String?): Kind {
+        val blob = text?.let { runCatching { fromBase64(it) }.getOrNull() } ?: return Kind.NotBackup
+        if (blob.size !in BACKUP_SIZES) return Kind.NotBackup
+        return when (blob[0].toInt()) {
+            VERSION -> Kind.Current
+            in VERSION + 1..MAX_FUTURE_VERSION -> Kind.Newer
+            else -> Kind.NotBackup
+        }
+    }
+
     /** Accepts Base64 with arbitrary whitespace. */
     fun fromBase64(text: String): ByteArray = try {
         Base64.getDecoder().decode(text.filterNot { it.isWhitespace() })

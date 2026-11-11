@@ -48,6 +48,11 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- A backup written by a future SeedTag version (a newer format) is
+  recognised as a backup: the tag check says so, and overwriting it warns
+  that it destroys a backup, not just "other data". Verify and Restore say
+  the tag was written by a newer version and to update the app, instead of
+  "Unsupported tag format version"; `seedtag.py` says the same.
 - `seedtag.py` says what to install when the `cryptography` package is
   missing, instead of stopping with a traceback, and checks this before the
   slow key derivation. It now runs on Python 3.8 and later (it needed 3.10).

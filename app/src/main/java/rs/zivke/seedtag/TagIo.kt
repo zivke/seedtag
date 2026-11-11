@@ -43,7 +43,7 @@ class OverwriteTarget(private val uid: ByteArray, private val message: ByteArray
     }
 }
 
-enum class TagContent { Empty, Backup, Other }
+enum class TagContent { Empty, Backup, NewerBackup, Other }
 
 /**
  * What the first Back up step found. [supported]: the tag can hold NDEF at all. [ndef]: it's
@@ -172,10 +172,14 @@ object TagIo {
             ndef.use {
                 it.connect()
                 val msg = readMessage(it)
-                val content = when {
-                    msg == null || msg.records.all { r -> r.tnf == NdefRecord.TNF_EMPTY } -> TagContent.Empty
-                    looksLikeBackup(runCatching { firstText(msg) }.getOrNull()) -> TagContent.Backup
-                    else -> TagContent.Other
+                val content = if (msg == null || msg.records.all { r -> r.tnf == NdefRecord.TNF_EMPTY }) {
+                    TagContent.Empty
+                } else {
+                    when (SeedBox.kindOf(runCatching { firstText(msg) }.getOrNull())) {
+                        SeedBox.Kind.Current -> TagContent.Backup
+                        SeedBox.Kind.Newer -> TagContent.NewerBackup
+                        SeedBox.Kind.NotBackup -> TagContent.Other
+                    }
                 }
                 return TagResult.Checked(TagCheck(true, ndef = true, capacity = it.maxSize, writable = it.isWritable, content = content))
             }
@@ -186,9 +190,8 @@ object TagIo {
         return TagResult.Checked(TagCheck(true, ndef = false, capacity = capacity, estimated = capacity != null))
     }
 
-    /** A SeedTag blob: Base64 that starts with a known version byte. */
-    fun looksLikeBackup(text: String?): Boolean =
-        text != null && runCatching { SeedBox.fromBase64(text) }.getOrNull()?.let { it.isNotEmpty() && it[0].toInt() == SeedBox.VERSION } == true
+    /** A SeedTag backup, of this format or a newer one ([SeedBox.kindOf]). */
+    fun looksLikeBackup(text: String?): Boolean = SeedBox.kindOf(text) != SeedBox.Kind.NotBackup
 
     private fun tooSmall(text: String, needed: Int, has: Int, estimated: Boolean): String {
         val words = (runCatching { SeedBox.fromBase64(text).size }.getOrDefault(0) - SeedBox.OVERHEAD) * 3 / 4

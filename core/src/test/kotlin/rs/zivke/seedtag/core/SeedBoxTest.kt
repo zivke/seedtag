@@ -113,4 +113,31 @@ class SeedBoxTest {
         assertEquals(77, Passphrase.estimateBits(p, random = true))
         assertTrue(Passphrase.estimateBits("hunter2".toCharArray()) < 40)
     }
+
+    @Test
+    fun kindOfTagText() {
+        val v1 = vectors[0].b64
+        val blob = SeedBox.fromBase64(v1)
+        fun withFirst(b: Int) = SeedBox.toBase64(blob.copyOf().also { it[0] = b.toByte() })
+        assertEquals(SeedBox.Kind.Current, SeedBox.kindOf(v1))
+        assertEquals(SeedBox.Kind.Newer, SeedBox.kindOf(withFirst(0x02)))
+        assertEquals(SeedBox.Kind.Newer, SeedBox.kindOf(withFirst(SeedBox.MAX_FUTURE_VERSION)))
+        assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(withFirst(0x00)))
+        assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(withFirst(0x10)))
+        assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(SeedBox.toBase64(blob.copyOf(40))))
+        assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf("https://example.com"))
+        assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(null))
+    }
+
+    @Test
+    fun newerFormatSaysSo() {
+        val v = vectors[0]
+        val blob = SeedBox.fromBase64(v.b64).also { it[0] = 0x02 }
+        try {
+            SeedBox.open(blob, v.password.toCharArray())
+            fail("opened a v2 blob")
+        } catch (e: SeedTagException.UnsupportedVersion) {
+            assertTrue(e.message!!, e.message!!.contains("newer version of SeedTag"))
+        }
+    }
 }
