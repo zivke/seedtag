@@ -149,6 +149,13 @@ class SeedTagViewModel : ViewModel() {
 
     fun backspacePassword(f: PwField) { buffer(f).removeLast(); passwordChanged(f) }
 
+    /** One repeat of a held ⌫ on the password keyboard: false once the field is empty. */
+    fun backspacePasswordHeld(f: PwField): Boolean {
+        if (buffer(f).isEmpty()) return false
+        backspacePassword(f)
+        return true
+    }
+
     /** Replaces the word being typed with [word] (a tapped BIP39 suggestion). */
     fun completePasswordWord(f: PwField, word: String) {
         val b = buffer(f)
@@ -240,6 +247,17 @@ class SeedTagViewModel : ViewModel() {
             !prefixBuf.isEmpty() -> { prefixBuf.removeLast(); prefixEdits++ }
             words.isNotEmpty() -> words.removeAt(words.lastIndex)
         }
+    }
+
+    /**
+     * One repeat of a held ⌫ on the word keypad: deletes a letter of the word being typed, and stops
+     * (false) at the start of the word. Entered words are only removed one tap at a time, so holding
+     * the key can't wipe the whole phrase.
+     */
+    fun backspaceLetter(): Boolean {
+        if (prefixBuf.isEmpty()) return false
+        prefixBuf.removeLast(); prefixEdits++
+        return true
     }
 
     fun pickWord(w: String) {

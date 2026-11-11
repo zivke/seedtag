@@ -7,6 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- Holding ⌫ keeps deleting, on the password keyboard and the word keypad.
+  On the keypad it stops at the start of the word being typed: words already
+  entered are still removed one tap at a time, so holding the key can't wipe
+  the phrase.
 - *Go offline first* says plainly that using your everyday phone, if you
   don't have a spare one, carries a risk that restarting it and turning on
   airplane mode reduce but can't completely remove.

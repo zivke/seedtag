@@ -21,11 +21,14 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -83,6 +86,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -106,6 +110,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
+import kotlinx.coroutines.delay
 import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
@@ -1001,7 +1006,7 @@ private fun WordsStep(vm: SeedTagViewModel) {
         bottom = {
             // Fixed height, so the keypad doesn't jump when the suggestions appear or disappear.
             Suggestions(vm.suggestions, vm::pickWord)
-            Keypad(onLetter = vm::typeLetter, onBackspace = vm::backspace)
+            Keypad(onLetter = vm::typeLetter, onBackspace = vm::backspace, onBackspaceHeld = vm::backspaceLetter)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = vm::backToLength) { Text("Back") }
                 TextButton(onClick = vm::clearWords, enabled = vm.words.isNotEmpty()) { Text("Clear") }
@@ -1092,7 +1097,7 @@ private fun WordGrid(words: List<String>, current: String? = null, hidden: Boole
 }
 
 @Composable
-private fun Keypad(onLetter: (Char) -> Unit, onBackspace: () -> Unit) {
+private fun Keypad(onLetter: (Char) -> Unit, onBackspace: () -> Unit, onBackspaceHeld: () -> Boolean) {
     val rows = listOf("qwertyuiop", "asdfghjkl", "zxcvbnm")
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         rows.forEachIndexed { i, r ->
@@ -1101,7 +1106,7 @@ private fun Keypad(onLetter: (Char) -> Unit, onBackspace: () -> Unit) {
                 if (i == 2) Spacer(Modifier.weight(1.5f))
                 r.forEach { c -> Key(c.toString(), Modifier.weight(1f)) { onLetter(c) } }
                 if (i == 1) Spacer(Modifier.weight(0.5f))
-                if (i == 2) Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, onClick = onBackspace)
+                if (i == 2) Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, onHold = onBackspaceHeld, onClick = onBackspace)
             }
         }
     }
@@ -1109,8 +1114,23 @@ private fun Keypad(onLetter: (Char) -> Unit, onBackspace: () -> Unit) {
 
 private enum class KeyKind { Char, Function, Active }
 
+/** A held key waits this long, then repeats [Key]'s `onHold` every [KEY_REPEAT_MS]. */
+private const val KEY_HOLD_MS = 400L
+private const val KEY_REPEAT_MS = 60L
+
+/**
+ * One keyboard key. A tap runs [onClick] on release. With [onHold], holding the key runs it after
+ * [KEY_HOLD_MS] and then every [KEY_REPEAT_MS] for as long as it returns true; a release after that
+ * isn't also a tap.
+ */
 @Composable
-private fun Key(label: String, modifier: Modifier, kind: KeyKind = KeyKind.Char, onClick: () -> Unit) {
+private fun Key(
+    label: String,
+    modifier: Modifier,
+    kind: KeyKind = KeyKind.Char,
+    onHold: (() -> Boolean)? = null,
+    onClick: () -> Unit,
+) {
     val c = MaterialTheme.colorScheme
     val bg = when (kind) {
         KeyKind.Char -> c.surfaceContainerHighest
@@ -1119,12 +1139,32 @@ private fun Key(label: String, modifier: Modifier, kind: KeyKind = KeyKind.Char,
     }
     val fg = if (kind == KeyKind.Active) c.onPrimary else c.onSurface
     val view = LocalView.current
+    val interaction = remember { MutableInteractionSource() }
+    var repeated by remember { mutableStateOf(false) }
+    if (onHold != null) {
+        val hold by rememberUpdatedState(onHold)
+        val pressed by interaction.collectIsPressedAsState()
+        LaunchedEffect(pressed) {
+            if (!pressed) return@LaunchedEffect
+            repeated = false
+            delay(KEY_HOLD_MS)
+            while (hold()) {
+                repeated = true
+                view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                delay(KEY_REPEAT_MS)
+            }
+        }
+    }
     Box(
         modifier
             .height(46.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
-            .clickable {
+            .clickable(interactionSource = interaction, indication = LocalIndication.current) {
+                if (repeated) {
+                    repeated = false
+                    return@clickable
+                }
                 view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
                 onClick()
             },
@@ -1418,6 +1458,7 @@ private fun PasswordKeyboard(vm: SeedTagViewModel, field: PwField) {
     TextKeyboard(
         onChar = { c -> vm.typePassword(field, c) },
         onBackspace = { vm.backspacePassword(field) },
+        onBackspaceHeld = { vm.backspacePasswordHeld(field) },
     )
 }
 
@@ -1434,7 +1475,7 @@ private val ACCENT_ROWS = listOf("áàâäãåąæçč", "ćđéèêëěęíî",
  * accented letters. Characters outside these sets can't be typed in the app.
  */
 @Composable
-private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit) {
+private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit, onBackspaceHeld: () -> Boolean) {
     var layer by remember { mutableStateOf(KeyLayer.Letters) }
     var shift by remember { mutableStateOf(Shift.Off) }
     val shiftable = layer == KeyLayer.Letters || layer == KeyLayer.Accents
@@ -1488,7 +1529,7 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit) {
             if (layer == KeyLayer.Accents) LayerKey("?123", KeyLayer.Symbols, Modifier.weight(1.5f))
             else LayerKey("àé", KeyLayer.Accents, Modifier.weight(1.5f))
             Key("space", Modifier.weight(5f), kind = KeyKind.Function) { onChar(' ') }
-            Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, onClick = onBackspace)
+            Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, onHold = onBackspaceHeld, onClick = onBackspace)
         }
     }
 }
