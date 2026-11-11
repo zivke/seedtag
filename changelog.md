@@ -21,7 +21,9 @@ All notable user-visible changes to SeedTag. The format follows
 - The screen no longer times out while seed words, a password or restored
   words are on the phone, which wiped them mid-entry. Instead, after
   3 minutes without a touch SeedTag asks *Still there?*, and clears
-  everything a minute later unless you tap **Keep**.
+  everything a minute later unless you tap **Keep**. While it asks, the
+  screen behind it is blurred (covered before Android 12), so words left
+  on screen aren't readable.
 
 ### Changed
 - Back no longer leaves the app with your input. On the Words and Password

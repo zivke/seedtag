@@ -93,6 +93,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
@@ -294,38 +295,45 @@ fun SeedTagApp(
     val prompting = vm.busy != null || vm.scanPrompt != null || vm.dialog != null
     var actionsDone by remember { mutableIntStateOf(0) }
     LaunchedEffect(prompting) { if (!prompting) actionsDone++ }
-    CompositionLocalProvider(
-        LocalAirplaneMode provides airplaneMode,
-        LocalDebugging provides debugging,
-        LocalOpenDeveloperSettings provides openDeveloperSettings,
-        LocalActionsDone provides actionsDone,
-    ) {
-        Scaffold(
-            containerColor = MaterialTheme.colorScheme.background,
-            topBar = {
-                Header(
-                    page = page,
-                    onBack = { vm.page = null },
-                    onFindSpot = { vm.page = Page.Antenna },
-                    onAbout = { vm.page = Page.About },
-                )
-            },
-        ) { pad ->
-            Column(Modifier.padding(pad).fillMaxSize()) {
-                if (page == null && !typing) ModeSwitch(vm)
-                // The NFC spot page says it itself, as its first step.
-                Banners(if (page == Page.Antenna) NfcState.Ready else nfcState, openNfcSettings, overlayDetected, accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
-                when (page) {
-                    Page.Antenna -> AntennaPage(vm, nfcState, openNfcSettings)
-                    Page.About -> AboutPage()
-                    null -> when (vm.tab) {
-                        Screen.Backup -> BackupScreen(vm)
-                        Screen.Verify -> ReadScreen(vm, reveal = false)
-                        Screen.Restore -> ReadScreen(vm, reveal = true)
+    // While "Still there?" is up, nobody is watching the screen, which is kept on: what's behind the
+    // dialog (words, a password) is blurred until Keep. Blur needs Android 12; before that, it's covered.
+    val idle = vm.dialog == Dialog.StillThere
+    val blurs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+    Box(if (idle && blurs) Modifier.blur(32.dp) else Modifier) {
+        CompositionLocalProvider(
+            LocalAirplaneMode provides airplaneMode,
+            LocalDebugging provides debugging,
+            LocalOpenDeveloperSettings provides openDeveloperSettings,
+            LocalActionsDone provides actionsDone,
+        ) {
+            Scaffold(
+                containerColor = MaterialTheme.colorScheme.background,
+                topBar = {
+                    Header(
+                        page = page,
+                        onBack = { vm.page = null },
+                        onFindSpot = { vm.page = Page.Antenna },
+                        onAbout = { vm.page = Page.About },
+                    )
+                },
+            ) { pad ->
+                Column(Modifier.padding(pad).fillMaxSize()) {
+                    if (page == null && !typing) ModeSwitch(vm)
+                    // The NFC spot page says it itself, as its first step.
+                    Banners(if (page == Page.Antenna) NfcState.Ready else nfcState, openNfcSettings, overlayDetected, accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
+                    when (page) {
+                        Page.Antenna -> AntennaPage(vm, nfcState, openNfcSettings)
+                        Page.About -> AboutPage()
+                        null -> when (vm.tab) {
+                            Screen.Backup -> BackupScreen(vm)
+                            Screen.Verify -> ReadScreen(vm, reveal = false)
+                            Screen.Restore -> ReadScreen(vm, reveal = true)
+                        }
                     }
                 }
             }
         }
+        if (idle && !blurs) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
     }
     Dialogs(vm, leave)
 }
