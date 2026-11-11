@@ -11,6 +11,11 @@ plus a single-file Python tool to recover it on any computer. Source: <https://g
 - The encrypted backup is decrypted once before it's written, and every write is read back and compared before it's
   reported as success.
 
+> **Beta.** SeedTag is still in development. It has been tested only with MIFARE Ultralight C tags, on a few phones;
+> other tag brands and types (NTAG, Type 4, Type 5 and others) haven't been tried yet, and may not behave as described
+> here. Before relying on a tag, back up to it, then Verify and Restore it, ideally also decrypt it with
+> [`seedtag.py`](#recovering-on-a-computer), and keep another copy of your seed. See [Choosing a tag](#choosing-a-tag) for what's known.
+
 ## Project layout
 
 ```
@@ -469,6 +474,10 @@ throwaway mnemonic.
 
 SeedTag comes **without any warranty**, and its developer isn't responsible for any loss or damage from using it,
 including a lost seed or lost funds. You use it at your own risk (see also the [licenses](#license)).
+
+SeedTag is **beta** software, still in development, and has only been tested with MIFARE Ultralight C tags. Other tag
+brands and types may not work as described: test every tag (write, Verify, Restore) before relying on it, and keep
+another copy of your seed.
 
 **Make sure yourself that there's no malware on the phone before you enter a seed.** SeedTag defends against some
 attacks by other apps (see the warnings above), but it can't cover every possible one: if the phone is compromised,

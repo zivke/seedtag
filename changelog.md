@@ -26,6 +26,10 @@ All notable user-visible changes to SeedTag. The format follows
   on screen aren't readable.
 
 ### Changed
+- SeedTag now says it's beta software, in the README, on the About page and
+  in the disclaimer shown before you start: it's still in development and
+  has only been tested with MIFARE Ultralight C tags, so test any other tag
+  before relying on it.
 - Back no longer leaves the app with your input. On the Words and Password
   steps it does what the step's **Back** button does, and going back from
   the Password step asks before clearing a password (the on-screen **Back**

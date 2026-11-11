@@ -924,6 +924,9 @@ private fun BackupScreen(vm: SeedTagViewModel) {
 private const val DISCLAIMER =
     "SeedTag comes without any warranty, and its developer isn't responsible for any loss or damage resulting from " +
         "its use, including a lost seed or lost funds. You use it at your own risk.\n\n" +
+        "SeedTag is beta software, still in development. It has only been tested with MIFARE Ultralight C tags: other " +
+        "tag brands and types may not work as described. Before relying on a tag, back up to it, then Verify and " +
+        "Restore it (and ideally decrypt it with seedtag.py), and keep another copy of your seed.\n\n" +
         "Before you enter a seed, it's up to you to make sure this phone is free of malware. SeedTag defends against " +
         "some attacks by other apps, but it can't cover every possible one. If the phone is compromised, your seed may be too."
 
@@ -1766,7 +1769,7 @@ private fun AboutPage() {
     StepScreen {
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text("SeedTag", style = MaterialTheme.typography.headlineSmall)
-            Text("Version ${version ?: "unknown"}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Version ${version ?: "unknown"} · beta", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 "SeedTag is free, open-source software. It stores a password-encrypted BIP39 seed phrase on an NFC " +
                     "tag and reads it back. Back up writes it, Verify checks it without showing the words and Restore " +
