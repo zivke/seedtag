@@ -12,11 +12,12 @@
 | Mark | Meaning |
 |---|---|
 | ✅ | **Presumed tested.** It shipped in a released version (0.1.0 to 0.3.0), which was installed and used on the phone with a MIFARE Ultralight C. Nobody recorded which steps were actually exercised, so confirm the ones you aren't sure of. |
-| ❓ | **Shipped, but probably not tested.** It's in a release, but it depends on hardware or an Android version that may not have been at hand (another chip, Android 8 to 11, 13 or 14+, a low-RAM phone). |
+| ❓ | **Shipped, but probably not tested.** It's in a release, but it depends on hardware or an Android version that may not have been at hand (another chip, Android 13 or 14+, a low-RAM phone). |
 | ⬜ | **Not tested.** Under `[Unreleased]` in `changelog.md`, on `main` only. |
 | 🔀 | **Not tested, on a branch.** `tag-write-password`, not merged. |
 | 🔍 | **Suspected problem.** From the [expert review](2026-11-10-expert-review.md), needs a device to confirm. |
 | ⚠ | The test changes a tag for good, or may destroy its content. Use a spare tag. |
+| ✔️ | **Passed** on the device, with the date it was tested. |
 
 Record a result next to each row (pass, fail, or not possible, with the phone and Android version).
 
@@ -33,8 +34,8 @@ Record a result next to each row (pass, fail, or not possible, with the phone an
   - 12 words, different seed: `legal winner thank year wave sausage worth useful legal winner thank yellow`
 - **Tags:** at least two spare Ultralight C tags (A and B), one of them blank. Ideally also an NTAG213/215/216, a
   Type 5 tag (ICODE SLIX or ST25TV), a tag that's too small (plain Ultralight, 48 bytes) and any contactless card.
-- **Phones:** the main test phone, plus wherever possible an Android 10 or 11 phone, an Android 8 or 9 phone, an
-  Android 14+ phone and an old low-RAM phone. Write down each phone's model and Android version with the results.
+- **Phones:** the main test phone, plus wherever possible an Android 14+ phone and an old low-RAM phone, and an older
+  phone for [section 6](#6-android-8-to-11). Write down each phone's model and Android version with the results.
 - **Overlay app** for the overlay tests: any app that draws over other apps (a screen dimmer, a floating bubble or
   a chat head).
 
@@ -44,34 +45,34 @@ Everything under `[Unreleased]` in `changelog.md`.
 
 | # | Test | Steps | Expected | Status |
 |---|---|---|---|---|
-| 1.1 | **Bouncy Castle 1.86** in the R8 build | Back up the 12-word and the 24-word vector to tag A, Verify, Restore. | All succeed. The fingerprints after Back up and Verify match. Restore shows the same words. | ⬜ |
-| 1.2 | Backward compatibility after 1.86 | Verify and Restore a tag written by 0.3.0 (before the update). | It decrypts, same fingerprint as before. | ⬜ |
+| 1.1 | **Bouncy Castle 1.86** in the R8 build | Back up the 12-word and the 24-word vector to tag A, Verify, Restore. | All succeed. The fingerprints after Back up and Verify match. Restore shows the same words. | ✔️ Pass, 2026-11-11 |
+| 1.2 | Backward compatibility after 1.86 | Verify and Restore a tag written by 0.3.0 (before the update). | It decrypts, same fingerprint as before. | ✔️ Pass, 2026-11-11 |
 | 1.3 | Forward compatibility after 1.86 | Read a tag written by this build with NFC Tools and run `seedtag.py verify <Base64>`. | `OK` and the same fingerprint. | ⬜ |
-| 1.4 | Stray spaces refused | In Back up, type a new password with a leading space, then one with a trailing space, then one with two spaces in a row. | Each is flagged under the field and **Encrypt & write** refuses it. Removing the space clears the warning. | ⬜ |
-| 1.5 | Strength: typed BIP39 words | Type `abandon ability able about above absent` as the password. | Rated weak; writing asks for confirmation. | ⬜ |
-| 1.6 | Strength: generated passphrase | Tap **Generate a 7-word passphrase**. | About 77 bits, Strong, no confirmation. | ⬜ |
+| 1.4 | Stray spaces refused | In Back up, type a new password with a leading space, then one with a trailing space, then one with two spaces in a row. | Each is flagged under the field and **Encrypt & write** refuses it. Removing the space clears the warning. | ✔️ Pass, 2026-11-11 |
+| 1.5 | Strength: typed BIP39 words | Type `abandon ability able about above absent` as the password. | Rated weak; writing asks for confirmation. | ✔️ Pass, 2026-11-11 |
+| 1.6 | Strength: generated passphrase | Tap **Generate a 7-word passphrase**. | About 77 bits, Strong, no confirmation. | ✔️ Pass, 2026-11-11 |
 | 1.7 | Lock wording | Verify a tag, look at the **Make tag read-only** text and its confirmation dialog. Optional, ⚠: lock a spare tag and read the result. | The text says the lock stops overwriting and erasing, but not (on most chips) a stranger locking the tag against reading. Advice about a metal box or shielding sleeve and other copies. | ⬜ |
-| 1.8 | Keypad prefix shown as dots | Back up, words hidden (the default): type a few letters. Tap **Show words**, type again. | Hidden: the letters being typed are dots; the suggestions still show matching words. Shown: the letters are visible. Backspace works in both. | ⬜ |
-| 1.9 | Keypad prefix wiped | Type a few letters of a word, press Home, return. | The partial word is gone, along with everything else. | ⬜ |
+| 1.8 | Keypad prefix shown as dots | Back up, words hidden (the default): type a few letters. Tap **Show words**, type again. | Hidden: the letters being typed are dots; the suggestions still show matching words. Shown: the letters are visible. Backspace works in both. | ✔️ Pass, 2026-11-11 |
+| 1.9 | Keypad prefix wiped | Type a few letters of a word, press Home, return. | The partial word is gone, along with everything else. | ✔️ Pass, 2026-11-11 |
 | 1.10 | Overwrite bound to the tag | Tag A and B both hold data. Back up to A, confirm **Overwrite**, then hold **B** when asked to hold the same tag again. Then hold A. | B is not written: the app asks about B as a new tag. A is overwritten only after its own confirmation. | ⬜ |
-| 1.11 | Overwrite after the content changed | Confirm overwrite for tag A, cancel, change A's content (another backup, or NFC Tools), then try again. | It asks again, since the content changed. | ⬜ |
-| 1.12 ⚠ | Interrupted overwrite | Overwrite a spare tag that holds data and pull it away during the write (it takes a few tries to time). | The message says the old content may already be gone, not just "moved away too early". Retrying writes and reads back the new backup. | ⬜ |
+| 1.11 | Overwrite after the content changed | Confirm overwrite for tag A, cancel, change A's content (another backup, or NFC Tools), then try again. | It asks again, since the content changed. | ✔️ Pass, 2026-11-11 |
+| 1.12 ⚠ | Interrupted overwrite | Overwrite a spare tag that holds data and pull it away during the write (it takes a few tries to time). | The message says the old content may already be gone, not just "moved away too early". Retrying writes and reads back the new backup. | ✔️ Pass, 2026-11-11 |
 | 1.13 | Type 5 tag with data (needs a Type 5 tag) | Back up to an ICODE or ST25TV that holds data, with a very quick tap so Android misses the data. | Asks to hold the tag again; never formats it. A normal tap shows the overwrite prompt. | ⬜ |
 | 1.14 | Type 5 tag, blank | Back up to a blank Type 5 tag. | Formats, asks for a second tap, reads back, *Backup written*. | ⬜ |
-| 1.15 | Android 10/11: partial overlay (needs Android 10 or 11) | Start an overlay app whose window covers part of the screen but not the buttons. Tap a button in SeedTag, including in the Overwrite and Lock dialogs. | Taps are ignored and the red banner shows. Without the overlay, everything works normally. | ⬜ |
-| 1.16 | Android 10/11: no false positives (needs Android 10 or 11) | With no overlay app running, use every screen and dialog, including the system volume panel, a notification and a split screen. | No tap is blocked, unless something really covers the app. A tap blocked for no visible reason is a failure. | ⬜ |
 | 1.17 | Android 12+: no change | Use the app normally on Android 12 or later. | Taps work as before; the new filter is off on these versions. | ⬜ |
 | 1.22 | Tag from a newer format | Make the text of a "format 2" tag from a test backup's Base64: `python3 -c "import base64,sys; b=bytearray(base64.b64decode(sys.argv[1])); b[0]=2; print(base64.b64encode(b).decode())" <Base64>`. Write it to a spare tag with NFC Tools as a Text record. Check it in Back up, then Verify it. | Back up's check says "A backup from a newer version of SeedTag"; overwriting asks with "destroys that backup". Verify says the tag was written by a newer version and to update the app. | ⬜ |
-| 1.23 | Generated passphrase typed back | Generate a passphrase, write it down, tap **I've written it down**, type it into *Repeat password* from the paper, once with a deliberate typo. | *Repeat* starts empty. After the tap the passphrase is hidden (card and password field); **Show it again** brings it back. The typo shows "don't match" and blocks writing; the correct copy writes without a strength confirmation. | ⬜ |
-| 1.24 | Generate a different one | After generating, tap **Generate a different one**, then **Keep it**, then again and **Replace**. Also: type your own password, then tap Generate. | The button is relabelled after the first passphrase. Each replacement asks first; **Keep it** changes nothing; **Replace** shows the new passphrase and empties *Repeat*. | ⬜ |
-| 1.25 | Debugging warning | With USB debugging on (it is while testing over adb), open Back up, Verify and Restore. Tap **Open Developer options**. Turn debugging off and come back. | A red *USB or wireless debugging is on* item in *Before you start*; the link opens Developer options; the item is gone after turning debugging (and wireless debugging) off. | ⬜ |
-| 1.27 | Screen stays on, idle timeout | Set the screen timeout to 30 s. Enter a few words and wait without touching. Then let it run: wait 3 minutes, tap **Keep**; wait again and let the minute pass. Also try **Clear now**, the power button, and the Restore result left on screen. On the Done step and on empty screens, wait 30 s. | With secrets on screen the screen stays on. After 3 minutes, a buzz and *Still there?*, with the screen behind it blurred so no word or password can be read (on Android 8–11: covered, plain background); **Keep** brings it back sharp and carries on with everything kept; a minute without an answer (or **Clear now**) clears the entry, with *Cleared* explaining why. The power button still clears everything. With nothing entered (Done, empty steps) the 30 s timeout applies again. A scan prompt left open for 3 minutes is canceled by *Still there?*. | ⬜ |
-| 1.28 | Back | Words step: back gesture (also from the left and right edges, over the keypad's edge keys). Password step: Back with both fields empty, then with a password (gesture and on-screen **Back**: **Stay**, then **Clear and go back**). Length step with words entered, Verify / Restore with a password typed, and a Restore result: Back, **Stay**, then **Leave**. With nothing entered: Back. | Words → the length step, the words kept. Password with nothing typed goes straight back; with a password it asks *Clear the password?*. Elsewhere with input it asks *Leave SeedTag?*; **Leave** closes the app (and clears everything). With nothing entered, Back leaves as before. A top-bar page still closes with Back. | ⬜ |
+| 1.23 | Generated passphrase typed back | Generate a passphrase, write it down, tap **I've written it down**, type it into *Repeat password* from the paper, once with a deliberate typo. | *Repeat* starts empty. After the tap the passphrase is hidden (card and password field); **Show it again** brings it back. The typo shows "don't match" and blocks writing; the correct copy writes without a strength confirmation. | ✔️ Pass, 2026-11-11 |
+| 1.24 | Generate a different one | After generating, tap **Generate a different one**, then **Keep it**, then again and **Replace**. Also: type your own password, then tap Generate. | The button is relabelled after the first passphrase. Each replacement asks first; **Keep it** changes nothing; **Replace** shows the new passphrase and empties *Repeat*. | ✔️ Pass, 2026-11-11 |
+| 1.25 | Debugging warning | With USB debugging on (it is while testing over adb), open Back up, Verify and Restore. Tap **Open Developer options**. Turn debugging off and come back. | A red *USB or wireless debugging is on* item in *Before you start*; the link opens Developer options; the item is gone after turning debugging (and wireless debugging) off. | ✔️ Pass, 2026-11-11 |
+| 1.27 | Screen stays on, idle timeout | Set the screen timeout to 30 s. Enter a few words and wait without touching. Then let it run: wait 3 minutes, tap **Keep**; wait again and let the minute pass. Also try **Clear now**, the power button, and the Restore result left on screen. On the Done step and on empty screens, wait 30 s. | With secrets on screen the screen stays on. After 3 minutes, a buzz and *Still there?*, with the screen behind it blurred so no word or password can be read; **Keep** brings it back sharp and carries on with everything kept; a minute without an answer (or **Clear now**) clears the entry, with *Cleared* explaining why. The power button still clears everything. With nothing entered (Done, empty steps) the 30 s timeout applies again. A scan prompt left open for 3 minutes is canceled by *Still there?*. | ✔️ Pass, 2026-11-11 |
+| 1.28 | Back | Words step: back gesture (also from the left and right edges, over the keypad's edge keys). Password step: Back with both fields empty, then with a password (gesture and on-screen **Back**: **Stay**, then **Clear and go back**). Length step with words entered, Verify / Restore with a password typed, and a Restore result: Back, **Stay**, then **Leave**. With nothing entered: Back. | Words → the length step, the words kept. Password with nothing typed goes straight back; with a password it asks *Clear the password?*. Elsewhere with input it asks *Leave SeedTag?*; **Leave** closes the app (and clears everything). With nothing entered, Back leaves as before. A top-bar page still closes with Back. | ✔️ Pass, 2026-11-11 |
+| 1.29 | Verify result after a new backup | Verify tag A (result shown), then type a password on Restore without scanning. Back up a different seed to tag B. Open Verify and Restore. Then verify B, start another backup and cancel it at the scan, and look at Verify again. | After the backup, Verify and Restore are empty (no old result, no typed password). Verifying B says *Same seed*. A backup canceled before writing doesn't change *Backup from this session*. | ⬜ |
+| 1.30 | Scroll hint | On the Password step (keyboard open) and on the Length step, on a small phone or with a large font size; also a screen that fits. Tap the ↓ button, scroll by hand to the end and back. | Where the content goes on below the visible part: a fade at the bottom with a round ↓; tapping it scrolls most of a screen down. At the end both go away; scrolled down, the top edge fades. A screen that fits shows neither. Nothing is hidden under the ↓ that can't be reached by scrolling. | ⬜ |
 | 1.26 | Accessibility banner while open | With SeedTag in front, enable an accessibility app over adb (`adb shell settings put secure enabled_accessibility_services <pkg>/<service>`), then disable it. | The banner appears and disappears without leaving the app. | ⬜ |
 | 1.18 | Out of memory (needs a low-RAM phone) | Back up or Verify on an old phone. | Either it works, or an out-of-memory message appears and the app stays open. It never crashes. | ⬜ |
-| 1.19 | Held ⌫ on the password keyboard | Type a long password, hold ⌫. Then tap ⌫ once. | After a short pause it keeps deleting, with a tick each time, and stops at an empty field. A tap deletes one character; releasing after a hold deletes nothing extra. | ⬜ |
-| 1.20 | Held ⌫ on the word keypad | Enter a few words and type part of the next one, then hold ⌫. Hold it again with no letters typed. Then tap it. | The hold deletes the letters and stops at the start of the word; entered words stay. The second hold removes one word, when released. Each tap removes one letter, or one word when no letters are typed. | ⬜ |
-| 1.21 | Typed password that scores high | Type `q7#Lm!x2Vr9@kPz4&Wt8`, then `correct horse battery staple`, and try to write each. | The first shows "≈78 bits at most" in amber, never *Strong*; writing asks "Use your own password?". The second is *Weak* (≈43 bits) and asks "Weak password". Only the generated passphrase shows *Strong* and writes without asking. | ⬜ |
+| 1.19 | Held ⌫ on the password keyboard | Type a long password, hold ⌫. Then tap ⌫ once. | After a short pause it keeps deleting, with a tick each time, and stops at an empty field. A tap deletes one character; releasing after a hold deletes nothing extra. | ✔️ Pass, 2026-11-11 |
+| 1.20 | Held ⌫ on the word keypad | Enter a few words and type part of the next one, then hold ⌫. Hold it again with no letters typed. Then tap it. | The hold deletes the letters and stops at the start of the word; entered words stay. The second hold removes one word, when released. Each tap removes one letter, or one word when no letters are typed. | ✔️ Pass, 2026-11-11 |
+| 1.21 | Typed password that scores high | Type `q7#Lm!x2Vr9@kPz4&Wt8`, then `correct horse battery staple`, and try to write each. | The first shows "≈78 bits at most" in amber, never *Strong*; writing asks "Use your own password?". The second is *Weak* (≈43 bits) and asks "Weak password". Only the generated passphrase shows *Strong* and writes without asking. | ✔️ Pass, 2026-11-11 |
 
 The NFC-stack catch-all (`TagIo` never throwing) can't be provoked on purpose. Note any odd error that appears
 during the other tests.
@@ -84,9 +85,9 @@ during the other tests.
 |---|---|---|---|
 | 2.1.1 | Check your tag, blank Ultralight C | Says blank, the room it has, nothing written. | ✅ |
 | 2.1.2 | Check your tag with data: a SeedTag backup, and other data | Identifies a SeedTag backup vs. other data. | ✅ |
-| 2.1.3 | Check your tag, read-only tag | Says read-only; Back up isn't possible. | ✅ |
+| 2.1.3 | Check your tag, read-only tag | Says read-only; Back up isn't possible. | ⬜ |
 | 2.1.4 | Check your tag, tag too small (plain Ultralight) | Word counts it can't hold are grayed out; "too small" gives the bytes needed and available. | ❓ |
-| 2.1.5 | **Use another tag** | Goes back to the check. | ✅ |
+| 2.1.5 | **Use another tag** | Goes back to the check. | ⬜ |
 | 2.1.6 | Word count 12, 15, 18, 21, 24 | The keypad stops at the count; **Next** only when the checksum is valid. | ✅ (12 and 24 at least) |
 | 2.1.7 | Wrong checksum or unknown word | **Next** stays disabled; a clear message. | ✅ |
 | 2.1.8 | Hide entered words on by default, **Show words** | Dots by default; shown on request; hidden again after leaving the app. | ✅ |
@@ -123,14 +124,12 @@ during the other tests.
 |---|---|---|---|
 | 2.3.1 | Screenshot or screen recording, and the Recents thumbnail | Blocked or blank, in dialogs too. | ✅ |
 | 2.3.2 | Leave the app: Home, Recents, screen off | Everything typed or decrypted is gone on return. | ✅ |
-| 2.3.3 | Leave while Argon2 runs | The result doesn't appear on return. | ✅ |
+| 2.3.3 | Leave while Argon2 runs | The result doesn't appear on return. | ⬜ |
 | 2.3.4 | Full screen; bars return briefly on a swipe | As described. | ✅ |
 | 2.3.5 | Airplane-mode line on the *Before you start* card | Reflects airplane mode on and off. | ✅ |
-| 2.3.6 | Accessibility banner | An app with accessibility access is named, with a shortcut to Settings. | ❓ (needs such an app installed) |
+| 2.3.6 | Accessibility banner | An app with accessibility access is named, with a shortcut to Settings. | ✔️ Pass, 2026-11-11 |
 | 2.3.7 | Android 14+: the screen hidden from accessibility services that aren't accessibility tools | Such a service can't read the screen; TalkBack still works. | ❓ (needs Android 14+ and such a service) |
 | 2.3.8 | Android 12+: other apps' overlays hidden | An overlay disappears while SeedTag is on screen. | ❓ |
-| 2.3.9 | Android 8 to 11: a tap through an overlay | Ignored, red banner. | ❓ |
-| 2.3.10 | Android 8 and 9: task hijacking | Another app can't put its screen into SeedTag's task. | ❓ (hard to test without a test app) |
 | 2.3.11 | NFC reader mode | While SeedTag is in front, no other app or system popup reacts to a tag. | ✅ |
 | 2.3.12 | NFC off | The app says NFC is off. | ✅ |
 
@@ -149,13 +148,13 @@ during the other tests.
 | # | Test | What to look for | Status |
 |---|---|---|---|
 | 3.1 | Old low-RAM phone (finding 6) | `largeHeap` is now on: check 1.18 on the oldest phone available. | ⬜ |
-| 3.2 | Screen timeout mid-entry (finding 7) | Fixed on `main`: see 1.27. | ⬜ |
-| 3.3 | Back gesture (finding 7) | Fixed on `main`: see 1.28. | ⬜ |
-| 3.4 | Generate tapped twice (finding 2) | Fixed on `main`: see 1.24. | ⬜ |
+| 3.2 | Screen timeout mid-entry (finding 7) | Fixed on `main`: see 1.27. | ✔️ Pass, 2026-11-11 (1.27) |
+| 3.3 | Back gesture (finding 7) | Fixed on `main`: see 1.28. | ✔️ Pass, 2026-11-11 (1.28) |
+| 3.4 | Generate tapped twice (finding 2) | Fixed on `main`: see 1.24. | ✔️ Pass, 2026-11-11 (1.24) |
 | 3.5 | "Already read-only" tag (finding 9) | Fixed on `main`: Lock on a tag that's already read-only (verify it first) says "Already read-only", not "Tag locked". | ⬜ |
 | 3.6 | Late results (finding 12) | Fixed on `main`. Double-tap **Encrypt & write**: one encryption. Write to a blank tag and Cancel during the write: "Written, not checked", no prompt reappearing. Cancel right as a write finishes, then start a Verify scan: its prompt stays. | ⬜ |
 | 3.7 | Unreadable tag treated as empty (finding 14) | Hardened on `main`: on a Type 2 tag that every read calls empty, the raw TLVs are checked before writing without asking. Check that nothing regressed: Back up to an NDEF-formatted empty NTAG / Ultralight C (written without a prompt, *Backup written*), and to one holding a backup (the overwrite prompt). The failure itself is hard to provoke: a tag with data at a marginal position. | ⬜ |
-| 3.8 | NFC toggled from quick settings (finding 14) | Reader mode is now turned on again when NFC comes back on with SeedTag in front. Turn NFC off and on from the shade while SeedTag is open, on Back up's tag check and on Verify; tags must still reach the app (and no other app's tag popup appears). | ⬜ |
+| 3.8 | NFC toggled from quick settings (finding 14) | Reader mode is now turned on again when NFC comes back on with SeedTag in front. Turn NFC off and on from the shade while SeedTag is open, on Back up's tag check and on Verify; tags must still reach the app (and no other app's tag popup appears). | ✔️ Pass, 2026-11-11 |
 
 ## 4. Branch `tag-write-password` (before merging)
 
@@ -191,6 +190,34 @@ check the lock read-back after it.
 | 5.6 | `sign-release.sh --expect <wrong hash>` on the signing machine | Refuses, nothing signed. | ⬜ |
 | 5.7 | `sign-release.sh --expect <CI hash>` | Signs; certificate check passes; writes `seedtag.apk.sha256`. | ⬜ |
 | 5.8 | Install the newly signed release over the previous release | Updates in place (same certificate), no uninstall needed. | ✅ (0.1.0 to 0.3.0 were updated this way, presumably) |
+
+## 6. Android 8 to 11
+
+Several defences and details depend on the Android version, and the main test phone runs a newer one. Run this list
+on an Android 8, 9, 10 or 11 phone, with the release-test APK. Rows marked *10–11* or *8–9* only apply there. Write
+the phone's model and Android version next to each result.
+
+What's different before Android 12: other apps' overlays can't be hidden, so they stay on screen, and only taps
+that come through them are dropped. The idle warning covers the screen instead of blurring it. Before Android 14
+(so on all of these), SeedTag can't hide its screen from accessibility services, it can only name them.
+
+| # | Test | Steps | Expected | Status |
+|---|---|---|---|---|
+| 6.1 | Install and first start | `make uninstall`, `adb install seedtag-release-test.apk`, open it. Look at the launcher icon, the full-screen mode (swipe from an edge), dark and light theme. | Installs (the app needs Android 8.0 or later). The icon looks right (Android 8 introduced adaptive icons). Status and navigation bars are hidden and come back briefly on a swipe. Both themes are readable. | ⬜ |
+| 6.2 | Main flow | Back up the 24-word vector with a generated passphrase to tag A, then Verify and Restore. Note how long each *Encrypting…* / *Decrypting…* takes. | All succeed, same fingerprint, same words. Argon2id may take longer on an old phone; note the seconds. No crash. | ⬜ |
+| 6.3 | A tap through an overlay | Start an overlay app whose window covers a SeedTag button. Tap the button, also in the Overwrite, Weak password and Lock dialogs. | The overlay stays visible (it can't be hidden before Android 12). Taps through it are ignored and the red banner shows; nothing happens behind it. Without the overlay, the same buttons work. | ⬜ |
+| 6.4 | *10–11:* partial overlay | An overlay that covers part of the screen but not the buttons. Tap a button, including in the Overwrite and Lock dialogs. | Taps are ignored and the red banner shows. Without the overlay, everything works normally. | ⬜ |
+| 6.5 | *10–11:* no false positives | With no overlay app running, use every screen and dialog, including the system volume panel, a notification and a split screen. | No tap is blocked, unless something really covers the app. A tap blocked for no visible reason is a failure. | ⬜ |
+| 6.6 | *8–9:* partial overlay | An overlay that covers part of the screen but not the buttons. Tap a button. | The tap works: Android 8 and 9 don't report a partly covered window, so only taps through the overlay itself are dropped (6.3). Expected, not a failure. | ⬜ |
+| 6.7 | Accessibility banner | Enable an accessibility app (Settings › Accessibility), open SeedTag. With SeedTag open, turn accessibility off entirely, then on again (over adb: `adb shell settings put secure enabled_accessibility_services <pkg>/<service>`, and `adb shell settings delete secure enabled_accessibility_services`). | The banner names the app and says SeedTag can't hide its screen from it on this Android version. Turning accessibility as a whole on or off updates the banner at once. Adding or removing a second service while one is on only shows after leaving and returning (the live list update needs Android 13): expected. | ⬜ |
+| 6.8 | Haptics | Keypad keys, a successful write, a failed scan (wrong tag), **Find NFC spot** with a tag, the *Still there?* buzz. | All are felt. On Android 8–10, success and failure feel like a long press, since the dedicated confirm and reject effects need Android 11. | ⬜ |
+| 6.9 | Debugging warning (1.25) | With USB debugging on, open Back up; turn it off and come back. On Android 11, also with only wireless debugging on. | The red *USB or wireless debugging is on* item while it's on, gone when off. Wireless debugging only exists from Android 11. | ⬜ |
+| 6.10 | Idle warning (1.27) | Enter a few words and wait 3 minutes without touching. | *Still there?* with a buzz, and the screen behind it **covered with the plain background** (not blurred, which needs Android 12): no word readable. **Keep** brings it back; a minute without an answer clears everything. The screen stays on meanwhile. | ⬜ |
+| 6.11 | *8–9:* task hijacking | Hard without a test app: if you have one that declares `taskAffinity="rs.zivke.seedtag"`, start it, then SeedTag from the launcher and Recents. | Its screen never appears inside SeedTag's task, and Recents shows SeedTag's own blank thumbnail. Mark "not possible" without a test app. | ⬜ |
+| 6.12 | Back (1.28) | *8–9* (three-button navigation): the Back button on the Words step, the Password step with a password, and the Length step with words entered. *10–11* with gesture navigation: a back swipe from the left and right edges over the keypad. | As in 1.28: Words → length step with the words kept; with a password it asks first; elsewhere with input it asks *Leave SeedTag?*. | ⬜ |
+| 6.13 | Privacy basics | Screenshot and screen recording (also with a dialog open), the Recents thumbnail, Home and back, the screen off and on. With SeedTag in front, hold a tag; switch NFC off and on from the quick settings and hold it again (3.8). | Screenshots and recording blocked or black, the thumbnail blank. Everything typed is gone after Home or screen off. No system popup or other app reacts to the tag, also after NFC was switched off and on. | ⬜ |
+| 6.14 | Small screen (1.30) | On the Password step with the keyboard open, and on Length and Done. | Where content goes on below, the bottom fade and ↓ show, and everything can be reached by scrolling. Nothing is cut off at the sides. | ⬜ |
+| 6.15 | Low RAM (1.18, 3.1) | If the phone has little memory (2 GB or less): Back up and Verify, with a few other apps open. | Either it works, or an out-of-memory message appears and the app stays open. It never crashes. | ⬜ |
 
 ## Short regression check for every release
 
