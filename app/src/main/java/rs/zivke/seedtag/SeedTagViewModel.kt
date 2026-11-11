@@ -65,6 +65,10 @@ sealed interface Dialog {
     data object ConfirmLock : Dialog
     /** Generate a passphrase over a password that's already there; [generated] if that one was generated too. */
     data class ConfirmNewPassphrase(val generated: Boolean) : Dialog
+    /** Back would drop what was entered: [toWords] for the Password step's Back (clears the passwords), else leaving the app. */
+    data class ConfirmBack(val toWords: Boolean) : Dialog
+    /** Nothing was touched for [IDLE_WARN_MS] while secrets are in memory: they're wiped [IDLE_GRACE_MS] later. */
+    data object StillThere : Dialog
     /**
      * A password the user typed (not the generated passphrase): the app can't rate it, so writing
      * always needs a confirmation. [bits] is the estimate, an upper bound; [sharesSeedWords] if it
@@ -91,6 +95,14 @@ const val STRAY_SPACES =
 private const val OUT_OF_MEMORY =
     "There wasn't enough free memory for the key derivation (Argon2id needs 64 MiB). Nothing was written or kept. " +
         "Close other apps and try again."
+/**
+ * While secrets are in memory the screen stays on (see [SeedTagViewModel.holdsSecrets]), so the app keeps its
+ * own idle timeout instead: after this long without a touch it asks whether the user is still there...
+ */
+const val IDLE_WARN_MS = 3 * 60_000L
+/** ...and wipes everything if there's no answer within this. */
+const val IDLE_GRACE_MS = 60_000L
+
 /** [id] tells a result for the current scan from one that arrives after Cancel or a new scan. */
 private data class Pending(val request: TagRequest, val purpose: Purpose, val id: Long)
 
@@ -304,6 +316,11 @@ class SeedTagViewModel : ViewModel() {
     }
 
     fun backToWords() { step = BackupStep.Words; clearPasswords(PwField.Password, PwField.Repeat); generatedPassphrase = false }
+
+    /** The Password step's Back: asks first if that would clear a password. */
+    fun requestBackToWords() {
+        if (password.isEmpty() && passwordRepeat.isEmpty()) backToWords() else dialog = Dialog.ConfirmBack(toWords = true)
+    }
 
     /**
      * Generate a passphrase into the password field. Repeat is left empty, for the user to type it back
@@ -590,6 +607,67 @@ class SeedTagViewModel : ViewModel() {
         }
     }
 
+    // ======================================================== back and idle ===
+
+    /**
+     * Seed words, a password, or restored words are in memory. Leaving the app would wipe them, so
+     * meanwhile the screen stays on (the idle timeout takes over) and Back asks before leaving.
+     */
+    val holdsSecrets: Boolean
+        get() {
+            prefixEdits; passwordEdits
+            return words.isNotEmpty() || !prefixBuf.isEmpty() || !password.isEmpty() || !passwordRepeat.isEmpty() ||
+                !readPassword.isEmpty() || restoredWords != null
+        }
+
+    /** System Back is handled by [back] rather than leaving the app. */
+    val backStaysInApp: Boolean
+        get() = page != null || (tab == Screen.Backup && (step == BackupStep.Words || step == BackupStep.Password)) ||
+            holdsSecrets
+
+    /**
+     * System Back: closes a top-bar page, does what the step's own Back button does on the Words and
+     * Password steps, and elsewhere asks before leaving the app with secrets in memory.
+     */
+    fun back() {
+        when {
+            page != null -> page = null
+            tab == Screen.Backup && step == BackupStep.Words -> backToLength()
+            tab == Screen.Backup && step == BackupStep.Password -> requestBackToWords()
+            holdsSecrets -> dialog = Dialog.ConfirmBack(toWords = false)
+        }
+    }
+
+    /** Bumped by every touch (and Keep): restarts the idle timeout. */
+    var touches by mutableIntStateOf(0)
+        private set
+
+    fun touched() { touches++ }
+
+    /** The idle timeout ran out: ask, with a scan that's waiting for a tag canceled. */
+    fun idleWarning() {
+        cancelScan()
+        dialog = Dialog.StillThere
+        _haptics.tryEmit(Haptic.Found) // the longer buzz: felt even with the phone lying on the table
+    }
+
+    /** "Keep" in the still-there dialog. */
+    fun stillThere() {
+        if (dialog == Dialog.StillThere) dialog = null
+        touched()
+    }
+
+    /** No answer to the still-there dialog. */
+    fun idleTimeout() {
+        wipeAll()
+        val minutes = (IDLE_WARN_MS + IDLE_GRACE_MS) / 60_000
+        dialog = Dialog.Info(
+            "Cleared",
+            "Nothing was touched for $minutes minutes, so SeedTag cleared what you entered or restored. Start again " +
+                "when you're ready.",
+        )
+    }
+
     // ============================================================== hygiene ===
 
     private fun wipeBackup() {
@@ -604,7 +682,10 @@ class SeedTagViewModel : ViewModel() {
         if (step != BackupStep.Done && step != BackupStep.Tag) step = BackupStep.Length
         wipeBackup()
         clearPasswords(PwField.Read); restoredWords = null
-        if (dialog is Dialog.ConfirmOverwrite || dialog is Dialog.ConfirmWeakPassword || dialog is Dialog.ConfirmNewPassphrase) dialog = null
+        val d = dialog
+        if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
+            d is Dialog.ConfirmBack || d == Dialog.StillThere
+        ) dialog = null
     }
 
     private fun showError(msg: String) {

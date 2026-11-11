@@ -82,6 +82,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -277,11 +278,15 @@ fun SeedTagApp(
     accessibilityApps: List<String> = emptyList(),
     openAccessibilitySettings: () -> Unit = {},
     hideAccessibilityBanner: () -> Unit = {},
+    leave: () -> Unit = {},
 ) {
     val view = LocalView.current
     LaunchedEffect(vm) { vm.haptics.collect { view.play(it) } }
     val page = vm.page
-    BackHandler(enabled = page != null) { vm.page = null }
+    // Otherwise Back is the system's: it leaves the app, which has nothing to lose then.
+    val backStaysInApp by remember(vm) { derivedStateOf { vm.backStaysInApp } } // not every keystroke
+    BackHandler(enabled = backStaysInApp) { vm.back() }
+    IdleWatch(vm)
     // While words or a password are being typed, the mode switch is hidden: one task on screen.
     val typing = vm.tab == Screen.Backup && (vm.step == BackupStep.Words || vm.step == BackupStep.Password)
     // Each time the last prompt or dialog closes, the screen behind it scrolls back to the top, so
@@ -322,7 +327,29 @@ fun SeedTagApp(
             }
         }
     }
-    Dialogs(vm)
+    Dialogs(vm, leave)
+}
+
+/**
+ * While secrets are in memory: the screen stays on (a screen timeout would stop the app and wipe them
+ * mid-entry), and the app's own idle timeout runs instead, paused while Argon2 works. Its own
+ * composable, so a touch only recomposes this.
+ */
+@Composable
+private fun IdleWatch(vm: SeedTagViewModel) {
+    val view = LocalView.current
+    val holding by remember(vm) { derivedStateOf { vm.holdsSecrets } }
+    DisposableEffect(holding) {
+        view.keepScreenOn = holding
+        onDispose { view.keepScreenOn = false }
+    }
+    LaunchedEffect(holding, vm.touches, vm.busy != null) {
+        if (!holding || vm.busy != null) return@LaunchedEffect
+        delay(IDLE_WARN_MS)
+        vm.idleWarning()
+        delay(IDLE_GRACE_MS)
+        vm.idleTimeout()
+    }
 }
 
 /** Whether airplane mode is on, for [Preflight]. */
@@ -1220,7 +1247,7 @@ private fun PasswordStep(vm: SeedTagViewModel) {
         bottom = {
             PasswordKeyboard(vm, field)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = vm::backToWords) { Text("Back") }
+                TextButton(onClick = vm::requestBackToWords) { Text("Back") }
                 Spacer(Modifier.weight(1f))
                 Button(
                     onClick = vm::encryptAndWrite,
@@ -1830,7 +1857,7 @@ private fun ScanPulse() {
 }
 
 @Composable
-private fun Dialogs(vm: SeedTagViewModel) {
+private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
     vm.busy?.let { msg ->
         AlertDialog(
             onDismissRequest = {},
@@ -1965,6 +1992,41 @@ private fun Dialogs(vm: SeedTagViewModel) {
             },
             confirmButton = { TextButton(onClick = vm::confirmNewPassphrase) { DangerText("Replace") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Keep it") } },
+        )
+        is Dialog.ConfirmBack -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            icon = { WarningIcon() },
+            title = { Text(if (d.toWords) "Clear the password?" else "Leave SeedTag?") },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    if (d.toWords) {
+                        "Going back to the words clears the password. If you've written a generated passphrase down, " +
+                            "cross that copy out: the next one will be different."
+                    } else {
+                        "Leaving SeedTag clears everything you entered or restored: none of it is kept anywhere."
+                    },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.dialog = null; if (d.toWords) vm.backToWords() else leave() }) {
+                    DangerText(if (d.toWords) "Clear and go back" else "Leave")
+                }
+            },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Stay") } },
+        )
+        Dialog.StillThere -> AlertDialog(
+            onDismissRequest = vm::stillThere,
+            title = { Text("Still there?") },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    "Nothing was touched for ${IDLE_WARN_MS / 60_000} minutes. While words or a password are on " +
+                        "the phone, the screen stays on, so SeedTag clears them itself in a minute unless you tap Keep.",
+                )
+            },
+            confirmButton = { TextButton(onClick = vm::stillThere) { Text("Keep") } },
+            dismissButton = { TextButton(onClick = vm::wipeAll) { Text("Clear now") } },
         )
         Dialog.ConfirmLock -> AlertDialog(
             onDismissRequest = { vm.dialog = null },

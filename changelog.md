@@ -18,7 +18,17 @@ All notable user-visible changes to SeedTag. The format follows
   So a copy of `seedtag.py` and any Python 3.8 or later are enough to
   recover a tag. `encrypt` still needs `cryptography`.
 
+- The screen no longer times out while seed words, a password or restored
+  words are on the phone, which wiped them mid-entry. Instead, after
+  3 minutes without a touch SeedTag asks *Still there?*, and clears
+  everything a minute later unless you tap **Keep**.
+
 ### Changed
+- Back no longer leaves the app with your input. On the Words and Password
+  steps it does what the step's **Back** button does, and going back from
+  the Password step asks before clearing a password (the on-screen **Back**
+  too). Anywhere else, it asks before leaving while words, a password or
+  restored words would be lost.
 - CI also tests `seedtag.py` with the `cryptography` package (hash-pinned),
   the Argon2id implementation the README recommends, and the test vectors
   now cover 18- and 21-word phrases too.

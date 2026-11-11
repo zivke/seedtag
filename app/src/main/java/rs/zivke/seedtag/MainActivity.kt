@@ -92,6 +92,7 @@ class MainActivity : ComponentActivity() {
                     accessibilityApps = if (apps == accessibilityHidden.value) emptyList() else apps,
                     openAccessibilitySettings = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
                     hideAccessibilityBanner = { accessibilityHidden.value = apps },
+                    leave = { finish() },
                 )
             }
         }
@@ -132,6 +133,7 @@ class MainActivity : ComponentActivity() {
         if (ev.actionMasked == MotionEvent.ACTION_DOWN) {
             droppingGesture = false
             overlayDetected.value = obscured
+            if (!obscured) vm.touched() // restarts the idle timeout
         }
         if (obscured && !droppingGesture) {
             droppingGesture = true
@@ -234,7 +236,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onStop() {
-        // Leaving the app (home, recents, screen off) drops every secret from memory-held UI state.
+        // Leaving the app (home, recents, screen off) drops every secret from memory-held UI state. The
+        // screen doesn't time out meanwhile (IdleWatch in Ui.kt keeps it on, with the app's own timeout).
         if (!isChangingConfigurations) vm.wipeAll()
         super.onStop()
     }

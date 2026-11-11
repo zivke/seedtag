@@ -227,7 +227,12 @@ been decrypted, the password field and keyboard are gone; **Verify another tag**
 again from an empty password.
 
 Leaving or closing the app (home button, Recents, screen off) deletes everything typed or decrypted; nothing is
-ever saved on the phone.
+ever saved on the phone. So that a screen timeout doesn't wipe a half-typed phrase, the screen stays on while
+words, a password or restored words are on the phone. Instead, SeedTag has its own timeout: after 3 minutes without a
+touch it asks *Still there?* (with a buzz), and clears everything a minute later unless you tap **Keep**. The power
+button still turns the screen off, and that clears everything. Back on the Words and Password steps does what their
+**Back** button does (going back from the password asks first, since it clears the password). Anywhere else, Back
+asks before leaving while something would be lost.
 
 **ⓘ** (About) in the top bar shows the version, what the app does with your data (nothing leaves the phone), the
 encryption used and the license, with links to the source code and to donate. Links open in the browser, and only
