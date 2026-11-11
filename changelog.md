@@ -6,6 +6,12 @@ All notable user-visible changes to SeedTag. The format follows
 
 ## [Unreleased]
 
+### Added
+- Back up, Verify and Restore warn when USB or wireless debugging is on, with
+  a link to Developer options: a computer the phone was ever allowed to debug
+  can silently replace SeedTag or turn on an accessibility service. Android
+  shows these settings without any permission.
+
 ### Changed
 - A generated passphrase is now typed back from the written copy: *Repeat
   password* starts empty, and after **I've written it down** the passphrase
@@ -56,6 +62,9 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- The banner naming apps with accessibility access now also updates while
+  SeedTag is open, for example when a service is switched on over adb, not
+  only when you come back to the app.
 - **Make tag read-only** on a tag that was already read-only no longer says
   it's "now permanently read-only": SeedTag changed nothing and can't tell
   whether it's permanent, and now says so. On a tag Android can't lock, the

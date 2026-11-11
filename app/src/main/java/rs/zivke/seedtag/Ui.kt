@@ -272,6 +272,8 @@ fun SeedTagApp(
     airplaneMode: Boolean,
     overlayDetected: Boolean,
     openNfcSettings: () -> Unit,
+    debugging: Boolean = false,
+    openDeveloperSettings: () -> Unit = {},
     accessibilityApps: List<String> = emptyList(),
     openAccessibilitySettings: () -> Unit = {},
     hideAccessibilityBanner: () -> Unit = {},
@@ -287,7 +289,12 @@ fun SeedTagApp(
     val prompting = vm.busy != null || vm.scanPrompt != null || vm.dialog != null
     var actionsDone by remember { mutableIntStateOf(0) }
     LaunchedEffect(prompting) { if (!prompting) actionsDone++ }
-    CompositionLocalProvider(LocalAirplaneMode provides airplaneMode, LocalActionsDone provides actionsDone) {
+    CompositionLocalProvider(
+        LocalAirplaneMode provides airplaneMode,
+        LocalDebugging provides debugging,
+        LocalOpenDeveloperSettings provides openDeveloperSettings,
+        LocalActionsDone provides actionsDone,
+    ) {
         Scaffold(
             containerColor = MaterialTheme.colorScheme.background,
             topBar = {
@@ -320,6 +327,10 @@ fun SeedTagApp(
 
 /** Whether airplane mode is on, for [Preflight]. */
 private val LocalAirplaneMode = compositionLocalOf { false }
+
+/** USB or wireless debugging is on (read from Settings.Global, no permission). */
+private val LocalDebugging = compositionLocalOf { false }
+private val LocalOpenDeveloperSettings = staticCompositionLocalOf<() -> Unit> { {} }
 
 /** Counts closed prompts and dialogs; [StepScreen] scrolls to the top when it changes. */
 private val LocalActionsDone = compositionLocalOf { 0 }
@@ -775,6 +786,19 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
             )
         }
         add(offline)
+        if (LocalDebugging.current) {
+            add(
+                Item(
+                    Tone.Caution,
+                    "USB or wireless debugging is on",
+                    "A computer this phone was ever allowed to debug can silently replace SeedTag with a look-alike or " +
+                        "turn on an accessibility service. Don't use this phone for a real seed while debugging is on.",
+                    "In Developer options, turn off USB debugging and wireless debugging, and tap Revoke USB " +
+                        "debugging authorizations.",
+                    "Open Developer options" to LocalOpenDeveloperSettings.current,
+                ),
+            )
+        }
         add(
             Item(
                 Tone.Info,

@@ -145,8 +145,10 @@ seed. From safest down:
    look-alike (SeedTag keeps no data, so you wouldn't notice) or turn on an accessibility service. Don't enter a
    real seed on a phone you develop or test apps with.
 
-The Back up, Verify and Restore screens remind you of this, and say whether airplane mode is on. Android lets the
-app see airplane mode without any permission, but not Wi-Fi or Bluetooth, so those you have to check yourself.
+The Back up, Verify and Restore screens remind you of this, say whether airplane mode is on, and warn when USB or
+wireless debugging is on. Android lets the app see those settings without any permission, but not Wi-Fi or Bluetooth,
+so those you have to check yourself. The accessibility banner also updates while SeedTag is open, not only when you
+come back to it.
 
 ## Using it
 

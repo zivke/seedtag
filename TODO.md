@@ -91,7 +91,7 @@
   - [x] Separate result and message; the "can't be made read-only" message and the README say that Android
     usually only locks Type 1 and 2 tags.
   - [ ] Test Lock on a Type 4 and a Type 5 tag, and note the result in the README table.
-- [ ] **#10 (Low): no warning about adb.** Preflight item for USB / wireless debugging; listen for
+- [x] **#10 (Low): no warning about adb.** Preflight item for USB / wireless debugging; listen for
   accessibility changes while in the foreground.
 - [x] **#11 (Low): a BIP39 passphrase ("25th word") isn't stored.** Say so on the Words step and in the
   README; mention English phrases only.

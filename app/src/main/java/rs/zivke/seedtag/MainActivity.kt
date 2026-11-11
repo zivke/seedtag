@@ -52,6 +52,8 @@ class MainActivity : ComponentActivity() {
     private val nfcState = mutableStateOf(NfcState.Ready)
     /** Airplane mode is on: a hint that the phone is offline, not proof (Wi-Fi and Bluetooth can be on). */
     private val airplaneMode = mutableStateOf(false)
+    /** USB or wireless debugging is on: whatever the phone was paired with can install or replace apps. */
+    private val debugging = mutableStateOf(false)
     /** The last touch came through another app's overlay and was dropped. */
     private val overlayDetected = mutableStateOf(false)
     /** The current gesture is being dropped because an overlay covered it. */
@@ -81,6 +83,10 @@ class MainActivity : ComponentActivity() {
                     vm = vm,
                     nfcState = nfcState.value,
                     airplaneMode = airplaneMode.value,
+                    debugging = debugging.value,
+                    openDeveloperSettings = {
+                        runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
+                    },
                     overlayDetected = overlayDetected.value,
                     openNfcSettings = { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) },
                     accessibilityApps = if (apps == accessibilityHidden.value) emptyList() else apps,
@@ -102,6 +108,7 @@ class MainActivity : ComponentActivity() {
         val a = adapter
         refreshRadios()
         accessibilityApps.value = enabledAccessibilityApps()
+        watchAccessibility(true)
         // Reader mode for the whole time we're in the foreground: tags go to us only,
         // never to other apps (e.g. NFC Tools or the system tag viewer).
         a?.enableReaderMode(
@@ -153,6 +160,37 @@ class MainActivity : ComponentActivity() {
             .sorted()
     }
 
+    private val accessibilityChanged = AccessibilityManager.AccessibilityStateChangeListener {
+        accessibilityApps.value = enabledAccessibilityApps()
+    }
+    private var servicesChanged: Any? = null // AccessibilityServicesStateChangeListener, API 33+
+
+    /**
+     * While SeedTag is in front, a service switched on (over adb, say) shows in the banner right away,
+     * not only on the next resume. The state listener fires when accessibility as a whole goes on or
+     * off; on Android 13+ the services listener also catches a change to the list.
+     */
+    private fun watchAccessibility(on: Boolean) {
+        val am = getSystemService(AccessibilityManager::class.java) ?: return
+        if (on) {
+            am.addAccessibilityStateChangeListener(accessibilityChanged)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                val l = AccessibilityManager.AccessibilityServicesStateChangeListener {
+                    accessibilityApps.value = enabledAccessibilityApps()
+                }
+                am.addAccessibilityServicesStateChangeListener(mainExecutor, l)
+                servicesChanged = l
+            }
+        } else {
+            am.removeAccessibilityStateChangeListener(accessibilityChanged)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                (servicesChanged as? AccessibilityManager.AccessibilityServicesStateChangeListener)
+                    ?.let(am::removeAccessibilityServicesStateChangeListener)
+                servicesChanged = null
+            }
+        }
+    }
+
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
         // Coming back from a dialog, the shade or another app can bring the bars back.
@@ -163,7 +201,7 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * NFC on or off, and airplane mode. Reading the airplane-mode setting needs no permission; Wi-Fi
+     * NFC on or off, airplane mode, and USB / wireless debugging. Reading those settings needs no permission; Wi-Fi
      * and Bluetooth state would (ACCESS_WIFI_STATE, BLUETOOTH_CONNECT), so the app only reminds
      * users to check those.
      */
@@ -175,6 +213,10 @@ class MainActivity : ComponentActivity() {
             else -> NfcState.Ready
         }
         airplaneMode.value = Settings.Global.getInt(contentResolver, Settings.Global.AIRPLANE_MODE_ON, 0) != 0
+        // Readable without a permission, like airplane mode. "adb_wifi_enabled" (Android 11+) has no
+        // public constant.
+        debugging.value = Settings.Global.getInt(contentResolver, Settings.Global.ADB_ENABLED, 0) != 0 ||
+            Settings.Global.getInt(contentResolver, "adb_wifi_enabled", 0) != 0
     }
 
     /** Full screen: no status or navigation bar. A swipe from the edge shows them briefly. */
@@ -186,6 +228,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        watchAccessibility(false)
         adapter?.disableReaderMode(this)
         super.onPause()
     }
