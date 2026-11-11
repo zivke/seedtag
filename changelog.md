@@ -4,7 +4,7 @@ All notable user-visible changes to SeedTag. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are the
 `versionName` in `app/build.gradle.kts`.
 
-## [Unreleased]
+## [0.4.0] - 2026-11-11
 
 ### Added
 - When a screen goes on below what's visible, for example above the word
