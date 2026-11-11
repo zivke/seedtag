@@ -41,7 +41,9 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   (skipped with `--unsigned`), prints the APK's SHA-256 and **fails if the APK
   requests any permission except NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`**
   (overlay hiding on Android 12+, and the NFC-spot finder's buzz; neither
-  gives access to anything).
+  gives access to anything). It also fails a release APK that is debuggable,
+  test-only, allows backups, or declares a component outside its allowlist
+  (`--debug` for debug builds).
 - `tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] <keystore>`
   runs outside the container, in a fresh clone at the release tag: refuses an
   unsigned APK that doesn't match the independent build (`--expect`, the

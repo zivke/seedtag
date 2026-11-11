@@ -32,6 +32,9 @@ All notable user-visible changes to SeedTag. The format follows
 - CI also tests `seedtag.py` with the `cryptography` package (hash-pinned),
   the Argon2id implementation the README recommends, and the test vectors
   now cover 18- and 21-word phrases too.
+- `tools/check-apk.sh` also fails a release APK that is debuggable or
+  test-only, allows backups, or has an app component besides the three
+  known ones; `make debug` checks with `--debug`.
 - Releasing: `tools/sign-release.sh` now requires `--expect` (or an explicit
   `--no-expect`). It refuses to sign from a clone with uncommitted changes
   or whose `HEAD` isn't a `vX.Y.Z` tag that `git verify-tag` accepts (that

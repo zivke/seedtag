@@ -43,7 +43,10 @@ without notice (see [Using it safely](#using-it-safely)).
 
 Every build ends with `tools/check-apk.sh`. It verifies the signature, prints the APK's SHA-256, and **fails the
 build if the APK requests any permission other than NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`**, so a library
-can't quietly add network access.
+can't quietly add network access. It also fails a release APK that is debuggable or test-only, allows backups, or
+declares any component besides SeedTag's activity and the two that AndroidX adds (the startup initializer, not
+exported, and the profile installer's receiver, which only adb can call). A new one has to be looked at and added
+to the script. `--debug` (for `make debug`) allows what debug builds have: debuggable, and Compose's preview activity.
 (`HIDE_OVERLAY_WINDOWS` and `VIBRATE` are granted at install without a prompt and give no access to anything: one
 only lets SeedTag hide other apps' overlays, the other only runs the vibration motor.)
 
@@ -127,7 +130,9 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
   `gh workflow run build.yml --ref <branch-or-tag>`), in an image built from the same `.devcontainer/Dockerfile`,
   and shows the APK's SHA-256 in the run's summary (the APK is attached too). Pass that hash to
   `sign-release.sh --expect`. Its actions are pinned by commit SHA, which `make check-workflows` (part of
-  `make check`) enforces. You can also run `make build` in a fresh `git clone` on another machine. Build from a
+  `make check`) enforces. It can't tell offline whether a SHA is the release named in its comment, so check that
+  when updating an action: `git ls-remote https://github.com/actions/checkout refs/tags/v7.0.1` must print the
+  pinned SHA (for an annotated tag, the `^{}` line). Both current pins were checked this way on 2026-11-11. You can also run `make build` in a fresh `git clone` on another machine. Build from a
   real clone, not a `git worktree` or a source archive: the APK records the commit
   (`META-INF/version-control-info.textproto`), and without a `.git` directory that file differs. The image's
   Ubuntu packages (the JDK among them) aren't pinned, so a JDK update between two image builds could in principle

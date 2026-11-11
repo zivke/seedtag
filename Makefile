@@ -55,7 +55,7 @@ build-test: build
 debug: wrapper-check
 	$(GRADLE) :app:assembleDebug
 	cp $(OUT)/debug/app-debug.apk $(DEBUG_APK)
-	tools/check-apk.sh $(DEBUG_APK)
+	tools/check-apk.sh --debug $(DEBUG_APK)
 
 ## test: crypto core on the JVM + seedtag.py against the same vectors (no device)
 test: test-core test-py

@@ -103,7 +103,7 @@
 - [x] **#14 (Info): an unreadable tag is treated as empty.** Optional Type 2 hardening: check the NDEF TLV
   length before writing without confirmation. Also turn reader mode on again after NFC is switched on from
   the quick-settings shade.
-- [ ] **#15 (Info): build checks.** `check-apk.sh` could reject `debuggable` / `testOnly` and extra
+- [x] **#15 (Info): build checks.** `check-apk.sh` could reject `debuggable` / `testOnly` and extra
   components; check the two action SHAs by hand against their release tags.
 
 ## App and docs
