@@ -7,6 +7,11 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- A generated passphrase is now typed back from the written copy: *Repeat
+  password* starts empty, and after **I've written it down** the passphrase
+  is hidden while you type it, so a mistake in the copy is caught before the
+  tag is written. Generating again (**Generate a different one**) asks first,
+  since the old one may already be written down.
 - Back up and the README say that only English BIP39 phrases are supported,
   and that a wallet's BIP39 passphrase (a "25th word") isn't stored and must
   be backed up separately; it isn't SeedTag's own password.

@@ -172,8 +172,10 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    supported, and only the words are stored: if your wallet also uses a **BIP39 passphrase** (a "25th word", set in
    the wallet), SeedTag doesn't store it, so back it up separately. It has nothing to do with SeedTag's own password.
    **Generate a 7-word passphrase** is recommended (≈77 bits). Write it down and label it *SeedTag password*: it's made of
-   the same BIP39 words as a seed phrase, so an unlabeled copy is easy to mistake for one, by you or by your heirs. Tap
-   *Encrypt & write*, then hold the tag to the phone.
+   the same BIP39 words as a seed phrase, so an unlabeled copy is easy to mistake for one, by you or by your heirs. Then
+   tap **I've written it down**: the passphrase is hidden, and you type it into *Repeat password* from your written
+   copy, so a mistake in the copy is caught before anything is written. **Generate a different one** asks before
+   replacing a passphrase you may already have written down. Tap *Encrypt & write*, then hold the tag to the phone.
    The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
    Only the generated passphrase is rated *Strong*. A password you type yourself always needs a confirmation
    before writing: SeedTag can't recognise a well-known phrase (`correct horse battery staple`, a quote, a name and

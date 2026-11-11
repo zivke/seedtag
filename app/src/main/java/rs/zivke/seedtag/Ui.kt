@@ -1216,41 +1216,66 @@ private fun PasswordStep(vm: SeedTagViewModel) {
                 "password\" and store it apart from the tag. There's no reset and no recovery, so keep the written copy " +
                 "safe and keep another backup of the seed itself.",
         )
-        FilledTonalButton(onClick = vm::generatePassphrase, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-            Text("Generate a 7-word passphrase")
+        // A new passphrase is shown, in the password field, until the user says it's written down.
+        LaunchedEffect(vm.passphrasesGenerated) { if (vm.passphrasesGenerated > 0) field = PwField.Password }
+        FilledTonalButton(
+            onClick = vm::generatePassphrase,
+            modifier = Modifier.fillMaxWidth().height(48.dp),
+        ) {
+            Text(if (vm.generatedPassphrase) "Generate a different one" else "Generate a 7-word passphrase")
         }
+        // While Repeat is typed, the passphrase is hidden: it's typed back from the written copy, which
+        // checks that copy.
+        val copying = vm.generatedPassphrase && field == PwField.Repeat
         if (vm.generatedPassphrase) {
             Surface(shape = MaterialTheme.shapes.medium, color = MaterialTheme.colorScheme.primaryContainer) {
                 Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "Write this down now and label it \"SeedTag password\"",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Text(
-                        vm.revealPassword(PwField.Password),
-                        fontFamily = FontFamily.Monospace,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer,
-                    )
-                    Text(
-                        "It's made of the same kind of words as a seed phrase, but it isn't one. Label it so that no one – " +
-                            "neither you nor your heirs – mistakes one for the other, and keep it apart from the tag and the seed.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f),
-                    )
+                    val on = MaterialTheme.colorScheme.onPrimaryContainer
+                    if (copying) {
+                        Text("Now type it from your written copy", style = MaterialTheme.typography.labelLarge, color = on)
+                        Text(
+                            "The passphrase is hidden, so that Repeat password checks what you wrote down, not the screen. " +
+                                "If they don't match, your copy has a mistake: correct it before writing the tag.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = on.copy(alpha = 0.8f),
+                        )
+                        Link("Show it again") { field = PwField.Password }
+                    } else {
+                        Text("Write this down now and label it \"SeedTag password\"", style = MaterialTheme.typography.labelLarge, color = on)
+                        Text(
+                            vm.revealPassword(PwField.Password),
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = on,
+                        )
+                        Text(
+                            "It's made of the same kind of words as a seed phrase, but it isn't one. Label it so that no one – " +
+                                "neither you nor your heirs – mistakes one for the other, and keep it apart from the tag and the seed.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = on.copy(alpha = 0.8f),
+                        )
+                        Button(onClick = { field = PwField.Repeat }, modifier = Modifier.fillMaxWidth()) {
+                            Text("I've written it down")
+                        }
+                    }
                 }
             }
         }
-        SecretField("Password", vm, PwField.Password, vm.generatedPassphrase, active = field == PwField.Password) {
+        SecretField("Password", vm, PwField.Password, vm.generatedPassphrase && !copying, active = field == PwField.Password) {
             field = PwField.Password
         }
         if (vm.passwordLength(PwField.Password) > 0) StrengthMeter(vm.passwordBits, vm.generatedPassphrase)
         if (vm.passwordHasStraySpaces) {
             Text(STRAY_SPACES, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
         }
-        SecretField("Repeat password", vm, PwField.Repeat, vm.generatedPassphrase, active = field == PwField.Repeat) {
+        SecretField(
+            if (vm.generatedPassphrase) "Repeat password (from your written copy)" else "Repeat password",
+            vm,
+            PwField.Repeat,
+            revealDefault = vm.generatedPassphrase,
+            active = field == PwField.Repeat,
+        ) {
             field = PwField.Repeat
         }
         if (vm.passwordLength(PwField.Repeat) > 0 && !vm.passwordsMatch) {
@@ -1898,6 +1923,24 @@ private fun Dialogs(vm: SeedTagViewModel) {
             },
             confirmButton = { TextButton(onClick = vm::confirmWeakPassword) { DangerText("Write anyway") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Change password") } },
+        )
+        is Dialog.ConfirmNewPassphrase -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            icon = { WarningIcon() },
+            title = { Text("Replace the password?") },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    if (d.generated) {
+                        "This replaces the passphrase shown with a new one. If you've already written the old one down, " +
+                            "cross that copy out so it can't be mistaken for the new one."
+                    } else {
+                        "This replaces the password you typed with a generated passphrase."
+                    },
+                )
+            },
+            confirmButton = { TextButton(onClick = vm::confirmNewPassphrase) { DangerText("Replace") } },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Keep it") } },
         )
         Dialog.ConfirmLock -> AlertDialog(
             onDismissRequest = { vm.dialog = null },

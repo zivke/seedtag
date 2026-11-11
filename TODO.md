@@ -67,7 +67,7 @@
 - [x] **#1 (Medium): the strength meter rates well-known weak passwords "Strong".** Only the generated
   passphrase earns "Strong"; always confirm a typed password. If an estimate stays, fold case before the
   BIP39 lookup, split on any non-letter and count repeats once. Add the report's examples to the tests.
-- [ ] **#2 (Medium): a generated passphrase is never checked against the written copy.** Leave Repeat
+- [x] **#2 (Medium): a generated passphrase is never checked against the written copy.** Leave Repeat
   empty and have the user type it back from paper; confirm before Generate replaces one.
 - [ ] **#3 (Medium): `--expect` proves the build, not the source, and the container can push to GitHub.**
   - [ ] Sign from a fresh clone on the signing machine, and review `git diff <last tag>..<new tag>` there
