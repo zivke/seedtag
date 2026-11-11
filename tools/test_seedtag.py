@@ -8,6 +8,7 @@
 Standard library only, plus whatever seedtag.py itself needs.
 """
 import base64
+import os
 import pathlib
 import sys
 import unittest
@@ -104,6 +105,10 @@ class SeedBoxV1(unittest.TestCase):
         self.assertNotEqual(blob, seedtag.seal(ent, "pw"))  # fresh salt + nonce
 
 
+# Backends that must be installed (comma-separated), e.g. in CI: a skip is then a failure.
+REQUIRED_BACKENDS = set(filter(None, os.environ.get("SEEDTAG_REQUIRE_BACKENDS", "").split(",")))
+
+
 class Argon2Backends(unittest.TestCase):
     """Each Argon2id backend that's installed must reproduce the vectors on its own."""
 
@@ -115,6 +120,8 @@ class Argon2Backends(unittest.TestCase):
                     try:
                         seedtag.derive_key("x", bytes(16))
                     except seedtag.NoArgon2 as e:
+                        if name in REQUIRED_BACKENDS:
+                            self.fail(f"{name} is required (SEEDTAG_REQUIRE_BACKENDS) but not available: {e}")
                         self.skipTest(f"{name} not available: {e}")
                     for pw, ent, salt, nonce, b64, _ in vecs:
                         pw = bytes.fromhex(pw).decode("utf-8")

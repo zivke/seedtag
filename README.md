@@ -437,7 +437,10 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
   normalisation, and the 137-byte size budget.
 - `tools/test_seedtag.py`: the same vector files run through `seedtag.py`, plus a check that its embedded wordlist
   matches the app's. The vectors are run through each Argon2id backend (`cryptography`, `argon2-cffi`) on its own;
-  a backend that isn't installed is reported as skipped. The dev container only has `argon2-cffi`.
+  a backend that isn't installed is reported as skipped. The dev container only has `argon2-cffi`; CI also runs the
+  tests with `cryptography` installed from the hash-pinned `tools/requirements-ci.txt`, and there a skipped
+  `cryptography` backend fails the run (`SEEDTAG_REQUIRE_BACKENDS=cryptography`). The vectors cover all five
+  phrase lengths (12 to 24 words).
 
 NFC itself has no automated tests: there's no emulator support. Test on a real phone with a real tag, using a
 throwaway mnemonic.

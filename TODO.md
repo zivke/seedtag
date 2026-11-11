@@ -80,7 +80,7 @@
   - [x] Catch `ImportError` in `seedtag.py` and say what to install; state the minimum Python version.
   - [x] README and Done screen: keep a copy of `seedtag.py` with the written password.
   - [ ] Pure-Python decrypt-only fallback (Argon2id and AES-GCM), tested against the vectors.
-- [ ] **#5 (Low): the `cryptography` Argon2id backend is never tested.** CI step with a hash-pinned
+- [x] **#5 (Low): the `cryptography` Argon2id backend is never tested.** CI step with a hash-pinned
   `cryptography` ≥ 44 that fails on a skipped backend; add 18- and 21-word vectors.
 - [x] **#6 (Low): Argon2's 64 MiB on the Java heap.** `android:largeHeap="true"`, tried on an old phone.
 - [ ] **#7 (Low): screen timeout or Back wipes everything mid-entry.** Keep the screen on while secrets
