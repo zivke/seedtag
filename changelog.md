@@ -7,6 +7,9 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- Back up and the README say that only English BIP39 phrases are supported,
+  and that a wallet's BIP39 passphrase (a "25th word") isn't stored and must
+  be backed up separately; it isn't SeedTag's own password.
 - Only the generated passphrase is rated *Strong*. A password you type
   yourself is shown as "≈N bits at most" and always needs a confirmation
   before writing, since SeedTag can't recognise a well-known phrase. The

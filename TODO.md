@@ -92,7 +92,7 @@
   README table.
 - [ ] **#10 (Low): no warning about adb.** Preflight item for USB / wireless debugging; listen for
   accessibility changes while in the foreground.
-- [ ] **#11 (Low): a BIP39 passphrase ("25th word") isn't stored.** Say so on the Words step and in the
+- [x] **#11 (Low): a BIP39 passphrase ("25th word") isn't stored.** Say so on the Words step and in the
   README; mention English phrases only.
 - [ ] **#12 (Low): late tag results can leave a scan armed with no prompt.** Close the prompt only when
   nothing is pending; ignore a second Encrypt while busy. Pin it down with the tag-flow state machine,

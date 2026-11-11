@@ -979,6 +979,13 @@ private fun LengthStep(vm: SeedTagViewModel) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        Notice(
+            Tone.Caution,
+            "Only the words are stored",
+            "If your wallet also uses a BIP39 passphrase (a \"25th word\", set in the wallet), SeedTag doesn't store it: " +
+                "back it up separately, or the words alone won't restore your funds. SeedTag's own password, set later, is " +
+                "something else. Only English BIP39 phrases are supported.",
+        )
     }
 }
 
