@@ -167,8 +167,8 @@ object Passphrase {
     fun hasStraySpaces(password: CharArray, length: Int): Boolean {
         for (i in 0 until length) {
             val c = password[i]
-            if (!c.isWhitespace()) continue
-            if (c != ' ' || i == 0 || i == length - 1 || password[i - 1].isWhitespace()) return true
+            if (!SeedBox.isPasswordSpace(c)) continue
+            if (c != ' ' || i == 0 || i == length - 1 || SeedBox.isPasswordSpace(password[i - 1])) return true
         }
         return false
     }

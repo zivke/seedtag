@@ -51,6 +51,11 @@ All notable user-visible changes to SeedTag. The format follows
   not to use a development phone for them.
 
 ### Fixed
+- The app and `seedtag.py` now agree on every password edge case: both use
+  the same explicit list of whitespace (the app missed U+0085), and the app
+  lower-cases letters outside the Basic Multilingual Plane too. Neither can
+  be typed on the app's keyboard. A password with a broken character gives a
+  clear error instead of an unexpected one.
 - A backup written by a future SeedTag version (a newer format) is
   recognised as a backup: the tag check says so, and overwriting it warns
   that it destroys a backup, not just "other data". Verify and Restore say

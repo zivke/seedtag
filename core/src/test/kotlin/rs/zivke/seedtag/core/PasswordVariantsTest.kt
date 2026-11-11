@@ -17,7 +17,7 @@ class PasswordVariantsTest {
     @Test
     fun variantsMatchSeedtagPy() {
         val rows = javaClass.getResource("/password-variants.tsv")!!.readText().lines().filter { it.isNotEmpty() }
-        assertEquals(11, rows.size)
+        assertEquals(14, rows.size)
         for (row in rows) {
             val cols = row.split("\t")
             val input = utf8(cols[0])
@@ -53,5 +53,20 @@ class PasswordVariantsTest {
             } catch (_: SeedTagException.WrongPassword) {
             }
         }
+    }
+
+    @Test
+    fun loneSurrogateIsAPasswordError() {
+        try {
+            SeedBox.passwordBytes(charArrayOf('a', '\uD800', 'b'))
+            fail("encoded a lone surrogate")
+        } catch (_: SeedTagException.BadPassword) {
+        }
+    }
+
+    @Test
+    fun straySpacesUseTheSameWhitespace() {
+        // U+0085 (NEL) is whitespace for seedtag.py, so it must be stray here too.
+        assertEquals(true, Passphrase.hasStraySpaces("a\u0085b".toCharArray()))
     }
 }

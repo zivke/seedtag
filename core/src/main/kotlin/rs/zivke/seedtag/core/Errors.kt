@@ -26,6 +26,9 @@ sealed class SeedTagException(message: String) : Exception(message) {
     class Malformed(detail: String) :
         SeedTagException("The tag data isn't a valid SeedTag backup ($detail).")
 
+    class BadPassword :
+        SeedTagException("The password contains a character that can't be encoded. Retype it on the app's keyboard.")
+
     class WrongPassword :
         SeedTagException("Wrong password, or the tag data is corrupted.")
 }

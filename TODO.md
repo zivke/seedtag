@@ -97,7 +97,7 @@
 - [ ] **#12 (Low): late tag results can leave a scan armed with no prompt.** Close the prompt only when
   nothing is pending; ignore a second Encrypt while busy. Pin it down with the tag-flow state machine,
   extracted before `tag-write-password` is merged.
-- [ ] **#13 (Low): Kotlin and Python disagree on two password-variant edge cases.** Explicit whitespace
+- [x] **#13 (Low): Kotlin and Python disagree on two password-variant edge cases.** Explicit whitespace
   list in both, two new `password-variants.tsv` rows, wrap the encoder failure in a `SeedTagException`.
 - [ ] **#14 (Info): an unreadable tag is treated as empty.** Optional Type 2 hardening: check the NDEF TLV
   length before writing without confirmation.

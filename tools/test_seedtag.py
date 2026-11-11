@@ -171,7 +171,7 @@ class PasswordVariants(unittest.TestCase):
 
     def test_variants_match_vectors(self):
         vecs = rows("password-variants.tsv")
-        self.assertEqual(11, len(vecs))
+        self.assertEqual(14, len(vecs))
         for cols in vecs:
             pw = bytes.fromhex(cols[0]).decode("utf-8")
             expected = [(cols[i], bytes.fromhex(cols[i + 1]).decode("utf-8")) for i in range(1, len(cols), 2)]

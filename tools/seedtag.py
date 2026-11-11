@@ -376,11 +376,25 @@ def open_blob(blob: bytes, password: str) -> bytes:
 FIXES = {"Spaces": "extra spaces", "Case": "capital letters", "SpacesAndCase": "extra spaces and capital letters"}
 
 
+# The whitespace the password rules know, spelled out (not str.split()) so the app can match it
+# exactly: str.isspace() as of Python 3.12, Unicode White_Space plus U+001C-U+001F. Same list as
+# SeedBox.isPasswordSpace in the app.
+PASSWORD_SPACES = frozenset(
+    "\t\n\v\f\r\x1c\x1d\x1e\x1f \x85\xa0\u1680" + "".join(map(chr, range(0x2000, 0x200B)))
+    + "\u2028\u2029\u202f\u205f\u3000")
+
+
+def _collapse_spaces(password: str) -> str:
+    """Whitespace (PASSWORD_SPACES) trimmed, and every run of it made one plain space."""
+    spaced = "".join(" " if c in PASSWORD_SPACES else c for c in password)
+    return " ".join(w for w in spaced.split(" ") if w)
+
+
 def password_variants(password: str) -> list[tuple[str, str]]:
     """Retry candidates for a password that didn't match: whitespace trimmed and collapsed to
     single spaces, then that lower-cased (char by char, except U+0130, whose lower case is two
     chars). Only variants that differ. Same rules as SeedBox.passwordVariants in the app."""
-    collapsed = " ".join(password.split())
+    collapsed = _collapse_spaces(password)
     lowered = "".join(c if len(c.lower()) != 1 else c.lower() for c in collapsed)
     out = []
     spaces = collapsed != password
@@ -395,7 +409,7 @@ def has_stray_spaces(password: str) -> bool:
     """True if the password starts or ends with whitespace, has two in a row, or has whitespace other
     than a plain space. encrypt refuses such a password: a written copy rarely shows it, and the
     forgiving retries only take spaces away. Same rule as Passphrase.hasStraySpaces in the app."""
-    return " ".join(password.split()) != password
+    return _collapse_spaces(password) != password
 
 
 def open_forgiving(blob: bytes, password: str) -> tuple[bytes, str | None]:

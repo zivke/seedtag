@@ -7,6 +7,7 @@ import org.bouncycastle.crypto.generators.Argon2BytesGenerator
 import org.bouncycastle.crypto.params.Argon2Parameters
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
+import java.nio.charset.CharacterCodingException
 import java.security.SecureRandom
 import java.text.Normalizer
 import java.util.Base64
@@ -119,13 +120,13 @@ object SeedBox {
 
     /**
      * Retry candidates for a password that didn't match, each a new array the caller zeroes:
-     * whitespace trimmed and collapsed to single spaces, then that lower-cased (char by char,
-     * except U+0130 İ, whose lower case is two chars). Only variants that differ are returned.
-     * Same rules as password_variants() in seedtag.py.
+     * whitespace ([isPasswordSpace]) trimmed and collapsed to single spaces, then that lower-cased
+     * (code point by code point, except U+0130 İ, whose lower case is two code points). Only
+     * variants that differ are returned. Same rules as password_variants() in seedtag.py.
      */
     fun passwordVariants(password: CharArray): List<Pair<PasswordFix, CharArray>> {
         val collapsed = collapseSpaces(password)
-        val lowered = CharArray(collapsed.size) { i -> collapsed[i].let { if (it == '\u0130') it else it.lowercaseChar() } }
+        val lowered = lowerCase(collapsed)
         val spaces = !collapsed.contentEquals(password)
         val case = !lowered.contentEquals(collapsed)
         val out = ArrayList<Pair<PasswordFix, CharArray>>(2)
@@ -134,12 +135,36 @@ object SeedBox {
         return out
     }
 
+    /**
+     * The whitespace the password rules know, spelled out so that the app and seedtag.py agree: exactly
+     * Python's `str.isspace()` (Unicode White_Space plus U+001C–U+001F). Kotlin's `isWhitespace()`
+     * differs (it leaves out U+0085).
+     */
+    fun isPasswordSpace(c: Char): Boolean = when (c.code) {
+        in 0x09..0x0D, in 0x1C..0x20, 0x85, 0xA0, 0x1680, in 0x2000..0x200A, 0x2028, 0x2029, 0x202F, 0x205F, 0x3000 -> true
+        else -> false
+    }
+
+    /** Lower case by code point, so a capital outside the BMP is lowered too; U+0130 İ is kept. */
+    private fun lowerCase(chars: CharArray): CharArray {
+        val out = CharArray(chars.size)
+        var i = 0
+        while (i < chars.size) {
+            val cp = Character.codePointAt(chars, i)
+            val n = Character.charCount(cp)
+            val lower = if (cp == 0x130) cp else Character.toLowerCase(cp)
+            Character.toChars(if (Character.charCount(lower) == n) lower else cp, out, i)
+            i += n
+        }
+        return out
+    }
+
     private fun collapseSpaces(password: CharArray): CharArray {
         val tmp = CharArray(password.size)
         var n = 0
         var gap = false
         for (c in password) {
-            if (c.isWhitespace()) {
+            if (isPasswordSpace(c)) {
                 if (n > 0) gap = true
             } else {
                 if (gap) { tmp[n++] = ' '; gap = false }
@@ -179,7 +204,11 @@ object SeedBox {
     internal fun passwordBytes(password: CharArray): ByteArray {
         if (password.all { it.code < 0x80 }) return ByteArray(password.size) { password[it].code.toByte() }
         val normalized = Normalizer.normalize(CharBuffer.wrap(password), Normalizer.Form.NFKD)
-        val bb: ByteBuffer = Charsets.UTF_8.newEncoder().encode(CharBuffer.wrap(normalized))
+        val bb: ByteBuffer = try {
+            Charsets.UTF_8.newEncoder().encode(CharBuffer.wrap(normalized))
+        } catch (e: CharacterCodingException) {
+            throw SeedTagException.BadPassword() // a lone surrogate: no UTF-8 for it
+        }
         val out = ByteArray(bb.remaining())
         bb.get(out)
         if (bb.hasArray()) bb.array().fill(0)
