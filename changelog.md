@@ -7,6 +7,9 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- When a screen goes on below what's visible, for example above the word
+  keypad or the password keyboard, its bottom edge fades out and a small ↓
+  button scrolls further; the top edge fades when there's more above.
 - Back up, Verify and Restore warn when USB or wireless debugging is on, with
   a link to Developer options: a computer the phone was ever allowed to debug
   can silently replace SeedTag or turn on an accessibility service. Android

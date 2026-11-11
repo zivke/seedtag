@@ -19,6 +19,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
@@ -26,12 +28,14 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -49,6 +53,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Warning
@@ -87,6 +92,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -96,6 +102,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
@@ -113,6 +120,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
@@ -673,11 +681,14 @@ private fun StepScreen(
     val actionsDone = LocalActionsDone.current
     LaunchedEffect(actionsDone) { if (scrollToTop) scroll.animateScrollTo(0) }
     Column(Modifier.fillMaxSize()) {
-        Column(
-            Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll).padding(horizontal = Gutter, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-            content = content,
-        )
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            Column(
+                Modifier.fillMaxSize().verticalScroll(scroll).padding(horizontal = Gutter, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                content = content,
+            )
+            ScrollHints(scroll)
+        }
         if (bottom != null) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Column(
@@ -685,6 +696,42 @@ private fun StepScreen(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
                 content = bottom,
             )
+        }
+    }
+}
+
+/**
+ * Shows that a screen goes on beyond what's visible, e.g. above a keyboard: a fade at the edge with
+ * more content, and at the bottom a ↓ button that scrolls most of a screen further.
+ */
+@Composable
+private fun BoxScope.ScrollHints(scroll: ScrollState) {
+    val bg = MaterialTheme.colorScheme.background
+    val scope = rememberCoroutineScope()
+    AnimatedVisibility(scroll.canScrollBackward, Modifier.align(Alignment.TopCenter), enter = fadeIn(), exit = fadeOut()) {
+        Box(Modifier.fillMaxWidth().height(16.dp).background(Brush.verticalGradient(listOf(bg, bg.copy(alpha = 0f)))))
+    }
+    AnimatedVisibility(scroll.canScrollForward, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
+        Box(
+            Modifier.fillMaxWidth().height(48.dp).background(Brush.verticalGradient(listOf(bg.copy(alpha = 0f), bg))),
+            contentAlignment = Alignment.BottomCenter,
+        ) {
+            Box(
+                Modifier
+                    .padding(bottom = 6.dp)
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickable { scope.launch { scroll.animateScrollBy(scroll.viewportSize * 0.8f) } },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.KeyboardArrowDown,
+                    "More below: scroll down",
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
         }
     }
 }
