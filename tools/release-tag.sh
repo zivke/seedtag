@@ -11,13 +11,15 @@
 #   --remote     default origin
 #   --dry-run    all the checks and the review, then stop before creating the tag
 #   --bootstrap  only for the first signed release: review against <vX.Y.Z> although it isn't signed with
-#                your release key, and run although the checkout isn't such a tag (read this script first)
+#                your release key, and run although the checkout isn't such a tag (read this script first).
+#                You confirm that tag's commit from evidence of your own, e.g. the APK you signed.
 #
 # Everything on GitHub is treated as untrusted (the dev container can push as you), so:
 # - It fetches only main, never tags. The previous release, the start of the review, is the newest vX.Y.Z
 #   tag in the history of the commit that is signed with your release key; others are listed and ignored.
-# - "Signed" means signed with the key in user.signingkey (its fingerprint), and gpg.ssh.allowedSignersFile
-#   must list only that key, so the agent check covers every key git verify-tag would accept.
+# - "Signed" means signed with the key in user.signingkey (its fingerprint), with the tag's own name and
+#   the message "SeedTag X.Y.Z" inside, and gpg.ssh.allowedSignersFile must list only that key, so the
+#   agent check covers every key git verify-tag would accept.
 # - The script that runs is the one checked out here, and that must be a release tag signed with your key:
 #   a new version of this script shows up in the review instead of running unreviewed. Never pull main here.
 # - Commit messages and diffs are shown with control characters removed, so they can't redraw the terminal.
@@ -30,8 +32,8 @@
 #     the commit isn't on <remote>/main, the version isn't newer, the changelog has no section for it,
 #     versionCode didn't go up, or a .gitattributes in it sets a filter.
 #  3. Review, each part on request in your pager: the commits, the changelog section, everything except the
-#     app's source code and docs, the whole diff. Refuses undiffable (binary) changes outside art/ and the
-#     Gradle wrapper jar; warns about bidirectional-text and other control characters.
+#     app's source code and docs, the whole diff. Refuses undiffable (binary) changes except art/*.png and
+#     the Gradle wrapper jar; warns about bidirectional-text and other control characters.
 #  4. Type the tag name to create the signed tag; it must verify with your key.
 #  5. Confirm to push the tag (only the tag); otherwise offer to delete it again.
 #  6. Optionally check out the tag; print the next steps (CI run of exactly this commit, sign-release.sh).
@@ -39,11 +41,12 @@ set -eu
 
 # Nothing from the environment decides which repository or config git uses.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES \
-    GIT_NAMESPACE GIT_CEILING_DIRECTORIES GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT \
+    GIT_COMMON_DIR GIT_ATTR_SOURCE GIT_NAMESPACE GIT_CEILING_DIRECTORIES GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT \
     GIT_EXTERNAL_DIFF GIT_DIFF_OPTS
 # No hooks (fetch, tag, push and checkout would run them) and no fsmonitor program.
 git() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
 
+HERE="$(cd "$(dirname "$0")" && pwd -P)"
 usage="usage: tools/release-tag.sh [--dry-run] [--commit <rev>] [--remote <name>] [--bootstrap <vX.Y.Z>]"
 DRY=0
 REV=""
@@ -75,32 +78,43 @@ ask() {
 }
 must() { ask "$1" || die "Stopped. Nothing was changed${2:-}."; }
 # Text from the repository (commit messages, names, diffs) goes through this before it reaches the
-# terminal: no escape sequences, carriage returns or other control characters except tab and newline.
-clean() { LC_ALL=C tr -d '\000-\010\013-\037\177'; }
+# terminal: no escape sequences, carriage returns or other control characters except tab and newline
+# (C1 controls in UTF-8 too, U+0080-U+009F), and bidirectional-text controls shown as <bidi>.
+clean() {
+    LC_ALL=C tr -d '\000-\010\013-\037\177' \
+        | LC_ALL=C awk '{ gsub(/\302[\200-\237]/, ""); gsub(/\342\200[\252-\256]|\342\201[\246-\251]/, "<bidi>"); print }'
+}
 is_release() { printf '%s\n' "$1" | grep -qxE 'v[0-9]+\.[0-9]+\.[0-9]+'; }
 short() { git rev-parse --short "$1"; }
 subject() { git log -1 --no-color --format="${2:-%h %s}" --date=short "$1" | clean; }
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-trap 'exit 130' INT TERM HUP
+interrupted() { printf '\n%s\n' "${R}✗ Interrupted. Steps above that say they changed something did; nothing else was.$N" >&2; exit 130; }
+trap interrupted INT TERM HUP
 PG="$(git var GIT_PAGER 2>/dev/null || echo less)"
 # page <command…>: runs it into a file (so a failure is noticed, and quitting the pager early doesn't kill
 # the script), then shows it cleaned in your pager.
 page() {
     "$@" > "$TMP/page" || die "Failed: $*"
+    trap '' INT
     clean < "$TMP/page" | LESS="${LESS-FRX}" sh -c "$PG" || true
+    trap interrupted INT
 }
 
 # ---- 1. this clone ---------------------------------------------------------------------------------
 step "1. This clone"
 [ -t 0 ] || die "Run it in a terminal: it asks before every step."
+[ "$(printf 'a\342\200\256\302\233b\n' | clean)" = "a<bidi>b" ] \
+    || die "This system's awk or tr can't filter bytes as needed ($(command -v awk)); try another awk on PATH."
 if [ -f /.dockerenv ] || [ -f /run/.containerenv ] || [ -n "${REMOTE_CONTAINERS:-}${CODESPACES:-}${DEVCONTAINER:-}" ]; then
     die "This looks like a container. Run it on the host, in the release clone (README, \"Signing a release\")."
 fi
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "Not in a git repository."
 cd "$ROOT"
 case "$ROOT" in /workspaces/*) die "$ROOT is a dev container path. Use the separate release clone." ;; esac
+[ "$HERE" = "$(cd "$ROOT/tools" 2>/dev/null && pwd -P)" ] \
+    || die "This is $HERE/release-tag.sh, not the copy in this clone. Run tools/release-tag.sh from $ROOT."
 [ -f tools/sign-release.sh ] && [ -f app/build.gradle.kts ] || die "$ROOT isn't a SeedTag clone."
 git --version | awk '{ split($3, v, "."); exit !(v[1] > 2 || (v[1] == 2 && v[2] >= 34)) }' \
     || die "git 2.34 or later is needed for SSH signatures ($(git --version))."
@@ -116,11 +130,11 @@ command git config --get-regexp '^(core\.hookspath|core\.sshcommand|gpg\.ssh\.pr
 sk="$(git config --path user.signingkey || true)"
 case "$sk" in
     "") die "No user.signingkey: git config user.signingkey \"\$HOME/.ssh/seedtag_signing.pub\"" ;;
-    key::*) pub="${sk#key::}" ;;
-    ssh-*|ecdsa-*|sk-*) pub="$sk" ;;
+    key::*|ssh-*|ecdsa-*|sk-*) die "user.signingkey is a literal key: git can sign with that only through the SSH
+  agent, which must not hold it. Set it to the path of the .pub file next to the private key." ;;
     *) [ -f "$sk" ] || die "user.signingkey file $sk doesn't exist."; pub="$(head -n 1 "$sk")" ;;
 esac
-case "$pub" in ssh-*|ecdsa-*|sk-*) ;; *) die "user.signingkey must be the public key (.pub file or key::…), not $sk." ;; esac
+case "$pub" in ssh-*|ecdsa-*|sk-*) ;; *) die "user.signingkey must be the public key (the .pub file), not $sk." ;; esac
 material="$(printf '%s\n' "$pub" | awk '{ print $2 }')"
 fp="$(printf '%s\n' "$pub" | ssh-keygen -lf - 2>/dev/null | awk '{ print $2 }')" || fp=""
 [ -n "$material" ] && [ -n "$fp" ] || die "ssh-keygen can't read the public key in user.signingkey."
@@ -141,22 +155,26 @@ asf="$(git config --path gpg.ssh.allowedSignersFile || true)"
 [ -f "$asf" ] || die "gpg.ssh.allowedSignersFile $asf doesn't exist."
 # Every entry must be the signing key: git verify-tag accepts any key in the file.
 signers="$(awk -v m="$material" '
+    { sub(/\r$/, "") }
     /^[[:space:]]*(#|$)/ { next }
     { k = ""; for (i = 1; i < NF; i++) if ($i ~ /^(ssh-|ecdsa-|sk-)/) { k = $(i + 1); break }
       if (k == m) good++; else bad = bad " " NR }
     END { printf "%d%s\n", good, bad }' "$asf")"
-case "$signers" in
-    0) die "$asf doesn't list the signing key: git verify-tag would reject the tag." ;;
-    *" "*) die "$asf also lists other keys (line(s)${signers#* }). git verify-tag accepts any of them, so use a
-  file that lists only the release signing key, set in this clone (README, \"Signing a release\")." ;;
-esac
+good="${signers%% *}"; bad="${signers#"$good"}"
+[ "$good" -gt 0 ] || die "$asf doesn't list the signing key$([ -z "$bad" ] || printf ', only other keys (line(s)%s)' "$bad"):
+  git verify-tag would reject the tag."
+[ -z "$bad" ] || die "$asf also lists other keys (line(s)$bad). git verify-tag accepts any of them, so use a
+  file that lists only the release signing key, set in this clone (README, \"Signing a release\")."
+
 ok "$asf lists only this key."
 
 # signed_release <tag>: a vX.Y.Z tag object of that name, signed with the signing key.
 signed_release() {
     is_release "$1" || return 1
     [ "$(git cat-file -t "refs/tags/$1" 2>/dev/null)" = tag ] || return 1
-    [ "$(git cat-file tag "refs/tags/$1" | sed -n 's/^tag //p' | head -n 1)" = "$1" ] || return 1
+    git cat-file tag "refs/tags/$1" > "$TMP/tagobj" 2>/dev/null || return 1
+    [ "$(sed -n 's/^tag //p' "$TMP/tagobj" | head -n 1)" = "$1" ] || return 1
+    [ "$(sed -n '/^$/{n;p;q;}' "$TMP/tagobj")" = "SeedTag ${1#v}" ] || return 1
     git verify-tag "refs/tags/$1" 2>&1 | awk -v f="$fp" '/^Good "git" signature/ && $NF == f { g = 1 } END { exit !g }'
 }
 here="$(git rev-parse HEAD)"
@@ -230,9 +248,15 @@ say "Version:        $ver (versionCode $code) → tag $B$TAG$N"
 say "Previous:       $prev → $prev_sha ($(subject "$prev_sha" %ad))"
 [ -z "$ignored" ] || warn "Ignored (not vX.Y.Z, or not signed with your key):$ignored"
 if [ -n "$BOOT" ]; then
-    warn "$prev isn't signed with your key (--bootstrap), so nothing proves it's the release you made.
-  Check that $prev is the commit above (your own notes, the release you installed, GitHub's tag page)."
-    must "Is $prev → $(short "$prev_sha") the previous release?"
+    warn "$prev isn't signed with your key (--bootstrap) and came from GitHub with the clone, so nothing here
+  proves it's the release you made: GitHub's tag page and the commit date can be forged too. Check the commit
+  against evidence the container couldn't change, e.g. the $prev APK you signed or installed:
+    apksigner verify --print-certs <apk> | grep SHA-256      (your release certificate's digest)
+    unzip -p <apk> META-INF/version-control-info.textproto   (revision: the commit)
+  or the commit hash you noted when you released it."
+    printf '%sIf your evidence shows %s, type its first 12 characters (anything else stops):%s ' "$B" "$prev_sha" "$N"
+    read -r typed || typed=""
+    [ "$typed" = "$(printf '%.12s' "$prev_sha")" ] || die "Stopped. Nothing was changed."
 fi
 awk -v a="$ver" -v b="${prev#v}" 'BEGIN { split(a, x, "."); split(b, y, ".")
     for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) exit !(x[i] + 0 > y[i] + 0); exit 1 }' \
@@ -241,9 +265,15 @@ if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
     die "A tag $TAG exists in this clone already. If you didn't create it here, something else did (it may
   have come with the clone): don't check it out or sign it. Delete it (git tag -d $TAG) and start again."
 fi
-if [ -n "$(git ls-remote --tags "$REMOTE" "refs/tags/$TAG")" ]; then
-    die "$TAG already exists on $REMOTE. If you didn't push it from this clone, something else did: don't use it."
-fi
+# remote_tag <tag>: the object id of refs/tags/<tag> on the remote (exact match), empty if it has none.
+# Use only in a plain assignment, so that its die stops the script.
+remote_tag() {
+    _o="$(git ls-remote --tags "$REMOTE" "refs/tags/$1")" || die "Can't reach $REMOTE (git ls-remote failed)."
+    printf '%s\n' "$_o" | awk -v r="refs/tags/$1" '$2 == r { print $1 }'
+}
+there="$(remote_tag "$TAG")"
+[ -z "$there" ] || die "$TAG already exists on $REMOTE. If you didn't push it from this clone, something else did: don't use it."
+
 pcode="$(gradle_value "$prev_sha" versionCode)"
 case "$pcode" in ''|*[!0-9]*) die "Can't read $prev's versionCode." ;; esac
 [ "$code" -gt "$pcode" ] || die "versionCode $code isn't higher than $prev's ($pcode)."
@@ -253,10 +283,13 @@ section="$(git show "$sha:changelog.md" | awk -v v="$ver" '
     f')"
 [ -n "$section" ] || die "changelog.md at $(short "$sha") has no '## [$ver] - YYYY-MM-DD' section."
 # A filter in .gitattributes would run a program on checkout (step 6, sign-release.sh's clone).
-git ls-tree -r --name-only "$sha" | grep -E '(^|/)\.gitattributes$' > "$TMP/attrs" || true
-while IFS= read -r a; do
-    if git show "$sha:$a" | grep -qE '(^|[[:space:]])filter='; then
-        die "$a at $(short "$sha") sets a filter (filter=…): checking it out would run that filter's program."
+git ls-tree -r "$sha" > "$TMP/tree" || die "Can't list the files of $(short "$sha")."
+awk -F'\t' '{ p = tolower($2); sub(/^"/, "", p); sub(/"$/, "", p)
+    if (p ~ /(^|\/)\.gitattributes$/) { split($1, m, " "); print m[3] "\t" $2 } }' "$TMP/tree" > "$TMP/attrs"
+while IFS="$(printf '\t')" read -r oid a; do
+    git cat-file blob "$oid" > "$TMP/attr" || die "Can't read $(printf '%s' "$a" | clean) at $(short "$sha")."
+    if grep -qiE '(^|[[:space:]])filter=' "$TMP/attr"; then
+        die "$(printf '%s' "$a" | clean) at $(short "$sha") sets a filter (filter=…): checking it out would run that filter's program."
     fi
 done < "$TMP/attrs"
 ok "$TAG doesn't exist yet; $prev → $ver; versionCode $pcode → $code; changelog has [$ver]; no filters."
@@ -288,10 +321,10 @@ ctl="$(LC_ALL=C tr -cd '\000-\010\013\014\016-\037\177' < "$TMP/diff" | wc -c | 
 [ "$ctl" = 0 ] || warn "The diff contains $ctl control character(s) (escape sequences or similar); they're removed when shown."
 
 say "$(git rev-list --count "$prev_sha..$sha") commits,$(git diff --shortstat "$prev_sha" "$sha")."
-# Everything but the app's source code, its tests and docs: what builds, checks, signs and configures.
+# Everything but the app's source code and docs: what builds, checks, signs and configures. Tests stay in:
+# CI runs them in the same tree before it builds the APK.
 focus() {
-    "$@" -- . ':(exclude)app/src/main/java' ':(exclude)core/src/main/kotlin' ':(exclude)core/src/test' \
-        ':(exclude)art' ':(exclude)*.md'
+    "$@" -- . ':(exclude)app/src/main/java' ':(exclude)core/src/main/kotlin' ':(exclude)art' ':(exclude)*.md'
 }
 unseen=""
 # shellcheck disable=SC2086
@@ -299,9 +332,10 @@ if ask "Show the commits?"; then page git log $DIFF --stat --format='%n%h %s%n%a
 else unseen="$unseen, the commits"; fi
 if ask "Show the changelog section for $ver?"; then page printf '%s\n' "$section"
 else unseen="$unseen, the changelog"; fi
-say "Changed since $prev, except the app's source code and docs (Kotlin under app/ and core/, tests, art/, *.md):"
+say "Changed since $prev, except the app's source code and docs (app/src/main/java, core/src/main/kotlin, art/, *.md):"
 # shellcheck disable=SC2086
-focus git diff $DIFF --stat "$prev_sha" "$sha" | clean | sed 's/^/  /'
+focus git diff $DIFF --stat "$prev_sha" "$sha" > "$TMP/stat" || die "git diff --stat failed."
+clean < "$TMP/stat" | sed 's/^/  /'
 # shellcheck disable=SC2086
 if ask "Show those diffs (what builds, checks, signs and configures the release)?"; then page focus git diff $DIFF "$prev_sha" "$sha"
 else unseen="$unseen, the build and release diffs"; fi
@@ -343,7 +377,8 @@ if ! ask "Push $TAG to $REMOTE ($purl)?"; then
 fi
 git push "$REMOTE" "refs/tags/$TAG:refs/tags/$TAG" \
     || die "The push failed; $TAG is still in this clone. Retry: git push $REMOTE refs/tags/$TAG, or delete it: git tag -d $TAG"
-[ "$(git ls-remote --tags "$REMOTE" "refs/tags/$TAG" | cut -f1)" = "$(git rev-parse "refs/tags/$TAG")" ] \
+there="$(remote_tag "$TAG")"
+[ "$there" = "$(git rev-parse "refs/tags/$TAG")" ] \
     || die "$REMOTE doesn't show $TAG as pushed. Check with: git ls-remote --tags $REMOTE"
 ok "$TAG is on $REMOTE."
 

@@ -112,8 +112,11 @@ tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # writes seed
 The release clone stays checked out at the last release tag, so the copy of `release-tag.sh` that runs is one you
 reviewed: the script refuses to run unless `HEAD` is a `vX.Y.Z` tag signed with your key, and a new version of it
 shows up in the review instead. **The first signed release** has no such tag yet: read the script as checked out,
-then run `tools/release-tag.sh --bootstrap vPREVIOUS` (the last, unsigned release tag, e.g. `v0.3.0`). It asks you to
-confirm that tag's commit, which you check against your own records.
+then run `tools/release-tag.sh --bootstrap vPREVIOUS` (the last, unsigned release tag, e.g. `v0.3.0`). That tag
+came from GitHub, so it asks you to confirm its commit from evidence the container couldn't change, by typing the
+commit's first 12 characters: the APK of that release you signed or installed
+(`apksigner verify --print-certs` shows your certificate's digest, and
+`unzip -p <apk> META-INF/version-control-info.textproto` the commit it was built from), or your own notes.
 
 Everything on GitHub counts as untrusted, since the container can push as you. So the script fetches only `main`,
 never tags, names every ref in full (a tag called `origin/main` can't stand in for the branch), runs git without
@@ -121,18 +124,20 @@ hooks, and shows commit messages and diffs with control characters removed, so t
 refuses in a container, in a clone with uncommitted changes, with a signing key that's loaded in the SSH agent,
 with an allowed-signers file that lists any other key, and for a commit that isn't on `origin/main`, whose version
 isn't newer than the previous release or whose tag exists already, whose changelog has no section for its version,
-whose `versionCode` didn't go up, or whose `.gitattributes` sets a filter (a program checkout would run). The
+whose `versionCode` didn't go up, or whose `.gitattributes` sets a filter (a program checkout would run). It
+also refuses to run a copy of itself from anywhere but the clone's own `tools/`. The
 previous release, where the review starts, is the newest `vX.Y.Z` tag in the commit's history **signed with your
-key**; any other tag is listed and ignored, so a tag pushed from the container can't shorten the review.
+key** (with the message `SeedTag X.Y.Z`); any other tag is listed and ignored, so a tag pushed from the container
+can't shorten the review.
 
 Then it shows the commits since the previous release, the changelog section, the diff of everything except the
 app's source code and docs (what builds, checks, signs and configures the release: `tools/`, `.github/`, Gradle
-files and wrapper, the manifest and resources, `.devcontainer/`, `.gitattributes`, …), each on request in your
-pager, and the whole diff. It refuses binary (undiffable) changes outside `art/` and the Gradle wrapper jar, and
-warns about bidirectional-text characters. If you skipped a view, it says which and you type `reviewed` to go on.
+files and wrapper, the manifest and resources, the tests, which CI runs in the same tree before building,
+`.devcontainer/`, `.gitattributes`, …), each on request in your pager, and the whole diff. It refuses binary
+(undiffable) changes except `art/*.png` and the Gradle wrapper jar, and warns about bidirectional-text characters. If you skipped a view, it says which and you type `reviewed` to go on.
 Only after you type the tag name does it run `git tag -s`; it deletes the tag again unless it verifies with your
 signing key. Pushing (the tag only) is a separate confirmation. `--dry-run` stops before the tag. By hand, it
-amounts to `git fetch`, `git log` and `git diff vPREVIOUS <commit>`, `git tag -s`, `git verify-tag` and
+amounts to `git fetch --no-tags origin main`, `git log` and `git diff vPREVIOUS <commit>`, `git tag -s`, `git verify-tag` and
 `git push origin refs/tags/vX.Y.Z`.
 
 Review against the previous release tag, not the previous fetch, so nothing slips through in between. Then
@@ -146,7 +151,8 @@ the clone only reviews, tags and signs, so the only code of the repository it ru
   skips the comparison, with a warning;
 - the clone has uncommitted changes, so an edited script in a shared working tree can't run next to your key;
 - `HEAD` isn't exactly the tag `v<versionName>`, or that tag isn't signed with the key in the clone's
-  `user.signingkey`, compared by fingerprint (`--no-verify-tag` skips that check, with a warning);
+  `user.signingkey`, compared by fingerprint, with the message `SeedTag X.Y.Z` (`--no-verify-tag` skips that
+  check, with a warning);
 - the tag on `origin` isn't this same tag any more, so CI may have built something else (`--no-remote-check` skips
   that, with a warning, e.g. offline);
 - the APK says it was built from a different commit (`META-INF/version-control-info.textproto`);

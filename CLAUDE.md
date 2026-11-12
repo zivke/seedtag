@@ -45,7 +45,7 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   test-only, allows backups, or declares a component outside its allowlist
   (`--debug` for debug builds).
 - `tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] [--no-remote-check] <keystore>`
-  runs outside the container, in a fresh clone at the release tag: refuses an
+  runs outside the container, in the release clone at the release tag: refuses an
   unsigned APK that doesn't match the independent build (`--expect`, the
   SHA-256 from the GitHub Actions run of the tag), a clone with uncommitted
   changes, a HEAD that isn't the tag `v<versionName>` signed with the key in

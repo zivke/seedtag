@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 zivke
 # Signs the release APK with the release key. Run it OUTSIDE the dev container, on the machine
-# that holds the key, from a fresh clone checked out at the release tag: the key and its password
-# never enter the container, and the script that handles them isn't one the container could edit.
+# that holds the key, in the release clone (README, "Signing a release") checked out at the release
+# tag: the key and its password never enter the container, and the script that handles them isn't
+# one the container could edit.
 #
 #   tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] [--no-remote-check]
 #                         <keystore> [key alias]
@@ -14,7 +15,7 @@
 #   dev container isn't signed. It's required; --no-expect skips it, with a warning.
 # - The clone has no uncommitted changes, and HEAD is exactly the tag v<versionName>. The tag is
 #   signed with the key in this clone's user.signingkey (compared by fingerprint, not just "a key
-#   git verify-tag accepts"), made outside the container. --no-verify-tag skips the signature
+#   git verify-tag accepts"), made outside the container, and carries the message "SeedTag X.Y.Z". --no-verify-tag skips the signature
 #   check, with a warning, e.g. for a first try.
 # - The tag on origin (REMOTE=… for another remote) is still this one, so CI built what you tagged
 #   and nothing moved it since. --no-remote-check skips that, with a warning, e.g. offline.
@@ -23,8 +24,9 @@
 #
 # Reads seedtag-unsigned.apk (from `make build`), writes seedtag.apk and its checksum in
 # seedtag.apk.sha256. apksigner asks for the keystore password. The result must be signed with the
-# certificate whose SHA-256 is in tools/release-cert.sha256, or it's deleted. Needs git, unzip and
-# the Android build-tools (apksigner, aapt2), from ANDROID_HOME or on PATH.
+# certificate whose SHA-256 is in tools/release-cert.sha256, or it's deleted. Needs git, unzip,
+# ssh-keygen, sha256sum (or shasum) and the Android build-tools (apksigner, aapt2), from ANDROID_HOME
+# or on PATH.
 #
 # Review what changed since the last release before running this with your key, in this clone:
 # git diff <previous tag>..<this tag> (the source, and this script, check-apk.sh and the CI workflow).
@@ -57,7 +59,7 @@ OUT="${OUT:-seedtag.apk}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 # Nothing from the environment decides which repository or config git uses; no hooks, no fsmonitor.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES \
-    GIT_NAMESPACE GIT_CEILING_DIRECTORIES GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
+    GIT_COMMON_DIR GIT_ATTR_SOURCE GIT_NAMESPACE GIT_CEILING_DIRECTORIES GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
 git() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
 
 SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
@@ -67,14 +69,18 @@ if [ -x "$BUILD_TOOLS/apksigner" ]; then APKSIGNER="$BUILD_TOOLS/apksigner"
 elif command -v apksigner >/dev/null 2>&1; then APKSIGNER="$(command -v apksigner)"
 else echo "Missing: apksigner (set ANDROID_HOME, or put the Android build-tools on PATH)" >&2; exit 1
 fi
-for tool in git unzip sha256sum ssh-keygen; do
+for tool in git unzip ssh-keygen; do
     command -v "$tool" >/dev/null 2>&1 || { echo "Missing: $tool" >&2; exit 1; }
 done
+if command -v sha256sum >/dev/null 2>&1; then sha256() { sha256sum "$@"; }
+elif command -v shasum >/dev/null 2>&1; then sha256() { shasum -a 256 "$@"; }
+else echo "Missing: sha256sum or shasum" >&2; exit 1
+fi
 
 [ -f "$IN" ] || { echo "Missing: $IN (run make build first)" >&2; exit 1; }
 
 # 1. The independent build.
-got="$(sha256sum "$IN" | cut -d' ' -f1)"
+got="$(sha256 "$IN" | cut -d' ' -f1)"
 if [ -n "$EXPECT" ]; then
     if [ "$got" != "$EXPECT" ]; then
         echo "!! $IN has SHA-256 $got," >&2
@@ -122,8 +128,10 @@ if [ "$VERIFY_TAG" = 1 ]; then
         exit 1
     fi
     vt="$(git -C "$REPO" verify-tag "refs/tags/$TAG" 2>&1 | LC_ALL=C tr -d '\000-\010\013-\037\177')" || true
-    name="$(git -C "$REPO" cat-file tag "refs/tags/$TAG" 2>/dev/null | sed -n 's/^tag //p' | head -n 1)"
-    if [ "$name" != "$TAG" ] || ! printf '%s\n' "$vt" | awk -v f="$fp" '/^Good "git" signature/ && $NF == f { g = 1 } END { exit !g }'; then
+    obj="$(git -C "$REPO" cat-file tag "refs/tags/$TAG" 2>/dev/null || true)"
+    name="$(printf '%s\n' "$obj" | sed -n 's/^tag //p' | head -n 1)"
+    msg="$(printf '%s\n' "$obj" | sed -n '/^$/{n;p;q;}')"
+    if [ "$name" != "$TAG" ] || [ "$msg" != "SeedTag $ver" ] || ! printf '%s\n' "$vt" | awk -v f="$fp" '/^Good "git" signature/ && $NF == f { g = 1 } END { exit !g }'; then
         echo "!! $TAG isn't a tag signed with the release signing key $fp:" >&2
         printf '%s\n' "$vt" | sed 's/^/!!   /' >&2
         echo "!! Create release tags with tools/release-tag.sh outside the container (README.md), or pass --no-verify-tag." >&2
@@ -176,5 +184,5 @@ if [ "$actual" != "$expected" ]; then
     exit 1
 fi
 "$HERE/check-apk.sh" "$OUT"
-sha256sum "$OUT" > "$OUT.sha256"
+sha256 "$OUT" > "$OUT.sha256"
 echo ">> $OUT is signed with the release key. Publish $OUT.sha256 and the certificate digest with it."

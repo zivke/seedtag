@@ -14,10 +14,14 @@ All notable user-visible changes to SeedTag. The format follows
   and an allowed-signers file with only that key. Commit text and diffs are
   shown without control characters, the build review covers everything
   except app source and docs, undiffable changes and `.gitattributes` filters
-  are refused, and git runs without hooks. `tools/sign-release.sh` checks the
-  tag's signer by fingerprint, takes the tag from `versionName`, and checks
-  that the tag on GitHub wasn't moved (`--no-remote-check` to skip). From the
-  review in `reports/2026-11-12-release-tag-review.md`.
+  are refused, and git runs without hooks. For the first signed release,
+  `--bootstrap` has you confirm the previous tag's commit from your own
+  evidence (e.g. the APK you signed). `tools/sign-release.sh` checks the
+  tag's signer by fingerprint and its message, takes the tag from
+  `versionName`, and checks that the tag on GitHub wasn't moved
+  (`--no-remote-check` to skip). From the reviews in
+  `reports/2026-11-12-release-tag-review.md` and
+  `reports/2026-11-12-release-tag-hardening-review.md`.
 
 ## [0.4.1] - 2026-11-12
 
