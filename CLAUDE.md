@@ -52,6 +52,10 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   APK whose recorded commit isn't HEAD. It signs `seedtag-unsigned.apk` into
   `seedtag.apk`, refuses any certificate but the one in
   `tools/release-cert.sha256`, and writes `seedtag.apk.sha256`.
+  `tools/release-tag.sh [--dry-run] [--commit <rev>]` also runs on the host, in
+  the release clone: checks the clone and the signing setup, shows the review
+  (commits, changelog, build and release diffs since the last tag), then asks
+  before creating the signed tag, verifying it and pushing only the tag.
   The release build is reproducible; keep it that way (no timestamps, paths or
   other machine-specific data in the APK). `make install` / `make run` install that
   signed `seedtag.apk`; they never build or sign.

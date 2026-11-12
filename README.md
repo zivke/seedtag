@@ -96,19 +96,24 @@ make build                       # prints the SHA-256 of seedtag-unsigned.apk
 
 # on the host, in the release clone:
 cd ~/seedtag-release
-git checkout main && git pull --ff-only   # fails if main was rewritten: find out why
-git log --oneline vPREVIOUS..main          # every commit since the last release, nothing unexpected
-git rev-parse HEAD                         # the release commit you expect
-git diff vPREVIOUS main -- tools/ .github/ Makefile app/build.gradle.kts gradle/ build.gradle.kts \
-    settings.gradle.kts app/src/main/AndroidManifest.xml   # at least the build, the checks and this script
-git tag -s vX.Y.Z -m "SeedTag X.Y.Z"
-git verify-tag vX.Y.Z                      # Good "git" signature, your signing key's fingerprint
-git push origin vX.Y.Z
+tools/release-tag.sh [--commit <sha>]     # review, signed tag, verify, push: asks before each step
 # the tag's GitHub Actions run shows the SHA-256 of its own build (see Build integrity); it should
 # match the container's. Download the run's seedtag-unsigned.apk into the release clone, then:
-git checkout vX.Y.Z
+git checkout vX.Y.Z                       # release-tag.sh offers to do this
 tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # writes seedtag.apk and seedtag.apk.sha256
 ```
+
+`tools/release-tag.sh` only fetches, so the copy that runs is the one checked out in the release clone (from the
+last release; read it the first time). It refuses in a container, in a clone with uncommitted changes, with a
+signing key that's loaded in the SSH agent or missing from `allowed_signers`, and for a commit that isn't on
+`origin/main`, whose tag exists already, whose changelog has no section for its version, or whose `versionCode`
+didn't go up. Then it shows the commits since the previous release tag, the changelog section, and the diffs of
+everything that builds, checks and signs the release (`tools/`, `.github/`, the Gradle files, the manifest,
+`.devcontainer/`), each on request in your pager, and the whole diff. Only after you confirm the review and type
+the tag name does it run `git tag -s`; it deletes the tag again unless `git verify-tag` accepts it with your
+signing key. Pushing (the tag only) is a separate confirmation. `--dry-run` stops before the tag. By hand, it
+amounts to `git fetch`, `git log` and `git diff vPREVIOUS <commit>`, `git tag -s`, `git verify-tag` and
+`git push origin refs/tags/vX.Y.Z`.
 
 Review against the previous release tag, not the previous pull, so nothing slips through in between. Then
 install `seedtag.apk` over the previous release (`adb install -r`, or `make run` after copying it into the
