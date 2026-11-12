@@ -44,18 +44,22 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   gives access to anything). It also fails a release APK that is debuggable,
   test-only, allows backups, or declares a component outside its allowlist
   (`--debug` for debug builds).
-- `tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] <keystore>`
+- `tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] [--no-remote-check] <keystore>`
   runs outside the container, in a fresh clone at the release tag: refuses an
   unsigned APK that doesn't match the independent build (`--expect`, the
   SHA-256 from the GitHub Actions run of the tag), a clone with uncommitted
-  changes, a HEAD that isn't a `v*` tag accepted by `git verify-tag`, and an
-  APK whose recorded commit isn't HEAD. It signs `seedtag-unsigned.apk` into
+  changes, a HEAD that isn't the tag `v<versionName>` signed with the key in
+  the clone's `user.signingkey` (by fingerprint), a tag that differs on
+  `origin`, and an APK whose recorded commit isn't HEAD. It signs `seedtag-unsigned.apk` into
   `seedtag.apk`, refuses any certificate but the one in
   `tools/release-cert.sha256`, and writes `seedtag.apk.sha256`.
-  `tools/release-tag.sh [--dry-run] [--commit <rev>]` also runs on the host, in
-  the release clone: checks the clone and the signing setup, shows the review
-  (commits, changelog, build and release diffs since the last tag), then asks
-  before creating the signed tag, verifying it and pushing only the tag.
+  `tools/release-tag.sh [--dry-run] [--commit <rev>] [--bootstrap <vX.Y.Z>]` also
+  runs on the host, in the release clone checked out at the last signed release
+  tag: checks the clone and the signing setup, fetches only `main` (never tags),
+  shows the review since the newest release tag signed with the release key
+  (commits, changelog, everything but app source and docs, the whole diff),
+  then asks before creating the signed tag, verifying it and pushing only the
+  tag. It treats everything on GitHub as untrusted input.
   The release build is reproducible; keep it that way (no timestamps, paths or
   other machine-specific data in the APK). `make install` / `make run` install that
   signed `seedtag.apk`; they never build or sign.

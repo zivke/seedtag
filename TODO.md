@@ -74,6 +74,8 @@
     (README).
   - [x] Signed release tags (`git tag -s`, key outside the container), checked by `sign-release.sh`.
   - [x] Make `--expect` mandatory, with an explicit `--no-expect`.
+  - [x] Harden `release-tag.sh` and `sign-release.sh` after their review
+    ([reports/2026-11-12-release-tag-review.md](reports/2026-11-12-release-tag-review.md)): all 17 findings.
   - [ ] Set up the release clone on the host and a signing key outside the SSH agent, and tag and sign
     only there (README, "Signing a release"; `.devcontainer/README.md`, "What the container can reach on
     the host"). Pushing `main` from VS Code in the container stays. User action, on the host.

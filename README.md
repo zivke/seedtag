@@ -66,27 +66,32 @@ and git on the host runs hooks and some settings from there (`.git/hooks/*`, `co
 | Where | What |
 |---|---|
 | Dev container | Work, commit, `make build`. Push `main` with VS Code's Source Control (in a container window it runs in the container, with your forwarded credentials). No tags. |
-| Release clone on the host (`~/seedtag-release`) | Pull, review, signed tag, `sign-release.sh`. Never opened in a container. |
+| Release clone on the host (`~/seedtag-release`) | Review, signed tag, `sign-release.sh`, all through the scripts. `release-tag.sh` fetches `main` itself; never `git pull` or check out `main` there. Never opened in a container. |
 
 **Once, on the host:**
 
 ```sh
-# a signing key just for releases, with a passphrase; never ssh-add it (see below)
-ssh-keygen -t ed25519 -C "seedtag release signing" -f ~/.ssh/seedtag_signing
-echo "<your git email> namespaces=\"git\" $(cat ~/.ssh/seedtag_signing.pub)" >> ~/.ssh/allowed_signers
-git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers   # public keys only
+# a signing key for releases only, with a passphrase; never ssh-add it (see below)
+ssh-keygen -t ed25519 -C "release signing" -f ~/.ssh/seedtag_signing
+# an allowed-signers file with only that key (git verify-tag accepts every key in it)
+printf '%s namespaces="git" %s\n' "<your git email>" "$(cut -d' ' -f1,2 ~/.ssh/seedtag_signing.pub)" \
+    > ~/.ssh/release_allowed_signers
 
 git clone https://github.com/zivke/seedtag.git ~/seedtag-release && cd ~/seedtag-release
 git config gpg.format ssh
-git config user.signingkey ~/.ssh/seedtag_signing.pub
+git config user.signingkey "$HOME/.ssh/seedtag_signing.pub"
+git config gpg.ssh.allowedSignersFile "$HOME/.ssh/release_allowed_signers"
 git config tag.gpgSign true
 ```
 
-Add `~/.ssh/seedtag_signing.pub` on GitHub as a **Signing Key** (Settings › SSH and GPG keys), so the tags show as
-verified; it grants no access. The key isn't loaded into the SSH agent on purpose: VS Code forwards the agent into
-the container, so a key in it could sign a tag "as you" from there. Git reads the file and asks for its passphrase
-instead. (A hardware key, `-t ed25519-sk`, which needs a touch per signature, works too.) The release clone also
-needs a way to push the tag from the host: HTTPS with your credential manager, or an SSH login key.
+All of it is set in the release clone only, not with `--global`. Add `~/.ssh/seedtag_signing.pub` on GitHub as a
+**Signing Key** (Settings › SSH and GPG keys), so the tags show as verified; it grants no access. The key isn't
+loaded into the SSH agent on purpose: VS Code forwards the agent into the container, so a key in it could sign a
+tag "as you" from there. Git reads the file and asks for its passphrase instead. Make sure nothing loads it for you
+(`AddKeysToAgent` in `~/.ssh/config`, a desktop keyring). (A hardware key, `-t ed25519-sk`, which needs a touch per
+signature, works too.) The same key and file can serve other projects released the same way, never from a
+container or CI. The release clone also needs a way to push the tag from the host: HTTPS with your credential
+manager, or an SSH login key.
 
 **For each release:**
 
@@ -98,24 +103,39 @@ make build                       # prints the SHA-256 of seedtag-unsigned.apk
 cd ~/seedtag-release
 tools/release-tag.sh [--commit <sha>]     # review, signed tag, verify, push: asks before each step
 # the tag's GitHub Actions run shows the SHA-256 of its own build (see Build integrity); it should
-# match the container's. Download the run's seedtag-unsigned.apk into the release clone, then:
+# match the container's. Use the run only if GitHub's run page shows a push of vX.Y.Z at the commit
+# release-tag.sh printed. Download the run's seedtag-unsigned.apk into the release clone, then:
 git checkout vX.Y.Z                       # release-tag.sh offers to do this
 tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # writes seedtag.apk and seedtag.apk.sha256
 ```
 
-`tools/release-tag.sh` only fetches, so the copy that runs is the one checked out in the release clone (from the
-last release; read it the first time). It refuses in a container, in a clone with uncommitted changes, with a
-signing key that's loaded in the SSH agent or missing from `allowed_signers`, and for a commit that isn't on
-`origin/main`, whose tag exists already, whose changelog has no section for its version, or whose `versionCode`
-didn't go up. Then it shows the commits since the previous release tag, the changelog section, and the diffs of
-everything that builds, checks and signs the release (`tools/`, `.github/`, the Gradle files, the manifest,
-`.devcontainer/`), each on request in your pager, and the whole diff. Only after you confirm the review and type
-the tag name does it run `git tag -s`; it deletes the tag again unless `git verify-tag` accepts it with your
+The release clone stays checked out at the last release tag, so the copy of `release-tag.sh` that runs is one you
+reviewed: the script refuses to run unless `HEAD` is a `vX.Y.Z` tag signed with your key, and a new version of it
+shows up in the review instead. **The first signed release** has no such tag yet: read the script as checked out,
+then run `tools/release-tag.sh --bootstrap vPREVIOUS` (the last, unsigned release tag, e.g. `v0.3.0`). It asks you to
+confirm that tag's commit, which you check against your own records.
+
+Everything on GitHub counts as untrusted, since the container can push as you. So the script fetches only `main`,
+never tags, names every ref in full (a tag called `origin/main` can't stand in for the branch), runs git without
+hooks, and shows commit messages and diffs with control characters removed, so they can't redraw the terminal. It
+refuses in a container, in a clone with uncommitted changes, with a signing key that's loaded in the SSH agent,
+with an allowed-signers file that lists any other key, and for a commit that isn't on `origin/main`, whose version
+isn't newer than the previous release or whose tag exists already, whose changelog has no section for its version,
+whose `versionCode` didn't go up, or whose `.gitattributes` sets a filter (a program checkout would run). The
+previous release, where the review starts, is the newest `vX.Y.Z` tag in the commit's history **signed with your
+key**; any other tag is listed and ignored, so a tag pushed from the container can't shorten the review.
+
+Then it shows the commits since the previous release, the changelog section, the diff of everything except the
+app's source code and docs (what builds, checks, signs and configures the release: `tools/`, `.github/`, Gradle
+files and wrapper, the manifest and resources, `.devcontainer/`, `.gitattributes`, …), each on request in your
+pager, and the whole diff. It refuses binary (undiffable) changes outside `art/` and the Gradle wrapper jar, and
+warns about bidirectional-text characters. If you skipped a view, it says which and you type `reviewed` to go on.
+Only after you type the tag name does it run `git tag -s`; it deletes the tag again unless it verifies with your
 signing key. Pushing (the tag only) is a separate confirmation. `--dry-run` stops before the tag. By hand, it
 amounts to `git fetch`, `git log` and `git diff vPREVIOUS <commit>`, `git tag -s`, `git verify-tag` and
 `git push origin refs/tags/vX.Y.Z`.
 
-Review against the previous release tag, not the previous pull, so nothing slips through in between. Then
+Review against the previous release tag, not the previous fetch, so nothing slips through in between. Then
 install `seedtag.apk` over the previous release (`adb install -r`, or `make run` after copying it into the
 container), and publish it with `seedtag.apk.sha256`. Don't run `make build` in the release clone: CI builds, and
 the clone only reviews, tags and signs, so the only code of the repository it runs is `sign-release.sh` and
@@ -125,8 +145,10 @@ the clone only reviews, tags and signs, so the only code of the repository it ru
 - the unsigned APK doesn't match the independent build given with `--expect`. That's required: `--no-expect`
   skips the comparison, with a warning;
 - the clone has uncommitted changes, so an edited script in a shared working tree can't run next to your key;
-- `HEAD` isn't exactly a `vX.Y.Z` tag, or `git verify-tag` doesn't accept its signature (`--no-verify-tag` skips
-  that check, with a warning);
+- `HEAD` isn't exactly the tag `v<versionName>`, or that tag isn't signed with the key in the clone's
+  `user.signingkey`, compared by fingerprint (`--no-verify-tag` skips that check, with a warning);
+- the tag on `origin` isn't this same tag any more, so CI may have built something else (`--no-remote-check` skips
+  that, with a warning, e.g. offline);
 - the APK says it was built from a different commit (`META-INF/version-control-info.textproto`);
 - the APK asks for any other permission, or fails the manifest checks (`check-apk.sh`).
 
@@ -148,9 +170,11 @@ What each step protects against:
   can push to GitHub as you (VS Code forwards your credentials; that's how its push button works). So **review
   the diff since the last release** in the release clone before tagging. That review is the only defence for the
   source itself. A commit the container pushed on its own shows up there; a rewritten `main` makes
-  `git pull --ff-only` fail.
-- **The signed tag** says which commit you reviewed. Since the signing key is outside the agent, the container
-  can't make one: a `v*` tag it pushed itself would be built by CI, but `sign-release.sh` refuses to sign it.
+  `release-tag.sh` stop and ask.
+- **The signed tag** says which commit you reviewed. Since the signing key is outside the agent and the only key
+  in the release clone's allowed-signers file, the container can't make one: a `v*` tag it pushed itself would
+  be built by CI, but `release-tag.sh` ignores it and `sign-release.sh` refuses to sign it. CI runs aren't signed,
+  so check that the run you take the SHA-256 from is the push of your tag at the commit you tagged.
 - **The separate clone** keeps the container's `.git` (hooks, config) away from the git that signs, and makes the
   script that runs next to your release key the one in the reviewed tag.
 

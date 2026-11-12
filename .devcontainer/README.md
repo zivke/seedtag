@@ -50,10 +50,11 @@ release"):
 To take push access away completely, set
 `"dev.containers.gitCredentialHelperConfigLocation": "none"` in VS Code's
 user settings and rebuild the container. VS Code's push button then stops
-working here, and `main` is pushed from the release clone instead (`git pull`
-there can't see the container's commits, so bring them over with a bundle:
-`git bundle create seedtag.bundle origin/main..main` here, then `git fetch
-<path>/seedtag.bundle main:incoming` in the release clone). A tag ruleset on
+working here, and `main` is pushed from the release clone instead (it can't
+see the container's commits, so bring them over with a bundle: `git bundle
+create seedtag.bundle origin/main..main` here, then `git fetch
+<path>/seedtag.bundle main:incoming` and `git push origin incoming:main` in the
+release clone, without checking `incoming` out). A tag ruleset on
 GitHub (Settings › Rules) that restricts `v*` tags only helps once the
 container has no credentials, since otherwise it acts as you.
 

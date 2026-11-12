@@ -4,6 +4,21 @@ All notable user-visible changes to SeedTag. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are the
 `versionName` in `app/build.gradle.kts`.
 
+## [Unreleased]
+
+### Changed
+- Releasing: `tools/release-tag.sh` treats everything on GitHub as untrusted.
+  It fetches only `main`, starts the review at the newest release tag signed
+  with your release key (others are ignored), requires the release clone to
+  be checked out at such a tag (`--bootstrap` for the first signed release),
+  and an allowed-signers file with only that key. Commit text and diffs are
+  shown without control characters, the build review covers everything
+  except app source and docs, undiffable changes and `.gitattributes` filters
+  are refused, and git runs without hooks. `tools/sign-release.sh` checks the
+  tag's signer by fingerprint, takes the tag from `versionName`, and checks
+  that the tag on GitHub wasn't moved (`--no-remote-check` to skip). From the
+  review in `reports/2026-11-12-release-tag-review.md`.
+
 ## [0.4.1] - 2026-11-12
 
 ### Changed
