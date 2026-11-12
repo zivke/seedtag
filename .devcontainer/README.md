@@ -15,22 +15,47 @@ Android's debug key, which lives in the `android-adb` volume.
 Debug-key and release-key builds can't be installed over each other, so
 switching between them on the device needs `make uninstall` first.
 
-## No push access from the container (recommended)
+## What the container can reach on the host
 
-VS Code forwards your host's git credentials into the container (a credential
-helper in `/etc/gitconfig` and `~/.gitconfig`), so anything running here can
-push commits and tags to GitHub as you. The CI build that `sign-release.sh
---expect` relies on then proves nothing about the source: whatever the
-container pushed, CI builds and "confirms". To close that:
+VS Code forwards three things from the host into the container, so anything
+running here can use them while the window is open:
 
-1. In VS Code on the host, set `"dev.containers.gitCredentialHelperConfigLocation":
-   "none"` in your user settings, then rebuild the container. Commit here, but
-   push from the host (`git push` there, from the same repository folder).
-2. Create release tags only on the host, signed: `git tag -s vX.Y.Z`. The
-   signing machine checks them (`sign-release.sh` runs `git verify-tag`).
-3. Optionally add a tag ruleset on GitHub (Settings › Rules) that restricts
-   creating and moving `v*` tags. It only helps once the container has no
-   credentials, since otherwise it acts as you.
+- **Git credentials** (a credential helper in `/etc/gitconfig` and
+  `~/.gitconfig`): pushing to GitHub as you. That's also how VS Code's
+  Source Control push works in a container window: it runs `git push` here.
+- **The SSH agent** (`SSH_AUTH_SOCK`): every key loaded in it can be used,
+  though not read, to log in or to sign.
+- **The GPG agent** (`~/.gnupg/S.gpg-agent`): the same for GPG keys.
+
+And the project folder is mounted read-write, `.git/` included: hooks and
+config written here run on the host if git runs in that folder there.
+
+Pushing `main` from VS Code is fine. The release doesn't rely on the
+container being unable to push; it relies on these (README, "Signing a
+release"):
+
+1. **Tag and sign in a separate clone on the host** (`~/seedtag-release`),
+   never opened in a container, after reviewing the diff since the last
+   release there. Never run git in the mounted folder from a host terminal.
+   Don't push tags from VS Code (leave `git.followTagsWhenSync` off).
+2. **Keep the release-signing key out of the agents**: a key file with a
+   passphrase that's never `ssh-add`ed (or a hardware key). Then the
+   container can't make a tag that `git verify-tag` accepts, and
+   `sign-release.sh` won't sign what CI built from a tag it pushed.
+3. For other keys in the agent (your GitHub login key), add them with
+   `ssh-add -c` so each use needs a confirmation on the host, or don't load
+   them while the container runs. Unsetting `SSH_AUTH_SOCK` here isn't
+   enough: the forwarded socket stays in `/tmp`.
+
+To take push access away completely, set
+`"dev.containers.gitCredentialHelperConfigLocation": "none"` in VS Code's
+user settings and rebuild the container. VS Code's push button then stops
+working here, and `main` is pushed from the release clone instead (`git pull`
+there can't see the container's commits, so bring them over with a bundle:
+`git bundle create seedtag.bundle origin/main..main` here, then `git fetch
+<path>/seedtag.bundle main:incoming` in the release clone). A tag ruleset on
+GitHub (Settings › Rules) that restricts `v*` tags only helps once the
+container has no credentials, since otherwise it acts as you.
 
 ## What is in the image
 

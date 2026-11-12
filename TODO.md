@@ -74,8 +74,9 @@
     (README).
   - [x] Signed release tags (`git tag -s`, key outside the container), checked by `sign-release.sh`.
   - [x] Make `--expect` mandatory, with an explicit `--no-expect`.
-  - [ ] No push credentials in the container (turn off VS Code's credential forwarding); protect `v*`
-    tags on GitHub. Documented in `.devcontainer/README.md`; it's a host setting, for the user to apply.
+  - [ ] Set up the release clone on the host and a signing key outside the SSH agent, and tag and sign
+    only there (README, "Signing a release"; `.devcontainer/README.md`, "What the container can reach on
+    the host"). Pushing `main` from VS Code in the container stays. User action, on the host.
 - [x] **#4 (Medium-Low): recovery needs third-party packages.**
   - [x] Catch `ImportError` in `seedtag.py` and say what to install; state the minimum Python version.
   - [x] README and Done screen: keep a copy of `seedtag.py` with the written password.

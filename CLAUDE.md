@@ -171,10 +171,11 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   `Added` entry bumps MINOR; only fixes bump PATCH.
 - Releasing (only when asked): rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`,
   bump `versionCode` by 1 and set `versionName` to `X.Y.Z` in
-  `app/build.gradle.kts`, commit, and run `make build`. The user creates the
-  signed tag `vX.Y.Z` (`git tag -s`, with a key that isn't in the container),
-  pushes it and signs `seedtag-unsigned.apk`, all outside the container. Never
-  create or push a release tag from the container.
+  `app/build.gradle.kts`, commit, and run `make build`. The user pushes `main`
+  (VS Code), then creates the signed tag `vX.Y.Z` (`git tag -s`, with a key
+  that isn't in the container or its agents), pushes it and signs
+  `seedtag-unsigned.apk`, all in a separate release clone on the host (README,
+  "Signing a release"). Never create or push a release tag from the container.
 - Branching: small fixes and changes go on the current branch; new features
   and bigger or more significant changes get a separate branch.
 - Never commit `*.p12` / `*.jks` / `*.keystore`, `.env` or an APK (`.gitignore`

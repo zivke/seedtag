@@ -58,23 +58,63 @@ only lets SeedTag hide other apps' overlays, the other only runs the vibration m
 ### Signing a release
 
 The release key is kept out of the dev container, so nothing that runs there (build scripts, dependencies, an AI
-agent) can read it and sign a fake update. Sign on the machine that holds the key, ideally an offline one with
-only the Android build-tools (`apksigner`, `aapt2`) installed:
+agent) can read it and sign a fake update. Releases are tagged and signed in a **separate clone on the host**, one
+the container never sees: the container can write to everything in the mounted project folder, `.git/` included,
+and git on the host runs hooks and some settings from there (`.git/hooks/*`, `core.fsmonitor`,
+`gpg.ssh.program`, …). Never run git in the mounted folder from a host terminal, and never tag or sign there.
+
+| Where | What |
+|---|---|
+| Dev container | Work, commit, `make build`. Push `main` with VS Code's Source Control (in a container window it runs in the container, with your forwarded credentials). No tags. |
+| Release clone on the host (`~/seedtag-release`) | Pull, review, signed tag, `sign-release.sh`. Never opened in a container. |
+
+**Once, on the host:**
 
 ```sh
-make build                       # in the container: seedtag-unsigned.apk, prints its SHA-256
-git tag -s vX.Y.Z && git push origin vX.Y.Z    # on the host, not in the container: a signed tag
-# the tag's GitHub Actions run shows the SHA-256 of its own build (see Build integrity)
+# a signing key just for releases, with a passphrase; never ssh-add it (see below)
+ssh-keygen -t ed25519 -C "seedtag release signing" -f ~/.ssh/seedtag_signing
+echo "<your git email> namespaces=\"git\" $(cat ~/.ssh/seedtag_signing.pub)" >> ~/.ssh/allowed_signers
+git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers   # public keys only
 
-# on the signing machine, in a fresh clone (not the container's working tree):
-git clone https://github.com/zivke/seedtag && cd seedtag && git checkout vX.Y.Z
-git diff vPREVIOUS..vX.Y.Z       # review what changed: the source, tools/ and .github/
-cp /path/to/seedtag-unsigned.apk .             # from the container, or the CI run's artifact
-tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # writes seedtag.apk
+git clone https://github.com/zivke/seedtag.git ~/seedtag-release && cd ~/seedtag-release
+git config gpg.format ssh
+git config user.signingkey ~/.ssh/seedtag_signing.pub
+git config tag.gpgSign true
 ```
 
-Then install `seedtag.apk` with `make run` back in the container (copy it there), or `adb install` from the
-signing machine.
+Add `~/.ssh/seedtag_signing.pub` on GitHub as a **Signing Key** (Settings › SSH and GPG keys), so the tags show as
+verified; it grants no access. The key isn't loaded into the SSH agent on purpose: VS Code forwards the agent into
+the container, so a key in it could sign a tag "as you" from there. Git reads the file and asks for its passphrase
+instead. (A hardware key, `-t ed25519-sk`, which needs a touch per signature, works too.) The release clone also
+needs a way to push the tag from the host: HTTPS with your credential manager, or an SSH login key.
+
+**For each release:**
+
+```sh
+# in the container: set the version (see CLAUDE.md, Releasing), commit, push main from VS Code; no tags
+make build                       # prints the SHA-256 of seedtag-unsigned.apk
+
+# on the host, in the release clone:
+cd ~/seedtag-release
+git checkout main && git pull --ff-only   # fails if main was rewritten: find out why
+git log --oneline vPREVIOUS..main          # every commit since the last release, nothing unexpected
+git rev-parse HEAD                         # the release commit you expect
+git diff vPREVIOUS main -- tools/ .github/ Makefile app/build.gradle.kts gradle/ build.gradle.kts \
+    settings.gradle.kts app/src/main/AndroidManifest.xml   # at least the build, the checks and this script
+git tag -s vX.Y.Z -m "SeedTag X.Y.Z"
+git verify-tag vX.Y.Z                      # Good "git" signature, your signing key's fingerprint
+git push origin vX.Y.Z
+# the tag's GitHub Actions run shows the SHA-256 of its own build (see Build integrity); it should
+# match the container's. Download the run's seedtag-unsigned.apk into the release clone, then:
+git checkout vX.Y.Z
+tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # writes seedtag.apk and seedtag.apk.sha256
+```
+
+Review against the previous release tag, not the previous pull, so nothing slips through in between. Then
+install `seedtag.apk` over the previous release (`adb install -r`, or `make run` after copying it into the
+container), and publish it with `seedtag.apk.sha256`. Don't run `make build` in the release clone: CI builds, and
+the clone only reviews, tags and signs, so the only code of the repository it runs is `sign-release.sh` and
+`check-apk.sh`, both in the reviewed diff.
 
 `sign-release.sh` checks everything before the key is used, and refuses to sign if:
 - the unsigned APK doesn't match the independent build given with `--expect`. That's required: `--no-expect`
@@ -83,7 +123,7 @@ signing machine.
 - `HEAD` isn't exactly a `vX.Y.Z` tag, or `git verify-tag` doesn't accept its signature (`--no-verify-tag` skips
   that check, with a warning);
 - the APK says it was built from a different commit (`META-INF/version-control-info.textproto`);
-- the APK asks for any other permission.
+- the APK asks for any other permission, or fails the manifest checks (`check-apk.sh`).
 
 Then it signs, and deletes the result unless it carries the release certificate:
 
@@ -99,13 +139,15 @@ What each step protects against:
 - **Signing outside protects the key, not the build.** If the container were compromised, the unsigned APK could
   already be tampered with, and the permission check wouldn't notice a weakened encryption. `--expect` catches
   that: sign only an APK that's byte-for-byte the same as a build made somewhere else.
-- **`--expect` proves the build, not the source.** CI builds whatever commit the tag points at. The container can
-  write to the repository, and with VS Code's forwarded git credentials it can push commits and tags too. So: take
-  push access away from the container (see `.devcontainer/README.md`, "No push access from the container"),
-  create release tags only on the host with `git tag -s`, and **review `git diff vPREVIOUS..vX.Y.Z` on the signing
-  machine** before signing. That review is the only defence for the source itself.
-- **A fresh clone** on the signing machine means the script that runs next to your key is the one in the
-  reviewed tag, not one the container could have edited in its working tree.
+- **`--expect` proves the build, not the source.** CI builds whatever commit the tag points at, and the container
+  can push to GitHub as you (VS Code forwards your credentials; that's how its push button works). So **review
+  the diff since the last release** in the release clone before tagging. That review is the only defence for the
+  source itself. A commit the container pushed on its own shows up there; a rewritten `main` makes
+  `git pull --ff-only` fail.
+- **The signed tag** says which commit you reviewed. Since the signing key is outside the agent, the container
+  can't make one: a `v*` tag it pushed itself would be built by CI, but `sign-release.sh` refuses to sign it.
+- **The separate clone** keeps the container's `.git` (hooks, config) away from the git that signs, and makes the
+  script that runs next to your release key the one in the reviewed tag.
 
 Keep a backup of the key: without it no update can ever be installed over the app.
 
