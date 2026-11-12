@@ -22,7 +22,8 @@
 #   agent check covers every key git verify-tag would accept.
 # - The script that runs is the one checked out here, and that must be a release tag signed with your key:
 #   a new version of this script shows up in the review instead of running unreviewed. Never pull main here.
-# - Commit messages and diffs are shown with control characters removed, so they can't redraw the terminal.
+# - Commit messages and diffs are shown with control characters removed or marked (<CR>, <C1>, <bidi>), so
+#   they can't redraw the terminal or hide code.
 # - git runs without hooks or fsmonitor, and refs are always given in full (refs/tags/…, refs/remotes/…).
 #
 # Steps:
@@ -46,7 +47,7 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OB
 # No hooks (fetch, tag, push and checkout would run them) and no fsmonitor program.
 git() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
 
-HERE="$(cd "$(dirname "$0")" && pwd -P)"
+unset CDPATH
 usage="usage: tools/release-tag.sh [--dry-run] [--commit <rev>] [--remote <name>] [--bootstrap <vX.Y.Z>]"
 DRY=0
 REV=""
@@ -78,11 +79,15 @@ ask() {
 }
 must() { ask "$1" || die "Stopped. Nothing was changed${2:-}."; }
 # Text from the repository (commit messages, names, diffs) goes through this before it reaches the
-# terminal: no escape sequences, carriage returns or other control characters except tab and newline
-# (C1 controls in UTF-8 too, U+0080-U+009F), and bidirectional-text controls shown as <bidi>.
+# terminal. C0 controls except tab and newline are removed, and so are bytes that aren't valid UTF-8 (a
+# lone 0x9B is CSI to an 8-bit terminal). Then, all on valid UTF-8, nothing removed can join its neighbours
+# into a new control: a CR at a line's end goes (CRLF files), any other CR is shown as <CR> (code after
+# it is a new line to compilers but not on screen), C1 controls (U+0080-U+009F) as <C1>, and
+# bidirectional-text controls as <bidi>.
 clean() {
-    LC_ALL=C tr -d '\000-\010\013-\037\177' \
-        | LC_ALL=C awk '{ gsub(/\302[\200-\237]/, ""); gsub(/\342\200[\252-\256]|\342\201[\246-\251]/, "<bidi>"); print }'
+    LC_ALL=C tr -d '\000-\010\013\014\016-\037\177' | iconv -c -f UTF-8 -t UTF-8 2>/dev/null \
+        | LC_ALL=C awk '{ sub(/\r$/, ""); gsub(/\r/, "<CR>"); gsub(/\302[\200-\237]/, "<C1>")
+            gsub(/\342\200[\252-\256]|\342\201[\246-\251]/, "<bidi>"); print }'
 }
 is_release() { printf '%s\n' "$1" | grep -qxE 'v[0-9]+\.[0-9]+\.[0-9]+'; }
 short() { git rev-parse --short "$1"; }
@@ -90,7 +95,9 @@ subject() { git log -1 --no-color --format="${2:-%h %s}" --date=short "$1" | cle
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
-interrupted() { printf '\n%s\n' "${R}✗ Interrupted. Steps above that say they changed something did; nothing else was.$N" >&2; exit 130; }
+# What an interrupt leaves behind, updated around the steps that change something.
+state="Nothing was changed."
+interrupted() { printf '\n%s\n' "${R}✗ Interrupted. $state$N" >&2; exit 130; }
 trap interrupted INT TERM HUP
 PG="$(git var GIT_PAGER 2>/dev/null || echo less)"
 # page <command…>: runs it into a file (so a failure is noticed, and quitting the pager early doesn't kill
@@ -98,23 +105,25 @@ PG="$(git var GIT_PAGER 2>/dev/null || echo less)"
 page() {
     "$@" > "$TMP/page" || die "Failed: $*"
     trap '' INT
-    clean < "$TMP/page" | LESS="${LESS-FRX}" sh -c "$PG" || true
+    if clean < "$TMP/page" | LESS="${LESS-FRX}" sh -c "$PG"; then :; else
+        case $? in 126|127) warn "The pager ($PG) didn't start; here it is without one."; clean < "$TMP/page" ;; esac
+    fi
     trap interrupted INT
 }
 
 # ---- 1. this clone ---------------------------------------------------------------------------------
 step "1. This clone"
 [ -t 0 ] || die "Run it in a terminal: it asks before every step."
-[ "$(printf 'a\342\200\256\302\233b\n' | clean)" = "a<bidi>b" ] \
-    || die "This system's awk or tr can't filter bytes as needed ($(command -v awk)); try another awk on PATH."
+[ "$(printf 'a\342\200\256\302\302\233\233\033[1mb\rc\r\n' | clean)" = "a<bidi><C1>[1mb<CR>c" ] \
+    || die "This system's tr, iconv or awk ($(command -v awk)) can't filter bytes as needed; try others on PATH."
 if [ -f /.dockerenv ] || [ -f /run/.containerenv ] || [ -n "${REMOTE_CONTAINERS:-}${CODESPACES:-}${DEVCONTAINER:-}" ]; then
     die "This looks like a container. Run it on the host, in the release clone (README, \"Signing a release\")."
 fi
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "Not in a git repository."
 cd "$ROOT"
 case "$ROOT" in /workspaces/*) die "$ROOT is a dev container path. Use the separate release clone." ;; esac
-[ "$HERE" = "$(cd "$ROOT/tools" 2>/dev/null && pwd -P)" ] \
-    || die "This is $HERE/release-tag.sh, not the copy in this clone. Run tools/release-tag.sh from $ROOT."
+[ "$(git hash-object --no-filters -- "$0" 2>/dev/null)" = "$(git rev-parse --verify --quiet HEAD:tools/release-tag.sh)" ] \
+    || die "$0 isn't tools/release-tag.sh as committed at HEAD in $ROOT. Run that one: cd $ROOT && tools/release-tag.sh"
 [ -f tools/sign-release.sh ] && [ -f app/build.gradle.kts ] || die "$ROOT isn't a SeedTag clone."
 git --version | awk '{ split($3, v, "."); exit !(v[1] > 2 || (v[1] == 2 && v[2] >= 34)) }' \
     || die "git 2.34 or later is needed for SSH signatures ($(git --version))."
@@ -130,7 +139,7 @@ command git config --get-regexp '^(core\.hookspath|core\.sshcommand|gpg\.ssh\.pr
 sk="$(git config --path user.signingkey || true)"
 case "$sk" in
     "") die "No user.signingkey: git config user.signingkey \"\$HOME/.ssh/seedtag_signing.pub\"" ;;
-    key::*|ssh-*|ecdsa-*|sk-*) die "user.signingkey is a literal key: git can sign with that only through the SSH
+    key::*|"ssh-"*" "*|"ecdsa-"*" "*|"sk-"*" "*) die "user.signingkey is a literal key: git can sign with that only through the SSH
   agent, which must not hold it. Set it to the path of the .pub file next to the private key." ;;
     *) [ -f "$sk" ] || die "user.signingkey file $sk doesn't exist."; pub="$(head -n 1 "$sk")" ;;
 esac
@@ -157,7 +166,7 @@ asf="$(git config --path gpg.ssh.allowedSignersFile || true)"
 signers="$(awk -v m="$material" '
     { sub(/\r$/, "") }
     /^[[:space:]]*(#|$)/ { next }
-    { k = ""; for (i = 1; i < NF; i++) if ($i ~ /^(ssh-|ecdsa-|sk-)/) { k = $(i + 1); break }
+    { k = ""; for (i = 2; i < NF; i++) if ($i ~ /^(ssh-|ecdsa-|sk-)/) { k = $(i + 1); break }
       if (k == m) good++; else bad = bad " " NR }
     END { printf "%d%s\n", good, bad }' "$asf")"
 good="${signers%% *}"; bad="${signers#"$good"}"
@@ -284,7 +293,9 @@ section="$(git show "$sha:changelog.md" | awk -v v="$ver" '
 [ -n "$section" ] || die "changelog.md at $(short "$sha") has no '## [$ver] - YYYY-MM-DD' section."
 # A filter in .gitattributes would run a program on checkout (step 6, sign-release.sh's clone).
 git ls-tree -r "$sha" > "$TMP/tree" || die "Can't list the files of $(short "$sha")."
-awk -F'\t' '{ p = tolower($2); sub(/^"/, "", p); sub(/"$/, "", p)
+# Any case, quoted or not, and ignoring non-ASCII characters, which some file systems drop from names.
+LC_ALL=C awk -F'\t' '{ p = tolower($2); sub(/^"/, "", p); sub(/"$/, "", p); gsub(/\\[0-7][0-7][0-7]/, "", p)
+    gsub(/[\200-\377]/, "", p)
     if (p ~ /(^|\/)\.gitattributes$/) { split($1, m, " "); print m[3] "\t" $2 } }' "$TMP/tree" > "$TMP/attrs"
 while IFS="$(printf '\t')" read -r oid a; do
     git cat-file blob "$oid" > "$TMP/attr" || die "Can't read $(printf '%s' "$a" | clean) at $(short "$sha")."
@@ -317,8 +328,12 @@ git diff $DIFF "$prev_sha" "$sha" > "$TMP/diff"
 bidi="$(LC_ALL=C awk '/^\+\+\+ / { f = substr($0, 5) } /^\+/ && /\342\200[\252-\256]|\342\201[\246-\251]/ { print f }' "$TMP/diff" | sort -u | clean)"
 [ -z "$bidi" ] || warn "Bidirectional-text control characters (they can make code read differently than it runs) in:
 $(printf '%s\n' "$bidi" | sed 's/^/  /')"
-ctl="$(LC_ALL=C tr -cd '\000-\010\013\014\016-\037\177' < "$TMP/diff" | wc -c | tr -d ' ')"
-[ "$ctl" = 0 ] || warn "The diff contains $ctl control character(s) (escape sequences or similar); they're removed when shown."
+ctl="$(LC_ALL=C awk '/^\+\+\+ / { f = substr($0, 5); next }
+    /^\+/ { sub(/\r$/, ""); if ($0 ~ /[\001-\010\013\014\016-\037\177]|\r|\302[\200-\237]/) print f }' "$TMP/diff" | sort -u | clean)"
+[ -z "$ctl" ] || warn "Control characters (escape sequences, a carriage return inside a line: what follows it is
+  a new line to compilers and shells, but not on screen) in added lines of these files. They're shown as <CR>
+  and <C1>, or removed:
+$(printf '%s\n' "$ctl" | sed 's/^/  /')"
 
 say "$(git rev-list --count "$prev_sha..$sha") commits,$(git diff --shortstat "$prev_sha" "$sha")."
 # Everything but the app's source code and docs: what builds, checks, signs and configures. Tests stay in:
@@ -360,6 +375,7 @@ if [ "$DRY" = 1 ]; then ok "--dry-run: stopping here. Nothing was changed."; exi
 printf '%sType %s to create it (anything else stops):%s ' "$B" "$TAG" "$N"
 read -r typed || typed=""
 [ "$typed" = "$TAG" ] || die "Stopped. Nothing was changed."
+state="$TAG may exist in this clone: check with git tag -l $TAG, delete it with git tag -d $TAG."
 git tag -s -m "$msg" "$TAG" "$sha"
 vt="$(git verify-tag "refs/tags/$TAG" 2>&1 | clean)" || true
 signed_release "$TAG" || { git tag -d "$TAG" >/dev/null; die "$TAG doesn't verify with $fp (deleted it again):
@@ -367,6 +383,7 @@ $vt"; }
 [ "$(git rev-parse "refs/tags/$TAG^{commit}")" = "$sha" ] || { git tag -d "$TAG" >/dev/null; die "$TAG doesn't point at $sha (deleted it again)."; }
 ok "$(printf '%s\n' "$vt" | grep -m1 '^Good' || echo "$TAG verifies with $fp")"
 say "  $TAG → $(subject "$sha")"
+state="$TAG exists in this clone, not pushed. Push it (git push $REMOTE refs/tags/$TAG) or delete it (git tag -d $TAG)."
 
 # ---- 5. push -----------------------------------------------------------------------------------------
 step "5. Push the tag"
@@ -375,12 +392,14 @@ if ! ask "Push $TAG to $REMOTE ($purl)?"; then
     if ask "Delete the local tag $TAG again?"; then git tag -d "$TAG"; else say "Kept $TAG locally. Push it later: git push $REMOTE refs/tags/$TAG"; fi
     exit 0
 fi
+state="$TAG exists in this clone and may have been pushed: check with git ls-remote --tags $REMOTE refs/tags/$TAG."
 git push "$REMOTE" "refs/tags/$TAG:refs/tags/$TAG" \
     || die "The push failed; $TAG is still in this clone. Retry: git push $REMOTE refs/tags/$TAG, or delete it: git tag -d $TAG"
 there="$(remote_tag "$TAG")"
 [ "$there" = "$(git rev-parse "refs/tags/$TAG")" ] \
     || die "$REMOTE doesn't show $TAG as pushed. Check with: git ls-remote --tags $REMOTE"
 ok "$TAG is on $REMOTE."
+state="$TAG is signed and pushed."
 
 # ---- 6. next -----------------------------------------------------------------------------------------
 step "6. Next"

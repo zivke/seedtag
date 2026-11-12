@@ -111,7 +111,8 @@ tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # writes seed
 
 The release clone stays checked out at the last release tag, so the copy of `release-tag.sh` that runs is one you
 reviewed: the script refuses to run unless `HEAD` is a `vX.Y.Z` tag signed with your key, and a new version of it
-shows up in the review instead. **The first signed release** has no such tag yet: read the script as checked out,
+shows up in the review instead. **The first signed release** has no such tag yet (and `v0.3.0` has no
+`release-tag.sh`), so stay on the commit the fresh clone gave you: read the script as checked out there,
 then run `tools/release-tag.sh --bootstrap vPREVIOUS` (the last, unsigned release tag, e.g. `v0.3.0`). That tag
 came from GitHub, so it asks you to confirm its commit from evidence the container couldn't change, by typing the
 commit's first 12 characters: the APK of that release you signed or installed
@@ -120,12 +121,14 @@ commit's first 12 characters: the APK of that release you signed or installed
 
 Everything on GitHub counts as untrusted, since the container can push as you. So the script fetches only `main`,
 never tags, names every ref in full (a tag called `origin/main` can't stand in for the branch), runs git without
-hooks, and shows commit messages and diffs with control characters removed, so they can't redraw the terminal. It
+hooks, and shows commit messages and diffs with control characters removed or marked (`<CR>`, `<C1>`, `<bidi>`), so
+they can't redraw the terminal or hide code behind a carriage return; it lists the files whose added lines contain
+any. It
 refuses in a container, in a clone with uncommitted changes, with a signing key that's loaded in the SSH agent,
 with an allowed-signers file that lists any other key, and for a commit that isn't on `origin/main`, whose version
 isn't newer than the previous release or whose tag exists already, whose changelog has no section for its version,
 whose `versionCode` didn't go up, or whose `.gitattributes` sets a filter (a program checkout would run). It
-also refuses to run a copy of itself from anywhere but the clone's own `tools/`. The
+also refuses to run any file but `tools/release-tag.sh` exactly as committed at the clone's `HEAD`. The
 previous release, where the review starts, is the newest `vX.Y.Z` tag in the commit's history **signed with your
 key** (with the message `SeedTag X.Y.Z`); any other tag is listed and ignored, so a tag pushed from the container
 can't shorten the review.

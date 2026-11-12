@@ -22,7 +22,7 @@
 # - The APK says it was built from HEAD (META-INF/version-control-info.textproto).
 # - The permissions (check-apk.sh).
 #
-# Reads seedtag-unsigned.apk (from `make build`), writes seedtag.apk and its checksum in
+# Reads seedtag-unsigned.apk (downloaded from the tag's CI run), writes seedtag.apk and its checksum in
 # seedtag.apk.sha256. apksigner asks for the keystore password. The result must be signed with the
 # certificate whose SHA-256 is in tools/release-cert.sha256, or it's deleted. Needs git, unzip,
 # ssh-keygen, sha256sum (or shasum) and the Android build-tools (apksigner, aapt2), from ANDROID_HOME
@@ -56,7 +56,8 @@ if [ -z "$EXPECT" ] && [ "$NO_EXPECT" = 0 ]; then
 fi
 IN="${IN:-seedtag-unsigned.apk}"
 OUT="${OUT:-seedtag.apk}"
-HERE="$(cd "$(dirname "$0")" && pwd)"
+unset CDPATH
+HERE="$(cd -- "$(dirname -- "$0")" && pwd)"
 # Nothing from the environment decides which repository or config git uses; no hooks, no fsmonitor.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES \
     GIT_COMMON_DIR GIT_ATTR_SOURCE GIT_NAMESPACE GIT_CEILING_DIRECTORIES GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT
@@ -77,7 +78,7 @@ elif command -v shasum >/dev/null 2>&1; then sha256() { shasum -a 256 "$@"; }
 else echo "Missing: sha256sum or shasum" >&2; exit 1
 fi
 
-[ -f "$IN" ] || { echo "Missing: $IN (run make build first)" >&2; exit 1; }
+[ -f "$IN" ] || { echo "Missing: $IN (download it from the tag's CI run into $(pwd))" >&2; exit 1; }
 
 # 1. The independent build.
 got="$(sha256 "$IN" | cut -d' ' -f1)"
@@ -97,7 +98,7 @@ fi
 # 2. This clone: clean, at a release tag, signed by you. The apk files themselves are ignored by git.
 REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
 if [ -n "$(git -C "$REPO" status --porcelain --untracked-files=no)" ]; then
-    echo "!! $REPO has uncommitted changes (git status). Sign from a clean clone of the release tag." >&2
+    echo "!! $REPO has uncommitted changes (git status). Sign in the release clone, clean, at the release tag." >&2
     exit 1
 fi
 HEAD_SHA="$(git -C "$REPO" rev-parse HEAD)"
@@ -117,7 +118,7 @@ if [ "$VERIFY_TAG" = 1 ]; then
     sk="$(git -C "$REPO" config --path user.signingkey || true)"
     case "$sk" in
         key::*) pub="${sk#key::}" ;;
-        ssh-*|ecdsa-*|sk-*) pub="$sk" ;;
+        "ssh-"*" "*|"ecdsa-"*" "*|"sk-"*" "*) pub="$sk" ;;
         "") pub="" ;;
         *) pub="$(head -n 1 "$sk" 2>/dev/null || true)" ;;
     esac

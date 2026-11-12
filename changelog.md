@@ -12,7 +12,7 @@ All notable user-visible changes to SeedTag. The format follows
   with your release key (others are ignored), requires the release clone to
   be checked out at such a tag (`--bootstrap` for the first signed release),
   and an allowed-signers file with only that key. Commit text and diffs are
-  shown without control characters, the build review covers everything
+  shown with control characters removed or marked, the build review covers everything
   except app source and docs, undiffable changes and `.gitattributes` filters
   are refused, and git runs without hooks. For the first signed release,
   `--bootstrap` has you confirm the previous tag's commit from your own
@@ -20,8 +20,9 @@ All notable user-visible changes to SeedTag. The format follows
   tag's signer by fingerprint and its message, takes the tag from
   `versionName`, and checks that the tag on GitHub wasn't moved
   (`--no-remote-check` to skip). From the reviews in
-  `reports/2026-11-12-release-tag-review.md` and
-  `reports/2026-11-12-release-tag-hardening-review.md`.
+  `reports/2026-11-12-release-tag-review.md`,
+  `reports/2026-11-12-release-tag-hardening-review.md` and
+  `reports/2026-11-12-release-tag-followup-review.md`.
 
 ## [0.4.1] - 2026-11-12
 

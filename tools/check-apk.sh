@@ -108,5 +108,6 @@ if [ "$UNSIGNED" = 1 ]; then state="unsigned"; else state="signed"; fi
 if [ "$DEBUG" = 1 ]; then state="$state debug build"; fi
 echo ">> $APK: $state, permissions OK (NFC, HIDE_OVERLAY_WINDOWS and VIBRATE only, no network)"
 echo ">> manifest OK: $(if [ "$DEBUG" = 1 ]; then echo "debuggable (debug build)"; else echo "not debuggable"; fi), not test-only, no backups, known components only"
-echo ">> SHA-256: $(sha256sum "$APK" | cut -d' ' -f1)"
+if command -v sha256sum >/dev/null 2>&1; then sum="$(sha256sum "$APK")"; else sum="$(shasum -a 256 "$APK")"; fi
+echo ">> SHA-256: ${sum%% *}"
 ls -l "$APK"
