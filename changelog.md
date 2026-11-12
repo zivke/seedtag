@@ -4,9 +4,9 @@ All notable user-visible changes to SeedTag. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are the
 `versionName` in `app/build.gradle.kts`.
 
-## [Unreleased]
+## [0.4.1] - 2026-11-12
 
-### Added
+### Changed
 - Releasing: `tools/release-tag.sh`, run in the release clone on the host,
   checks the clone and the signing setup, shows what changed since the last
   release, and only after confirmation creates, verifies and pushes the
