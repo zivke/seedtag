@@ -375,10 +375,12 @@ LC_ALL=C awk -F'\t' '{ p = tolower($2); sub(/^"/, "", p); sub(/"$/, "", p); gsub
     if (p ~ /(^|\/)\.gitattributes$/) { split($1, m, " "); print m[3] "\t" $2 } }' "$TMP/tree" > "$TMP/attrs"
 while IFS="$(printf '\t')" read -r oid a; do
     git cat-file blob "$oid" > "$TMP/attr" || die "Can't read $(printf '%s' "$a" | clean) at $(short "$sha")."
-    if grep -qiE '(^|[[:space:]])filter=' "$TMP/attr"; then
+    # Comment lines don't count; git ignores them too.
+    grep -v '^[[:space:]]*#' "$TMP/attr" > "$TMP/attrc" || true
+    if grep -qiE '(^|[[:space:]])filter=' "$TMP/attrc"; then
         die "$(printf '%s' "$a" | clean) at $(short "$sha") sets a filter (filter=…): checking it out would run that filter's program."
     fi
-    if grep -qE '(^|[[:space:]])diff([[:space:]]|$)' "$TMP/attr"; then
+    if grep -qE '(^|[[:space:]])diff([[:space:]]|$)' "$TMP/attrc"; then
         die "$(printf '%s' "$a" | clean) at $(short "$sha") sets a bare diff attribute: it forces files to be diffed as
   text, which would let a binary file pass the next release's review."
     fi
