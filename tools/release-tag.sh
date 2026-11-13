@@ -142,7 +142,7 @@ command git config --get-regexp '^(core\.hookspath|core\.sshcommand|gpg\.ssh\.pr
 [ "$(git config gpg.format || true)" = ssh ] || die "gpg.format isn't ssh here: git config gpg.format ssh"
 sk="$(git config --path user.signingkey || true)"
 case "$sk" in
-    "") die "No user.signingkey: git config user.signingkey \"\$HOME/.seedtag-signing/key.pub\"" ;;
+    "") die "No user.signingkey: git config user.signingkey \"\$HOME/.keys/seedtag-signing.pub\"" ;;
     key::*|"ssh-"*" "*|"ecdsa-"*" "*|"sk-"*" "*) die "user.signingkey is a literal key: git can sign with that only through the SSH
   agent, which must not hold it. Set it to the path of the .pub file next to the private key." ;;
     *) [ -f "$sk" ] || die "user.signingkey file $sk doesn't exist."; pub="$(head -n 1 "$sk")" ;;

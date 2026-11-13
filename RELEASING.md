@@ -37,15 +37,15 @@ installed over the app.
 
 ```sh
 # a signing key for releases only, with a passphrase; outside ~/.ssh (see below), never ssh-add it
-mkdir -m 700 ~/.seedtag-signing
-ssh-keygen -t ed25519 -C "release signing" -f ~/.seedtag-signing/key
+mkdir -p ~/.keys && chmod 700 ~/.keys
+ssh-keygen -t ed25519 -C "release signing" -f ~/.keys/seedtag-signing
 # an allowed-signers file with only that key (git verify-tag accepts every key in it)
-printf '%s namespaces="git" %s\n' "<your git email>" "$(cut -d' ' -f1,2 ~/.seedtag-signing/key.pub)" \
+printf '%s namespaces="git" %s\n' "<your git email>" "$(cut -d' ' -f1,2 ~/.keys/seedtag-signing.pub)" \
     > ~/.ssh/release_allowed_signers
 
 git clone https://github.com/zivke/seedtag.git ~/seedtag-release && cd ~/seedtag-release
 git config gpg.format ssh
-git config user.signingkey "$HOME/.seedtag-signing/key.pub"
+git config user.signingkey "$HOME/.keys/seedtag-signing.pub"
 git config gpg.ssh.allowedSignersFile "$HOME/.ssh/release_allowed_signers"
 git config tag.gpgSign true
 ```
@@ -57,11 +57,11 @@ Notes on this setup:
   you: `AddKeysToAgent` in `~/.ssh/config`, or a desktop keyring. GNOME's SSH agent (`SSH_AUTH_SOCK` under
   `/run/user/<uid>/gcr/` or `/keyring/`) offers every key in `~/.ssh` that has a `.pub` next to it and refuses
   `ssh-add -d`; that's why the key lives outside `~/.ssh`. Check with
-  `ssh-add -L | grep -cF "$(cut -d' ' -f2 ~/.seedtag-signing/key.pub)"`: it must print 0. `release-tag.sh` checks
+  `ssh-add -L | grep -cF "$(cut -d' ' -f2 ~/.keys/seedtag-signing.pub)"`: it must print 0. `release-tag.sh` checks
   it too. A hardware key (`-t ed25519-sk`, a touch per signature) works too.
 - **Other projects:** the same key and file can serve them, if they're released the same way, never from a container
   or CI.
-- **On GitHub (Settings › SSH and GPG keys):** add `~/.seedtag-signing/key.pub` as a **Signing Key**, so the tags
+- **On GitHub (Settings › SSH and GPG keys):** add `~/.keys/seedtag-signing.pub` as a **Signing Key**, so the tags
   show as verified. It grants no access.
 - **Pushing from the host:** the release clone needs its own way to push the tag, HTTPS with your credential
   manager or an SSH login key.
