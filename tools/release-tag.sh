@@ -415,25 +415,37 @@ nul="$(LC_ALL=C tr -cd '\000' < "$TMP/diff" | wc -c | tr -d ' ')"
     git -c core.quotePath=false diff --name-only --no-renames $(short "$prev_sha") $(short "$sha") | while IFS= read -r f; do
       for r in $(short "$prev_sha") $(short "$sha"); do git cat-file blob \"\$r:\$f\" 2>/dev/null | od -An -tx1 |
         grep -q ' 00' && printf '%s %s\\n' \"\$r\" \"\$f\"; done; done"
-bidi="$(LC_ALL=C awk -v re="$BIDI_RE" '/^\+\+\+ / { f = substr($0, 5) } /^\+/ && $0 ~ re { print f }' "$TMP/diff" | sort -u | clean)"
+# One pass over the added lines. File names come only from the diff headers (diff --git, then +++): an added
+# line can itself start with "++ b/…".
+LC_ALL=C awk -v bidi="$BIDI_RE" -v inv="$INV_RE" '
+    /^diff --git / { h = 1; next }
+    h && /^\+\+\+ / { f = substr($0, 5); h = 0; next }
+    /^@@ / { h = 0 }
+    h || !/^\+/ { next }
+    $0 ~ bidi { print "bidi\t" f }
+    $0 ~ inv { print "inv\t" f }
+    { sub(/\r$/, "") }
+    /[\001-\010\013\014\016-\037\177]|\r|\302[\200-\237]/ { print "ctl\t" f }
+    /[\200-\377]/ && f !~ /\/res\// && (f ~ /\.(kt|kts|java|sh|py|gradle|ya?ml|toml|properties|pro|json|xml|txt|bat|sha256)"?$/ ||
+        f ~ /(^|\/)(Makefile|Dockerfile|gradlew|\.editorconfig|\.gitignore|\.gitattributes)"?$/) { print "nonascii\t" f }
+' "$TMP/diff" > "$TMP/scan"
+# found <kind>: the files with added lines of that kind, cleaned and indented.
+found() { awk -F'\t' -v k="$1" '$1 == k { print $2 }' "$TMP/scan" | sort -u | clean | sed 's/^/  /'; }
+bidi="$(found bidi)"
 [ -z "$bidi" ] || warn "Bidirectional-text control characters (they can make code read differently than it runs) in:
-$(printf '%s\n' "$bidi" | sed 's/^/  /')"
-inv="$(LC_ALL=C awk -v re="$INV_RE" '/^\+\+\+ / { f = substr($0, 5) } /^\+/ && $0 ~ re { print f }' "$TMP/diff" | sort -u | clean)"
+$bidi"
+inv="$(found inv)"
 [ -z "$inv" ] || warn "Invisible characters in added lines of these files (shown as <inv>; they can hide in names
   and strings):
-$(printf '%s\n' "$inv" | sed 's/^/  /')"
-ctl="$(LC_ALL=C awk '/^\+\+\+ / { f = substr($0, 5); next }
-    /^\+/ { sub(/\r$/, ""); if ($0 ~ /[\001-\010\013\014\016-\037\177]|\r|\302[\200-\237]/) print f }' "$TMP/diff" | sort -u | clean)"
+$inv"
+ctl="$(found ctl)"
 [ -z "$ctl" ] || warn "Control characters (escape sequences, a carriage return inside a line: what follows it is
   a new line to compilers and shells, but not on screen) in added lines of these files. They're shown as <CR>
   and <C1>, or removed:
-$(printf '%s\n' "$ctl" | sed 's/^/  /')"
+$ctl"
 # Code, build and config files (not docs, not res/) with non-ASCII in added lines: where a lookalike letter
 # (Cyrillic а for Latin a) could hide.
-nonascii="$(LC_ALL=C awk '/^\+\+\+ / { f = substr($0, 5); next }
-    /^\+/ && /[\200-\377]/ && f !~ /\/res\// && (f ~ /\.(kt|kts|java|sh|py|gradle|ya?ml|toml|properties|pro|json|xml|txt|bat|sha256)"?$/ ||
-        f ~ /(^|\/)(Makefile|Dockerfile|gradlew|\.editorconfig|\.gitignore|\.gitattributes)"?$/) { n[f]++ }
-    END { for (f in n) print n[f] "\t" f }' "$TMP/diff" | sort -k2 | clean)"
+nonascii="$(awk -F'\t' '$1 == "nonascii" { n[$2]++ } END { for (f in n) print n[f] "\t" f }' "$TMP/scan" | sort -k2 | clean)"
 [ -z "$nonascii" ] || say "Non-ASCII characters in added lines of code and config files (lines, file); look there
   for lookalike letters:
 $(printf '%s\n' "$nonascii" | sed 's/^/  /')"
