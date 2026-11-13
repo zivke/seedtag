@@ -341,6 +341,24 @@ badbin="$(printf '%s\n' "$bin" | grep -vxE '(art/[^/]+\.png|gradle/wrapper/gradl
   .gitattributes (-diff, binary). Find out why first (git diff --text $prev $(short "$sha") -- <file>):
 $(printf '%s\n' "$badbin" | sed 's/^/  /')"
 [ -z "$bin" ] || warn "Binary changes, not shown as text: $(printf '%s\n' "$bin" | clean | tr '\n' ' ')"
+sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi | awk '{ print $1 }'; }
+JAR=gradle/wrapper/gradle-wrapper.jar
+if printf '%s\n' "$bin" | grep -qxF "$JAR" && git cat-file -e "$sha:$JAR" 2>/dev/null; then
+    git cat-file blob "$sha:$JAR" > "$TMP/jar" || die "Can't read $JAR at $(short "$sha")."
+    jarsum="$(sha256 < "$TMP/jar")"
+    printf '%s\n' "$jarsum" | grep -qxE '[0-9a-f]{64}' || die "Can't compute the SHA-256 of $JAR (sha256sum or shasum)."
+    gver="$(git show "$sha:gradle/wrapper/gradle-wrapper.properties" 2>/dev/null \
+        | sed -n 's#^distributionUrl=.*/gradle-\([0-9][0-9.]*\)-[a-z]*\.zip.*#\1#p' | clean)"
+    warn "$JAR changed. It is code that runs in the CI build, and no diff can show it.
+  Look up the \"Wrapper JAR Checksum\" for Gradle ${gver:-<version in gradle-wrapper.properties>} at
+  https://gradle.org/release-checksums/ in a browser (not from this repository). If the jar was generated
+  by another Gradle version, it must match that version's entry there; if it matches none, don't release."
+    printf '%sPaste that checksum (anything else stops):%s ' "$B" "$N"
+    read -r typed || typed=""
+    [ "$(printf '%s' "$typed" | tr -d '[:space:]' | tr 'A-F' 'a-f')" = "$jarsum" ] \
+        || die "That isn't the checksum of the jar at $(short "$sha") ($jarsum). Stopped. Nothing was changed."
+    ok "$JAR matches the checksum you pasted."
+fi
 # shellcheck disable=SC2086
 git diff $DIFF "$prev_sha" "$sha" > "$TMP/diff"
 bidi="$(LC_ALL=C awk '/^\+\+\+ / { f = substr($0, 5) } /^\+/ && /\342\200[\252-\256]|\342\201[\246-\251]/ { print f }' "$TMP/diff" | sort -u | clean)"
