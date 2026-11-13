@@ -459,11 +459,17 @@ git diff $DIFF "$prev_sha" "$sha" > "$TMP/diff"
 # A file diffed as text although it's binary ('diff' attribute in the checked-out .gitattributes): clean
 # would drop its NUL bytes, and numstat counted it as text above.
 nul="$(LC_ALL=C tr -cd '\000' < "$TMP/diff" | wc -c | tr -d ' ')"
-[ "$nul" = 0 ] || die "The diff contains NUL bytes: a binary file is being shown as text (a 'diff' attribute in
-  .gitattributes?). These files have NUL bytes (listed with the commit they're read from):
-    git -c core.quotePath=false diff --name-only --no-renames $(short "$prev_sha") $(short "$sha") | while IFS= read -r f; do
-      for r in $(short "$prev_sha") $(short "$sha"); do git cat-file blob \"\$r:\$f\" 2>/dev/null | od -An -tx1 |
-        grep -q ' 00' && printf '%s %s\\n' \"\$r\" \"\$f\"; done; done"
+if [ "$nul" != 0 ]; then
+    git -c core.quotePath=false diff --name-only --no-renames "$prev_sha" "$sha" > "$TMP/names"
+    while IFS= read -r f; do
+        for r in "$prev_sha" "$sha"; do
+            if git cat-file blob "$r:$f" 2>/dev/null | od -An -tx1 | grep -q ' 00'; then printf '%s %s\n' "$(short "$r")" "$f"; fi
+        done
+    done < "$TMP/names" > "$TMP/nulfiles"
+    die "The diff contains NUL bytes: a binary file is being shown as text (a 'diff' attribute in
+  .gitattributes?). Files with NUL bytes (commit, file):
+$(clean < "$TMP/nulfiles" | sed 's/^/  /')"
+fi
 # One pass over the added lines. File names come only from the diff headers (diff --git, then +++): an added
 # line can itself start with "++ b/…".
 LC_ALL=C awk -v bidi="$BIDI_RE" -v inv="$INV_RE" -v look="$LOOK_RE" '
