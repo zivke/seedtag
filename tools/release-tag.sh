@@ -187,7 +187,9 @@ agent="$(ssh-add -L 2>/dev/null)" && st=0 || st=$?
 case "$st" in
     0) if printf '%s\n' "$agent" | awk '{ print $2 }' | grep -qxF "$material"; then
            die "The signing key is loaded in the SSH agent, which VS Code forwards into the dev container: the
-  container could sign tags with it. Remove it (ssh-add -d $sk) and let git read the key file."
+  container could sign tags with it. Remove it (ssh-add -d $sk) and let git read the key file. If the agent
+  refuses, it's probably GNOME's, which offers every key in ~/.ssh that has a .pub next to it: move the key pair
+  out of ~/.ssh (e.g. to ~/.keys/), point user.signingkey at the new path, and log out and in (RELEASING.md)."
        fi
        ok "The signing key isn't among the $(printf '%s\n' "$agent" | wc -l | tr -d ' ') key(s) in the SSH agent (${SSH_AUTH_SOCK:-})." ;;
     1) ok "The SSH agent (${SSH_AUTH_SOCK:-}) holds no keys." ;;
