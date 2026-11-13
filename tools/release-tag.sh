@@ -50,9 +50,10 @@
 set -eu
 
 # Cleared: what lets the environment choose the repository, its objects, attributes, extra config and diff
-# programs. Not cleared: the programs git runs and the config files it reads (GIT_SSH, GIT_SSH_COMMAND,
-# GIT_ASKPASS, GIT_EXEC_PATH, GIT_CONFIG_GLOBAL, GIT_CONFIG_SYSTEM; step 1 warns if they're set), and PATH,
-# HOME, the pager and the SSH agent, which come from your shell as for any command.
+# programs. Not cleared: the programs git and ssh run and the config files git reads (GIT_SSH, GIT_SSH_COMMAND,
+# GIT_PROXY_COMMAND, GIT_ASKPASS, SSH_ASKPASS, SSH_ASKPASS_REQUIRE, GIT_EXEC_PATH, GIT_CONFIG_GLOBAL,
+# GIT_CONFIG_SYSTEM; step 1 warns if they're set), and PATH, HOME, the pager and the SSH agent, which come from
+# your shell as for any command.
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES \
     GIT_COMMON_DIR GIT_ATTR_SOURCE GIT_NAMESPACE GIT_CEILING_DIRECTORIES GIT_CONFIG GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT \
     GIT_EXTERNAL_DIFF GIT_DIFF_OPTS
@@ -158,11 +159,20 @@ say "Pager:          $PG"
 hooks="$(ls "$(git rev-parse --git-common-dir)/hooks" 2>/dev/null | grep -v '\.sample$' || true)"
 [ -z "$hooks" ] || warn "Hooks in .git/hooks: $(echo $hooks). They don't run here, but a fresh clone has none: check them."
 command git config --get-regexp '^(core\.hookspath|core\.sshcommand|gpg\.ssh\.program|gpg\.program|remote\..*\.pushurl|url\..*\.(push)?insteadof|core\.gitproxy|core\.askpass|core\.attributesfile|remote\..*\.(uploadpack|receivepack))$' \
-    | while IFS= read -r c; do warn "Set in git config: $c"; done
-for v in GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_EXEC_PATH GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
+    > "$TMP/cfg" || true
+[ ! -s "$TMP/cfg" ] || warn "Set in git config, choosing programs git runs or where it fetches and pushes:
+$(clean < "$TMP/cfg" | sed 's/^/  /')
+  Expected only if you set them yourself."
+envset=""
+for v in GIT_SSH GIT_SSH_COMMAND GIT_PROXY_COMMAND GIT_ASKPASS SSH_ASKPASS SSH_ASKPASS_REQUIRE GIT_EXEC_PATH \
+    GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
     eval "isset=\${$v+x} val=\${$v-}"
-    [ -z "$isset" ] || warn "Set in the environment: $v=$val"
+    [ -z "$isset" ] || envset="$envset
+  $v=$val"
 done
+[ -z "$envset" ] || warn "Set in the environment, choosing programs git or ssh run (one may be handed the signing
+  key's passphrase) or the config files git reads:$(printf '%s\n' "$envset" | clean)
+  Expected only if you set them yourself. A VS Code terminal sets GIT_ASKPASS: use a plain terminal."
 
 [ "$(git config gpg.format || true)" = ssh ] || die "gpg.format isn't ssh here: git config gpg.format ssh"
 # outside_clone <file> <setting>: the file must not be in this clone, where a checkout could replace it.
