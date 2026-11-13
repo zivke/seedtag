@@ -143,10 +143,11 @@ git --version | awk '{ split($3, v, "."); exit !(v[1] > 2 || (v[1] == 2 && v[2] 
 is_sha() { printf '%s\n' "$1" | grep -qxE '[0-9a-f]{40}'; }
 [ -n "$BOOT" ] && ! is_release "$BOOT" && ! is_sha "$BOOT" && die "--bootstrap needs a vX.Y.Z tag or a full 40-character commit SHA, not $BOOT."
 say "Clone:          $ROOT"
+say "Pager:          $PG"
 [ -z "$(git status --porcelain --untracked-files=no)" ] || die "Uncommitted changes (git status). The release clone must be clean."
 hooks="$(ls "$(git rev-parse --git-common-dir)/hooks" 2>/dev/null | grep -v '\.sample$' || true)"
 [ -z "$hooks" ] || warn "Hooks in .git/hooks: $(echo $hooks). They don't run here, but a fresh clone has none: check them."
-command git config --get-regexp '^(core\.hookspath|core\.sshcommand|gpg\.ssh\.program|gpg\.program|remote\..*\.pushurl|url\..*\.(push)?insteadof)$' \
+command git config --get-regexp '^(core\.hookspath|core\.sshcommand|gpg\.ssh\.program|gpg\.program|remote\..*\.pushurl|url\..*\.(push)?insteadof|core\.gitproxy|core\.askpass|core\.attributesfile|remote\..*\.(uploadpack|receivepack))$' \
     | while IFS= read -r c; do warn "Set in git config: $c"; done
 for v in GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_EXEC_PATH GIT_CONFIG_GLOBAL GIT_CONFIG_SYSTEM; do
     eval "isset=\${$v+x} val=\${$v-}"
