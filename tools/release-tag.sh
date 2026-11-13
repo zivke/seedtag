@@ -261,7 +261,9 @@ purl="$(git remote get-url --push "$REMOTE")"
 main_ref="refs/remotes/$REMOTE/main"
 old="$(git rev-parse --verify --quiet "$main_ref^{commit}" || true)"
 say "Fetching main from $REMOTE ($url), no tags…"
-git -c fetch.fsckObjects=true fetch --no-tags --no-recurse-submodules "$REMOTE" "+refs/heads/main:$main_ref"
+git -c fetch.fsckObjects=true fetch --no-tags --no-recurse-submodules "$REMOTE" "+refs/heads/main:$main_ref" \
+    || die "The fetch failed (see above). Nothing was changed. An fsck error means $REMOTE/main holds a malformed
+  object: stop and find out why."
 new="$(git rev-parse --verify "$main_ref^{commit}")"
 if [ -n "$old" ] && ! git merge-base --is-ancestor "$old" "$new"; then
     warn "$REMOTE/main was rewritten: it no longer contains $(short "$old"), which it had before this fetch.
