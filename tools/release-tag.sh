@@ -177,6 +177,7 @@ done
 [ "$(git config gpg.format || true)" = ssh ] || die "gpg.format isn't ssh here: git config gpg.format ssh"
 # outside_clone <file> <setting>: the file must not be in this clone, where a checkout could replace it.
 outside_clone() {
+    [ ! -L "$1" ] || die "$2 ($1) is a symbolic link, which could point into this clone. Use the file itself."
     _d="$(cd -P -- "$(dirname -- "$1")" && pwd -P)" || die "Can't find the folder of $2 ($1)."
     case "$_d/" in "$(pwd -P)"/*) die "$2 ($1) is inside this clone, where a checkout (step 6) could
   replace it. Keep it outside the clone." ;; esac
