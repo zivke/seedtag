@@ -7,22 +7,27 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
-- Releasing: `tools/release-tag.sh` treats everything on GitHub as untrusted.
-  It fetches only `main`, starts the review at the newest release tag signed
-  with your release key (others are ignored), requires the release clone to
-  be checked out at such a tag (`--bootstrap` for the first signed release),
-  and an allowed-signers file with only that key. Commit text and diffs are
-  shown with control characters removed or marked, the build review covers everything
-  except app source and docs, undiffable changes and `.gitattributes` filters
-  are refused, and git runs without hooks. For the first signed release,
-  `--bootstrap` has you confirm the previous tag's commit from your own
-  evidence (e.g. the APK you signed). `tools/sign-release.sh` checks the
-  tag's signer by fingerprint and its message, takes the tag from
-  `versionName`, and checks that the tag on GitHub wasn't moved
-  (`--no-remote-check` to skip). From the reviews in
-  `reports/2026-11-12-release-tag-review.md`,
-  `reports/2026-11-12-release-tag-hardening-review.md` and
-  `reports/2026-11-12-release-tag-followup-review.md`.
+- Releasing, `tools/release-tag.sh`: treats everything on GitHub as
+  untrusted. It fetches only `main`, never tags, and starts the review at the
+  newest release tag signed with your release key (others are listed and
+  ignored). It runs only as `tools/release-tag.sh` committed at a release tag
+  signed with that key. The build review covers everything except the app's
+  source and docs, tests included. Commit text and diffs are shown with
+  control characters removed or marked (`<CR>`, `<C1>`, `<bidi>`).
+  Undiffable changes and `.gitattributes` filters are refused, and git runs
+  without hooks. The first signed release uses `--bootstrap <tag or commit>`,
+  confirmed from your own evidence (e.g. the commit recorded in the APK you
+  signed).
+- Releasing, `tools/sign-release.sh`: accepts only the tag `v<versionName>`
+  at `HEAD`, signed with your release key (by fingerprint) with the message
+  `SeedTag X.Y.Z`, and still the same tag on GitHub (`--no-remote-check` to
+  skip, `--remote` for another remote). `tools/check-apk.sh` and
+  `sign-release.sh` work with `shasum` where `sha256sum` is missing (macOS).
+- Releasing, setup: the release clone uses its own allowed-signers file that
+  lists only the release key, set in the clone, not globally (README,
+  "Signing a release"). The README now says that the CI run page is the only
+  link between your tag and the APK, and how to start again after a fresh
+  clone.
 
 ## [0.4.1] - 2026-11-12
 

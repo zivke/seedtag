@@ -12,7 +12,8 @@
 # The no-network guarantee is the app's main security property, and a library
 # update can quietly add a permission through manifest merging. This fails the
 # build if that happens. The rest catches honest mistakes (a debug build signed for release, a library
-# adding an exported service); a tampered APK is caught by sign-release.sh --expect, not here.
+# adding an exported service). Whether the APK is the one built from the release tag is checked
+# elsewhere: release-tag.sh's review, the CI run page, and sign-release.sh.
 set -eu
 
 usage="usage: tools/check-apk.sh [--unsigned] [--debug] <apk>"

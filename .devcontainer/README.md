@@ -52,7 +52,7 @@ To take push access away completely, set
 user settings and rebuild the container. VS Code's push button then stops
 working here, and `main` is pushed from the release clone instead (it can't
 see the container's commits, so bring them over with a bundle: `git bundle
-create seedtag.bundle origin/main..main` here, then `git fetch
+create seedtag.bundle origin/main..main` here, then `git fetch --no-tags
 <path>/seedtag.bundle main:incoming` and `git push origin incoming:main` in the
 release clone, without checking `incoming` out). A tag ruleset on
 GitHub (Settings › Rules) that restricts `v*` tags only helps once the

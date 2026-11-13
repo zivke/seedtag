@@ -109,6 +109,21 @@ git checkout vX.Y.Z                       # release-tag.sh offers to do this
 tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # writes seedtag.apk and seedtag.apk.sha256
 ```
 
+Both scripts take `--remote <name>` if the GitHub remote isn't `origin`.
+
+**The run page is the only link between your tag and the APK.** The APK and the SHA-256 for `--expect` come from
+the same CI run, and the commit recorded in the APK is written by that build, so no script can tell a run of your
+tag from one the container started on other code. Before downloading, compare the commit in GitHub's own run
+header (not the summary, which the build writes) with the one `release-tag.sh` printed. If there are several runs
+for the tag, or none, stop: a missing run proves nothing. For more than that, build the tag yourself in a fresh
+clone on another machine and pass that hash to `--expect` instead.
+
+**After any fresh clone** of the release clone (a new machine, a deleted folder), it is on `main`, which the
+container can write. Before running anything in `tools/`, check out the last release by hand:
+`git verify-tag vX.Y.Z && git checkout vX.Y.Z`. That's safe because the allowed-signers file lists only your
+release key. The check inside `release-tag.sh` only stops an honest copy from running unreviewed; a tampered one
+wouldn't contain it.
+
 The release clone stays checked out at the last release tag, so the copy of `release-tag.sh` that runs is one you
 reviewed: the script refuses to run unless `HEAD` is a `vX.Y.Z` tag signed with your key, and a new version of it
 shows up in the review instead. **The first signed release** has no such tag yet (and `v0.3.0` has no
@@ -117,7 +132,10 @@ then run `tools/release-tag.sh --bootstrap vPREVIOUS` (the last, unsigned releas
 came from GitHub, so it asks you to confirm its commit from evidence the container couldn't change, by typing the
 commit's first 12 characters: the APK of that release you signed or installed
 (`apksigner verify --print-certs` shows your certificate's digest, and
-`unzip -p <apk> META-INF/version-control-info.textproto` the commit it was built from), or your own notes.
+`unzip -p <apk> META-INF/version-control-info.textproto` the commit it was built from), or your own notes. If the
+APK was built from a later commit than the tag (the signed 0.3.0 APK records `a8bff16`, 17 commits after `v0.3.0`),
+pass that commit instead: `--bootstrap <its full 40-character SHA>`. The review then starts where the release
+really was.
 
 Everything on GitHub counts as untrusted, since the container can push as you. So the script fetches only `main`,
 never tags, names every ref in full (a tag called `origin/main` can't stand in for the branch), runs git without
@@ -150,14 +168,15 @@ the clone only reviews, tags and signs, so the only code of the repository it ru
 `check-apk.sh`, both in the reviewed diff.
 
 `sign-release.sh` checks everything before the key is used, and refuses to sign if:
-- the unsigned APK doesn't match the independent build given with `--expect`. That's required: `--no-expect`
-  skips the comparison, with a warning;
+- the unsigned APK doesn't have the SHA-256 given with `--expect` (the CI run's, or that of your own independent
+  build). That's required: `--no-expect` skips the comparison, with a warning;
 - the clone has uncommitted changes, so an edited script in a shared working tree can't run next to your key;
 - `HEAD` isn't exactly the tag `v<versionName>`, or that tag isn't signed with the key in the clone's
   `user.signingkey`, compared by fingerprint, with the message `SeedTag X.Y.Z` (`--no-verify-tag` skips that
   check, with a warning);
-- the tag on `origin` isn't this same tag any more, so CI may have built something else (`--no-remote-check` skips
-  that, with a warning, e.g. offline);
+- the tag on `origin` isn't this same tag right now, so CI may have built something else (`--no-remote-check`
+  skips that, with a warning, e.g. offline). A tag moved, built and moved back passes this; only the run page shows
+  that;
 - the APK says it was built from a different commit (`META-INF/version-control-info.textproto`);
 - the APK asks for any other permission, or fails the manifest checks (`check-apk.sh`).
 
@@ -172,10 +191,11 @@ That's also the digest to compare when you install an APK from elsewhere
 
 What each step protects against:
 
-- **Signing outside protects the key, not the build.** If the container were compromised, the unsigned APK could
-  already be tampered with, and the permission check wouldn't notice a weakened encryption. `--expect` catches
-  that: sign only an APK that's byte-for-byte the same as a build made somewhere else.
-- **`--expect` proves the build, not the source.** CI builds whatever commit the tag points at, and the container
+- **Signing outside protects the key, not the build.** If the container were compromised, its APK could be
+  tampered with, and the permission check wouldn't notice a weakened encryption. So the APK you sign is CI's, not
+  the container's, and `--expect` makes sure it's the exact file that run built; the run page makes sure that run
+  built your tag. A hash from your own build on another machine checks CI too.
+- **The build proves nothing about the source.** CI builds whatever commit the tag points at, and the container
   can push to GitHub as you (VS Code forwards your credentials; that's how its push button works). So **review
   the diff since the last release** in the release clone before tagging. That review is the only defence for the
   source itself. A commit the container pushed on its own shows up there; a rewritten `main` makes

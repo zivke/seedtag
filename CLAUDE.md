@@ -44,7 +44,7 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   gives access to anything). It also fails a release APK that is debuggable,
   test-only, allows backups, or declares a component outside its allowlist
   (`--debug` for debug builds).
-- `tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] [--no-remote-check] <keystore>`
+- `tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] [--no-remote-check] [--remote <name>] <keystore>`
   runs outside the container, in the release clone at the release tag: refuses an
   unsigned APK that doesn't match the independent build (`--expect`, the
   SHA-256 from the GitHub Actions run of the tag), a clone with uncommitted
@@ -53,7 +53,7 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   `origin`, and an APK whose recorded commit isn't HEAD. It signs `seedtag-unsigned.apk` into
   `seedtag.apk`, refuses any certificate but the one in
   `tools/release-cert.sha256`, and writes `seedtag.apk.sha256`.
-  `tools/release-tag.sh [--dry-run] [--commit <rev>] [--bootstrap <vX.Y.Z>]` also
+  `tools/release-tag.sh [--dry-run] [--commit <rev>] [--remote <name>] [--bootstrap <vX.Y.Z | commit>]` also
   runs on the host, in the release clone checked out at the last signed release
   tag: checks the clone and the signing setup, fetches only `main` (never tags),
   shows the review since the newest release tag signed with the release key
@@ -180,10 +180,11 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
 - Releasing (only when asked): rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`,
   bump `versionCode` by 1 and set `versionName` to `X.Y.Z` in
   `app/build.gradle.kts`, commit, and run `make build`. The user pushes `main`
-  (VS Code), then creates the signed tag `vX.Y.Z` (`git tag -s`, with a key
-  that isn't in the container or its agents), pushes it and signs
-  `seedtag-unsigned.apk`, all in a separate release clone on the host (README,
-  "Signing a release"). Never create or push a release tag from the container.
+  (VS Code), then, in the separate release clone on the host, runs
+  `tools/release-tag.sh` (review, signed tag `vX.Y.Z` with a key that isn't in
+  the container or its agents, push), checks the tag's CI run and signs that
+  run's `seedtag-unsigned.apk` with `tools/sign-release.sh` (README, "Signing a
+  release"). Never create or push a release tag from the container.
 - Branching: small fixes and changes go on the current branch; new features
   and bigger or more significant changes get a separate branch.
 - Never commit `*.p12` / `*.jks` / `*.keystore`, `.env` or an APK (`.gitignore`

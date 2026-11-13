@@ -5,21 +5,23 @@
 # step that changes anything. Run it on the HOST, in the release clone (~/seedtag-release), never in the
 # dev container or in the folder it mounts (README, "Signing a release").
 #
-#   tools/release-tag.sh [--dry-run] [--commit <rev>] [--remote <name>] [--bootstrap <vX.Y.Z>]
+#   tools/release-tag.sh [--dry-run] [--commit <rev>] [--remote <name>] [--bootstrap <vX.Y.Z | commit>]
 #
 #   --commit     what to tag (default: <remote>/main). The version comes from versionName in that commit.
 #   --remote     default origin
 #   --dry-run    all the checks and the review, then stop before creating the tag
 #   --bootstrap  only for the first signed release: review against <vX.Y.Z> although it isn't signed with
 #                your release key, and run although the checkout isn't such a tag (read this script first).
-#                You confirm that tag's commit from evidence of your own, e.g. the APK you signed.
+#                You confirm that tag's commit from evidence of your own, e.g. the APK you signed. If that
+#                evidence shows another commit than the tag (the APK was built later), give the commit's
+#                full 40-character SHA instead of the tag.
 #
 # Everything on GitHub is treated as untrusted (the dev container can push as you), so:
 # - It fetches only main, never tags. The previous release, the start of the review, is the newest vX.Y.Z
 #   tag in the history of the commit that is signed with your release key; others are listed and ignored.
 # - "Signed" means signed with the key in user.signingkey (its fingerprint), with the tag's own name and
-#   the message "SeedTag X.Y.Z" inside, and gpg.ssh.allowedSignersFile must list only that key, so the
-#   agent check covers every key git verify-tag would accept.
+#   the message "SeedTag X.Y.Z" inside. gpg.ssh.allowedSignersFile must list only that key, so that a plain
+#   git verify-tag, which you run by hand after a fresh clone (README), accepts nothing else either.
 # - The script that runs is the one checked out here, and that must be a release tag signed with your key:
 #   a new version of this script shows up in the review instead of running unreviewed. Never pull main here.
 # - Commit messages and diffs are shown with control characters removed or marked (<CR>, <C1>, <bidi>), so
@@ -48,7 +50,7 @@ unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OB
 git() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"; }
 
 unset CDPATH
-usage="usage: tools/release-tag.sh [--dry-run] [--commit <rev>] [--remote <name>] [--bootstrap <vX.Y.Z>]"
+usage="usage: tools/release-tag.sh [--dry-run] [--commit <rev>] [--remote <name>] [--bootstrap <vX.Y.Z | commit>]"
 DRY=0
 REV=""
 REMOTE=origin
@@ -58,7 +60,7 @@ while [ $# -gt 0 ]; do
         --dry-run) DRY=1; shift ;;
         --commit) REV="${2:?--commit needs a revision}"; shift 2 ;;
         --remote) REMOTE="${2:?--remote needs a name}"; shift 2 ;;
-        --bootstrap) BOOT="${2:?--bootstrap needs the previous release tag, vX.Y.Z}"; shift 2 ;;
+        --bootstrap) BOOT="${2:?--bootstrap needs the previous release: its tag vX.Y.Z or its full commit SHA}"; shift 2 ;;
         -h|--help) awk 'NR > 3 && /^#/ { sub(/^# ?/, ""); print; next } NR > 3 { exit }' "$0"; exit 0 ;;
         *) echo "Unknown argument $1. $usage" >&2; exit 2 ;;
     esac
@@ -79,9 +81,10 @@ ask() {
 }
 must() { ask "$1" || die "Stopped. Nothing was changed${2:-}."; }
 # Text from the repository (commit messages, names, diffs) goes through this before it reaches the
-# terminal. C0 controls except tab and newline are removed, and so are bytes that aren't valid UTF-8 (a
-# lone 0x9B is CSI to an 8-bit terminal). Then, all on valid UTF-8, nothing removed can join its neighbours
-# into a new control: a CR at a line's end goes (CRLF files), any other CR is shown as <CR> (code after
+# terminal, which is assumed to be UTF-8. C0 controls except tab and newline are removed, and so are byte
+# sequences iconv rejects as UTF-8 (stray continuation bytes, truncated sequences; glibc lets a few
+# out-of-range ones through, which a UTF-8 terminal shows as replacement characters). Then, nothing removed
+# can join its neighbours into a new control: a CR at a line's end goes (CRLF files), any other CR is shown as <CR> (code after
 # it is a new line to compilers but not on screen), C1 controls (U+0080-U+009F) as <C1>, and
 # bidirectional-text controls as <bidi>.
 clean() {
@@ -127,7 +130,8 @@ case "$ROOT" in /workspaces/*) die "$ROOT is a dev container path. Use the separ
 [ -f tools/sign-release.sh ] && [ -f app/build.gradle.kts ] || die "$ROOT isn't a SeedTag clone."
 git --version | awk '{ split($3, v, "."); exit !(v[1] > 2 || (v[1] == 2 && v[2] >= 34)) }' \
     || die "git 2.34 or later is needed for SSH signatures ($(git --version))."
-[ -n "$BOOT" ] && ! is_release "$BOOT" && die "--bootstrap needs a vX.Y.Z tag, not $BOOT."
+is_sha() { printf '%s\n' "$1" | grep -qxE '[0-9a-f]{40}'; }
+[ -n "$BOOT" ] && ! is_release "$BOOT" && ! is_sha "$BOOT" && die "--bootstrap needs a vX.Y.Z tag or a full 40-character commit SHA, not $BOOT."
 say "Clone:          $ROOT"
 [ -z "$(git status --porcelain --untracked-files=no)" ] || die "Uncommitted changes (git status). The release clone must be clean."
 hooks="$(ls "$(git rev-parse --git-common-dir)/hooks" 2>/dev/null | grep -v '\.sample$' || true)"
@@ -234,8 +238,25 @@ code="$(gradle_value "$sha" versionCode)"
 is_release "v$ver" || die "versionName at $(short "$sha") isn't X.Y.Z (or not on a line of its own)."
 case "$code" in ''|*[!0-9]*) die "versionCode at $(short "$sha") isn't a number (or not on a line of its own)." ;; esac
 TAG="v$ver"
+# remote_tag <tag>: the object id of refs/tags/<tag> on the remote (exact match), empty if it has none.
+# Use only in a plain assignment, so that its die stops the script.
+remote_tag() {
+    _o="$(git ls-remote --tags "$REMOTE" "refs/tags/$1")" || die "Can't reach $REMOTE (git ls-remote failed)."
+    printf '%s\n' "$_o" | awk -v r="refs/tags/$1" '$2 == r { print $1 }'
+}
+there="$(remote_tag "$TAG")"
+if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
+    if [ -z "$there" ] && signed_release "$TAG" && [ "$(git rev-parse "refs/tags/$TAG^{commit}")" = "$sha" ]; then
+        die "You created $TAG here already (signed with your key, at $(short "$sha")) and didn't push it. Push it
+  (git push $REMOTE refs/tags/$TAG) and go on with step 6 by hand, or delete it (git tag -d $TAG) and run again."
+    fi
+    die "A tag $TAG exists in this clone already. If you didn't create it here, something else did (it may
+  have come with the clone): don't check it out or sign it. Delete it (git tag -d $TAG) and start again."
+fi
+[ -z "$there" ] || die "$TAG already exists on $REMOTE. If you didn't push it from this clone, something else did: don't use it."
 
-# The previous release: the newest vX.Y.Z tag in the history of $sha signed with the key (or --bootstrap).
+# The previous release: the newest vX.Y.Z tag in the history of $sha signed with the key, or --bootstrap's
+# tag or commit. prev is its name for messages, prev_sha its commit, pver its version.
 prev=""; ignored=""; sprev=""
 for t in $(git tag --list 'v[0-9]*' --sort=-v:refname --merged "$sha"); do
     if signed_release "$t"; then sprev="$t"; break; fi
@@ -245,43 +266,40 @@ for t in $(git tag --list 'v[0-9]*' --sort=-v:refname --merged "$sha"); do
 done
 if [ -n "$BOOT" ]; then
     [ -z "$sprev" ] || die "$sprev is a release signed with your key: --bootstrap is only for the first signed release."
-    [ -n "$prev" ] || die "--bootstrap $BOOT: no such tag in the history of $(short "$sha")."
+    if is_sha "$BOOT"; then
+        [ "$(git cat-file -t "$BOOT" 2>/dev/null)" = commit ] || die "--bootstrap $BOOT: no such commit here."
+        git merge-base --is-ancestor "$BOOT" "$sha" || die "--bootstrap $BOOT isn't in the history of $(short "$sha")."
+        prev_sha="$BOOT"; prev="$(short "$BOOT")"; ignored=""
+        pver="$(gradle_value "$prev_sha" versionName)"
+        is_release "v$pver" || die "versionName at $prev isn't X.Y.Z."
+    else
+        [ -n "$prev" ] || die "--bootstrap $BOOT: no such tag in the history of $(short "$sha")."
+    fi
 else
     prev="$sprev"
     [ -n "$prev" ] || die "No vX.Y.Z tag signed with $fp in the history of $(short "$sha").
-  For the first signed release, use --bootstrap <previous release tag>."
+  For the first signed release, use --bootstrap <previous release tag or commit>."
 fi
-prev_sha="$(git rev-parse "refs/tags/$prev^{commit}")"
+if [ -z "${prev_sha:-}" ]; then prev_sha="$(git rev-parse "refs/tags/$prev^{commit}")"; pver="${prev#v}"; fi
 say "Commit:         $(subject "$sha" '%H%n                %s (%an, %ad)')"
 say "Version:        $ver (versionCode $code) → tag $B$TAG$N"
-say "Previous:       $prev → $prev_sha ($(subject "$prev_sha" %ad))"
+say "Previous:       $prev → $prev_sha ($pver, $(subject "$prev_sha" %ad))"
 [ -z "$ignored" ] || warn "Ignored (not vX.Y.Z, or not signed with your key):$ignored"
 if [ -n "$BOOT" ]; then
-    warn "$prev isn't signed with your key (--bootstrap) and came from GitHub with the clone, so nothing here
-  proves it's the release you made: GitHub's tag page and the commit date can be forged too. Check the commit
-  against evidence the container couldn't change, e.g. the $prev APK you signed or installed:
+    warn "$prev isn't a release signed with your key (--bootstrap) and came from GitHub, so nothing here proves
+  it's the release you made: GitHub's tag page and the commit date can be forged too. Check the commit against
+  evidence the container couldn't change, e.g. the $pver APK you signed or installed:
     apksigner verify --print-certs <apk> | grep SHA-256      (your release certificate's digest)
     unzip -p <apk> META-INF/version-control-info.textproto   (revision: the commit)
-  or the commit hash you noted when you released it."
+  or the commit hash you noted when you released it. If the evidence shows another commit, stop and run
+  again with --bootstrap <that commit's full SHA>."
     printf '%sIf your evidence shows %s, type its first 12 characters (anything else stops):%s ' "$B" "$prev_sha" "$N"
     read -r typed || typed=""
     [ "$typed" = "$(printf '%.12s' "$prev_sha")" ] || die "Stopped. Nothing was changed."
 fi
-awk -v a="$ver" -v b="${prev#v}" 'BEGIN { split(a, x, "."); split(b, y, ".")
+awk -v a="$ver" -v b="$pver" 'BEGIN { split(a, x, "."); split(b, y, ".")
     for (i = 1; i <= 3; i++) if (x[i] + 0 != y[i] + 0) exit !(x[i] + 0 > y[i] + 0); exit 1 }' \
-    || die "$ver isn't newer than $prev."
-if git rev-parse --verify --quiet "refs/tags/$TAG" >/dev/null; then
-    die "A tag $TAG exists in this clone already. If you didn't create it here, something else did (it may
-  have come with the clone): don't check it out or sign it. Delete it (git tag -d $TAG) and start again."
-fi
-# remote_tag <tag>: the object id of refs/tags/<tag> on the remote (exact match), empty if it has none.
-# Use only in a plain assignment, so that its die stops the script.
-remote_tag() {
-    _o="$(git ls-remote --tags "$REMOTE" "refs/tags/$1")" || die "Can't reach $REMOTE (git ls-remote failed)."
-    printf '%s\n' "$_o" | awk -v r="refs/tags/$1" '$2 == r { print $1 }'
-}
-there="$(remote_tag "$TAG")"
-[ -z "$there" ] || die "$TAG already exists on $REMOTE. If you didn't push it from this clone, something else did: don't use it."
+    || die "$ver isn't newer than $prev ($pver)."
 
 pcode="$(gradle_value "$prev_sha" versionCode)"
 case "$pcode" in ''|*[!0-9]*) die "Can't read $prev's versionCode." ;; esac
@@ -371,12 +389,12 @@ step "4. Create the signed tag"
 msg="SeedTag $ver"
 say "Will run:  git tag -s -m \"$msg\" $TAG $sha"
 say "Signed with $fp; git may ask for the key's passphrase."
-if [ "$DRY" = 1 ]; then ok "--dry-run: stopping here. Nothing was changed."; exit 0; fi
+if [ "$DRY" = 1 ]; then ok "--dry-run: stopping here. Nothing was changed (only $REMOTE/main was fetched)."; exit 0; fi
 printf '%sType %s to create it (anything else stops):%s ' "$B" "$TAG" "$N"
 read -r typed || typed=""
 [ "$typed" = "$TAG" ] || die "Stopped. Nothing was changed."
 state="$TAG may exist in this clone: check with git tag -l $TAG, delete it with git tag -d $TAG."
-git tag -s -m "$msg" "$TAG" "$sha"
+git tag -s -m "$msg" "$TAG" "$sha" || die "git tag failed (see above); no tag was created."
 vt="$(git verify-tag "refs/tags/$TAG" 2>&1 | clean)" || true
 signed_release "$TAG" || { git tag -d "$TAG" >/dev/null; die "$TAG doesn't verify with $fp (deleted it again):
 $vt"; }
@@ -413,7 +431,9 @@ repo="$(printf '%s\n' "$url" | sed -nE 's#^(https://github\.com/|git@github\.com
 say "Wait for the run of $TAG. Use it only if GitHub's own run page (not the summary text, which the
 build writes) shows the event as a push of $TAG and the commit as $(short "$sha"), that is
   $sha
-If there are several runs for $TAG, stop: something re-ran or moved it. Copy the SHA-256 from the
-run's summary and download its seedtag-unsigned.apk into $ROOT. Then:"
+That check is the only link between your tag and the APK: no script can make it for you. If there are
+several runs for $TAG, or none, stop: something re-ran, moved or deleted it, and a missing run proves
+nothing. Copy the SHA-256 from the run's summary and download its seedtag-unsigned.apk into $ROOT. Then:"
 say "  git checkout $TAG   # if not done above"
-say "  tools/sign-release.sh --expect <SHA-256 from the CI run> /path/to/your-key.jks"
+if [ "$REMOTE" = origin ]; then rarg=""; else rarg=" --remote $REMOTE"; fi
+say "  tools/sign-release.sh$rarg --expect <SHA-256 from the CI run> /path/to/your-key.jks"

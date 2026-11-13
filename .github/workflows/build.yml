@@ -54,7 +54,7 @@ jobs:
             echo
             echo "\`$sum\`"
             echo
-            echo "Sign only if your own build matches: \`tools/sign-release.sh --expect $sum <keystore>\`"
+            echo "Use only if this run is the push of your release tag at the commit release-tag.sh printed (see the run's header, not this text): \`tools/sign-release.sh --expect $sum <keystore>\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

@@ -7,18 +7,21 @@
 # one the container could edit.
 #
 #   tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] [--no-remote-check]
-#                         <keystore> [key alias]
+#                         [--remote <name>] <keystore> [key alias]
 #
 # Before anything touches the key, it checks:
-# - --expect: seedtag-unsigned.apk has this SHA-256, the one the GitHub Actions run of the release
-#   tag shows (or `make build` in a fresh clone on another machine). So a build tampered with in the
-#   dev container isn't signed. It's required; --no-expect skips it, with a warning.
+# - --expect: seedtag-unsigned.apk has this SHA-256. Usually the APK and the hash both come from the
+#   GitHub Actions run of the release tag, so this only proves you have the file that run built; what
+#   ties that run to your tag is you checking, on GitHub's run page, that it is the push of the tag at
+#   the commit release-tag.sh printed. A hash from a second, independent build (`make build` in a fresh
+#   clone on another machine) proves more. It's required; --no-expect skips it, with a warning.
 # - The clone has no uncommitted changes, and HEAD is exactly the tag v<versionName>. The tag is
 #   signed with the key in this clone's user.signingkey (compared by fingerprint, not just "a key
-#   git verify-tag accepts"), made outside the container, and carries the message "SeedTag X.Y.Z". --no-verify-tag skips the signature
-#   check, with a warning, e.g. for a first try.
-# - The tag on origin (REMOTE=… for another remote) is still this one, so CI built what you tagged
-#   and nothing moved it since. --no-remote-check skips that, with a warning, e.g. offline.
+#   git verify-tag accepts"), made outside the container, and carries the message "SeedTag X.Y.Z".
+#   --no-verify-tag skips the signature check, with a warning, e.g. for a first try.
+# - The tag on the remote (--remote, default origin) is still this one right now. That catches a tag
+#   that was moved or deleted and not put back; it can't see one moved, built and restored.
+#   --no-remote-check skips it, with a warning, e.g. offline.
 # - The APK says it was built from HEAD (META-INF/version-control-info.textproto).
 # - The permissions (check-apk.sh).
 #
@@ -32,18 +35,19 @@
 # git diff <previous tag>..<this tag> (the source, and this script, check-apk.sh and the CI workflow).
 set -eu
 
-usage="usage: tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] [--no-remote-check] <keystore> [key alias]"
+usage="usage: tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] [--no-remote-check] [--remote <name>] <keystore> [key alias]"
 EXPECT=""
 NO_EXPECT=0
 VERIFY_TAG=1
 REMOTE_CHECK=1
-REMOTE="${REMOTE:-origin}"
+REMOTE=origin
 while [ $# -gt 0 ]; do
     case "$1" in
-        --expect) EXPECT="$(printf '%s' "${2:?--expect needs the SHA-256 of an independent build}" | tr 'A-F' 'a-f')"; shift 2 ;;
+        --expect) EXPECT="$(printf '%s' "${2:?--expect needs the SHA-256 from the CI run, or of an independent build}" | tr 'A-F' 'a-f')"; shift 2 ;;
         --no-expect) NO_EXPECT=1; shift ;;
         --no-verify-tag) VERIFY_TAG=0; shift ;;
         --no-remote-check) REMOTE_CHECK=0; shift ;;
+        --remote) REMOTE="${2:?--remote needs a name}"; shift 2 ;;
         --*) echo "Unknown option $1. $usage" >&2; exit 2 ;;
         *) break ;;
     esac
@@ -85,13 +89,13 @@ got="$(sha256 "$IN" | cut -d' ' -f1)"
 if [ -n "$EXPECT" ]; then
     if [ "$got" != "$EXPECT" ]; then
         echo "!! $IN has SHA-256 $got," >&2
-        echo "!! but the independent build has $EXPECT. Not signing." >&2
+        echo "!! but --expect is $EXPECT. Not signing." >&2
         echo "!! Find out what differs first (unzip both and diff -r, or diffoscope)." >&2
         exit 1
     fi
-    echo ">> $IN matches the independent build ($got)"
+    echo ">> $IN has the expected SHA-256 ($got)"
 else
-    echo "!! --no-expect: $IN ($got) wasn't compared with an independent build." >&2
+    echo "!! --no-expect: $IN ($got) wasn't compared with any expected SHA-256." >&2
     echo "!! See \"Build integrity\" in README.md." >&2
 fi
 
@@ -162,6 +166,7 @@ fi
 built="$(unzip -p "$IN" META-INF/version-control-info.textproto 2>/dev/null | sed -n 's/^ *revision: "\([0-9a-f]*\)".*/\1/p')"
 if [ "$built" != "$HEAD_SHA" ]; then
     echo "!! $IN was built from commit ${built:-(unknown)}, but $TAG is $HEAD_SHA. Not signing." >&2
+    echo "!! If $IN is a newer release, check out its tag first (git checkout vX.Y.Z) and run again." >&2
     exit 1
 fi
 echo ">> $IN was built from $TAG ($HEAD_SHA)"
@@ -169,7 +174,7 @@ echo ">> $IN was built from $TAG ($HEAD_SHA)"
 # 4. Permissions.
 "$HERE/check-apk.sh" --unsigned "$IN" >/dev/null
 
-rm -f "$OUT"
+rm -f "$OUT" "$OUT.sha256"
 if [ -n "$ALIAS" ]; then
     "$APKSIGNER" sign --ks "$KS" --ks-key-alias "$ALIAS" --out "$OUT" "$IN"
 else
