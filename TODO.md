@@ -80,6 +80,14 @@
     ([reports/2026-11-12-release-tag-hardening-review.md](reports/2026-11-12-release-tag-hardening-review.md),
     [reports/2026-11-12-release-tag-followup-review.md](reports/2026-11-12-release-tag-followup-review.md)),
     and the review of the whole flow ([reports/2026-11-13-release-flow-review.md](reports/2026-11-13-release-flow-review.md)).
+  - [x] Close the gaps a later security review found in `release-tag.sh`'s review step (branch
+    `release-tag-review-gaps`): fixes 1–5 (wrapper jar checksum, submodules, invisible characters, a
+    binary shown as text, raw tag names) and nits N1–N5 (script path, environment, config warnings, key
+    files outside the clone, fsck on fetch).
+  - [ ] The findings of the review of everything since 0.4.2
+    ([reports/2026-11-13-post-0.4.2-review.md](reports/2026-11-13-post-0.4.2-review.md)): P1–P12 fixed
+    (P7 as a note in RELEASING.md), P14 settled. P13 stays open by choice: marking no-break spaces would
+    warn on ordinary text.
   - [ ] Set up the release clone on the host and a signing key outside the SSH agent, and tag and sign
     only there (README, "Signing a release"; `.devcontainer/README.md`, "What the container can reach on
     the host"). Pushing `main` from VS Code in the container stays. User action, on the host.
