@@ -36,15 +36,16 @@ installed over the app.
 **The tag-signing key, its allowed-signers file and the release clone:**
 
 ```sh
-# a signing key for releases only, with a passphrase; never ssh-add it
-ssh-keygen -t ed25519 -C "release signing" -f ~/.ssh/seedtag_signing
+# a signing key for releases only, with a passphrase; outside ~/.ssh (see below), never ssh-add it
+mkdir -m 700 ~/.seedtag-signing
+ssh-keygen -t ed25519 -C "release signing" -f ~/.seedtag-signing/key
 # an allowed-signers file with only that key (git verify-tag accepts every key in it)
-printf '%s namespaces="git" %s\n' "<your git email>" "$(cut -d' ' -f1,2 ~/.ssh/seedtag_signing.pub)" \
+printf '%s namespaces="git" %s\n' "<your git email>" "$(cut -d' ' -f1,2 ~/.seedtag-signing/key.pub)" \
     > ~/.ssh/release_allowed_signers
 
 git clone https://github.com/zivke/seedtag.git ~/seedtag-release && cd ~/seedtag-release
 git config gpg.format ssh
-git config user.signingkey "$HOME/.ssh/seedtag_signing.pub"
+git config user.signingkey "$HOME/.seedtag-signing/key.pub"
 git config gpg.ssh.allowedSignersFile "$HOME/.ssh/release_allowed_signers"
 git config tag.gpgSign true
 ```
@@ -53,11 +54,14 @@ Notes on this setup:
 - **Local settings only:** all of these are set in the release clone, not with `--global`.
 - **Keep the key out of every agent:** VS Code forwards the SSH agent into the container, so a key in it could sign a
   tag "as you" from there. Git reads the key file and asks for its passphrase instead. Make sure nothing loads it for
-  you: `AddKeysToAgent` in `~/.ssh/config`, or a desktop keyring. A hardware key (`-t ed25519-sk`, a touch per
-  signature) works too.
+  you: `AddKeysToAgent` in `~/.ssh/config`, or a desktop keyring. GNOME's SSH agent (`SSH_AUTH_SOCK` under
+  `/run/user/<uid>/gcr/` or `/keyring/`) offers every key in `~/.ssh` that has a `.pub` next to it and refuses
+  `ssh-add -d`; that's why the key lives outside `~/.ssh`. Check with
+  `ssh-add -L | grep -cF "$(cut -d' ' -f2 ~/.seedtag-signing/key.pub)"`: it must print 0. `release-tag.sh` checks
+  it too. A hardware key (`-t ed25519-sk`, a touch per signature) works too.
 - **Other projects:** the same key and file can serve them, if they're released the same way, never from a container
   or CI.
-- **On GitHub (Settings › SSH and GPG keys):** add `~/.ssh/seedtag_signing.pub` as a **Signing Key**, so the tags
+- **On GitHub (Settings › SSH and GPG keys):** add `~/.seedtag-signing/key.pub` as a **Signing Key**, so the tags
   show as verified. It grants no access.
 - **Pushing from the host:** the release clone needs its own way to push the tag, HTTPS with your credential
   manager or an SSH login key.
