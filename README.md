@@ -113,7 +113,8 @@ hooks, and shows commit messages and diffs with control characters removed or ma
 `<inv>` for zero-width and other invisible characters), so they can't redraw the terminal or hide code behind a
 carriage return; it lists the files whose added lines contain any. It
 refuses in a container, in a clone with uncommitted changes, with a signing key that's loaded in the SSH agent,
-with an allowed-signers file that lists any other key, with either file inside the clone, and for a commit that
+with an allowed-signers file that lists any other key, with either file inside the clone or a symlink, and for a
+commit that
 isn't on `origin/main`, whose version
 isn't newer than the previous release or whose tag exists already, whose changelog has no section for its version,
 whose `versionCode` didn't go up, whose parent already has its version (a commit after the release commit), that

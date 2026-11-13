@@ -7,18 +7,24 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
-- Releasing, `tools/release-tag.sh`: a changed Gradle wrapper jar, and the
-  Gradle distribution a changed `gradle-wrapper.properties` names (a release
-  on services.gradle.org), must match the checksum you paste from gradle.org. Refuses submodules, a diff with NUL
-  bytes (a binary file shown as text) and a bare `diff` attribute in
-  `.gitattributes`. Marks zero-width and other invisible characters (`<inv>`)
-  and more bidirectional marks, warns about them, and shows added lines
-  outside `*.md` with letters that look like Latin ones (Greek, Cyrillic,
-  fullwidth). Also cleans the
-  names of ignored tags, checks fetched objects, refuses a signing key or
-  allowed-signers file inside the clone, warns about more git config and
-  environment that choose programs git runs, shows the pager, and runs from
-  any folder of the clone.
+- Releasing, `tools/release-tag.sh`: tags only the release commit itself
+  (it refuses a later commit, whose parent already has the version), and
+  RELEASING.md passes it with `--commit`. A changed Gradle wrapper jar, and
+  the Gradle release a changed `gradle-wrapper.properties` names (it must be
+  on services.gradle.org), must match a checksum you paste from gradle.org.
+  Refuses submodules, a diff with NUL bytes (a binary file shown as text,
+  with the files named) and a bare `diff` attribute in `.gitattributes`.
+- Releasing, `tools/release-tag.sh`, review display: marks zero-width and
+  other invisible characters (`<inv>`) and more bidirectional marks, warns
+  about them with the right file names, and shows added lines outside
+  `*.md` with letters that look like Latin ones (Greek, Cyrillic,
+  fullwidth). Cleans the names of ignored tags.
+- Releasing, `tools/release-tag.sh`, setup checks: fsck on the fetched
+  objects; the signing key and allowed-signers file must be outside the
+  clone and not symlinks; one warning each for git config and environment
+  that choose programs git or ssh run, saying what they mean; the message
+  for a key in GNOME's SSH agent says to move it out of `~/.ssh`. It shows
+  the pager and runs from any folder of the clone.
 
 ## [0.4.2] - 2026-11-13
 

@@ -126,6 +126,12 @@ If the Gradle wrapper jar or `gradle-wrapper.properties` changed, it asks you to
 the end it offers to check out the new tag (say yes) and prints the commit to compare in the next step. If it stops,
 its message says why and what to do.
 
+**A changed `release-tag.sh` runs one release late.** The clone runs the copy from the last release tag, so changes
+to the script are reviewed in the next release and first run in the one after. Until then, check by hand what the
+new checks would have: for 0.4.3, which 0.4.2's copy reviews, look at
+`git diff --stat v0.4.2 <release commit> -- gradle/ .gitattributes .gitmodules` and compare any changed wrapper jar or
+`gradle-wrapper.properties` with gradle.org.
+
 ## 4. The tag's CI run
 
 The pushed tag starts the workflow. On GitHub's run page for it:
