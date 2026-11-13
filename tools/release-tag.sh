@@ -329,6 +329,10 @@ while IFS="$(printf '\t')" read -r oid a; do
     if grep -qiE '(^|[[:space:]])filter=' "$TMP/attr"; then
         die "$(printf '%s' "$a" | clean) at $(short "$sha") sets a filter (filter=…): checking it out would run that filter's program."
     fi
+    if grep -qE '(^|[[:space:]])diff([[:space:]]|$)' "$TMP/attr"; then
+        die "$(printf '%s' "$a" | clean) at $(short "$sha") sets a bare diff attribute: it forces files to be diffed as
+  text, which would let a binary file pass the next release's review."
+    fi
 done < "$TMP/attrs"
 ok "$TAG doesn't exist yet; $prev → $ver; versionCode $pcode → $code; changelog has [$ver]; no filters."
 ahead="$(git rev-list --count "$sha..$main_ref")"
@@ -370,6 +374,14 @@ if printf '%s\n' "$bin" | grep -qxF "$JAR" && git cat-file -e "$sha:$JAR" 2>/dev
 fi
 # shellcheck disable=SC2086
 git diff $DIFF "$prev_sha" "$sha" > "$TMP/diff"
+# A file diffed as text although it's binary ('diff' attribute in the checked-out .gitattributes): clean
+# would drop its NUL bytes, and numstat counted it as text above.
+nul="$(LC_ALL=C tr -cd '\000' < "$TMP/diff" | wc -c | tr -d ' ')"
+[ "$nul" = 0 ] || die "The diff contains NUL bytes: a binary file is being shown as text (a 'diff' attribute in
+  .gitattributes?). These files have NUL bytes (listed with the commit they're read from):
+    git -c core.quotePath=false diff --name-only --no-renames $(short "$prev_sha") $(short "$sha") | while IFS= read -r f; do
+      for r in $(short "$prev_sha") $(short "$sha"); do git cat-file blob \"\$r:\$f\" 2>/dev/null | od -An -tx1 |
+        grep -q ' 00' && printf '%s %s\\n' \"\$r\" \"\$f\"; done; done"
 bidi="$(LC_ALL=C awk -v re="$BIDI_RE" '/^\+\+\+ / { f = substr($0, 5) } /^\+/ && $0 ~ re { print f }' "$TMP/diff" | sort -u | clean)"
 [ -z "$bidi" ] || warn "Bidirectional-text control characters (they can make code read differently than it runs) in:
 $(printf '%s\n' "$bidi" | sed 's/^/  /')"
