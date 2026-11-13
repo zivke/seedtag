@@ -304,10 +304,11 @@ fun SeedTagApp(
     var actionsDone by remember { mutableIntStateOf(0) }
     LaunchedEffect(prompting) { if (!prompting) actionsDone++ }
     // While "Still there?" is up, nobody is watching the screen, which is kept on: what's behind the
-    // dialog (words, a password) is blurred until Keep. Blur needs Android 12; before that, it's covered.
-    val idle = vm.dialog == Dialog.StillThere
+    // dialog (words, a password) is blurred until Keep. "Leave SeedTag?" blurs it the same way. Blur
+    // needs Android 12; before that, it's covered.
+    val veiled = vm.dialog.let { it == Dialog.StillThere || (it is Dialog.ConfirmBack && !it.toWords) }
     val blurs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    Box(if (idle && blurs) Modifier.blur(32.dp) else Modifier) {
+    Box(if (veiled && blurs) Modifier.blur(20.dp) else Modifier) {
         CompositionLocalProvider(
             LocalAirplaneMode provides airplaneMode,
             LocalDebugging provides debugging,
@@ -341,7 +342,7 @@ fun SeedTagApp(
                 }
             }
         }
-        if (idle && !blurs) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+        if (veiled && !blurs) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
     }
     Dialogs(vm, leave)
 }

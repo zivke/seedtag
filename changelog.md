@@ -7,6 +7,8 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- *Leave SeedTag?* (Back while something would be lost) blurs the screen
+  behind it, as *Still there?* does. Both blur it a little less than before.
 - Releasing, `tools/release-tag.sh`: treats everything on GitHub as
   untrusted. It fetches only `main`, never tags, and starts the review at the
   newest release tag signed with your release key (others are listed and
