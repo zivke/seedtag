@@ -21,9 +21,12 @@ plus a single-file Python tool to recover it on any computer. Source: <https://g
 ```
 core/          pure Kotlin/JVM: BIP39, SeedBox (crypto), tests
 app/           Android app (Jetpack Compose), NFC reader mode
-tools/         seedtag.py (desktop encrypt / decrypt / verify), its tests, check-apk.sh
+tools/         seedtag.py (desktop encrypt / decrypt / verify), its tests, check-apk.sh,
+               release-tag.sh and sign-release.sh (run on the host)
 art/           app icon source (SVG) and the 512 px store icon
 .devcontainer/ JDK, Android SDK, adb and Claude Code in a container
+reports/       reviews and the manual test plan
+RELEASING.md   how to make a release, step by step
 ```
 
 ## Build & install
@@ -68,46 +71,13 @@ and git on the host runs hooks and some settings from there (`.git/hooks/*`, `co
 | Dev container | Work, commit, `make build`. Push `main` with VS Code's Source Control (in a container window it runs in the container, with your forwarded credentials). No tags. |
 | Release clone on the host (`~/seedtag-release`) | Review, signed tag, `sign-release.sh`, all through the scripts. `release-tag.sh` fetches `main` itself; never `git pull` or check out `main` there. Never opened in a container. |
 
-**Once, on the host:**
+**The steps, with every command, are in [RELEASING.md](RELEASING.md)**:
+- setting up the host once (tools, the release keystore, a tag-signing key that is never loaded into an SSH agent,
+  an allowed-signers file listing only that key, the release clone);
+- then, for each release, the release commit in the container, a CI run of `main`, `tools/release-tag.sh`, the
+  tag's CI run, `tools/sign-release.sh`, a test of the signed APK, and publishing.
 
-```sh
-# a signing key for releases only, with a passphrase; never ssh-add it (see below)
-ssh-keygen -t ed25519 -C "release signing" -f ~/.ssh/seedtag_signing
-# an allowed-signers file with only that key (git verify-tag accepts every key in it)
-printf '%s namespaces="git" %s\n' "<your git email>" "$(cut -d' ' -f1,2 ~/.ssh/seedtag_signing.pub)" \
-    > ~/.ssh/release_allowed_signers
-
-git clone https://github.com/zivke/seedtag.git ~/seedtag-release && cd ~/seedtag-release
-git config gpg.format ssh
-git config user.signingkey "$HOME/.ssh/seedtag_signing.pub"
-git config gpg.ssh.allowedSignersFile "$HOME/.ssh/release_allowed_signers"
-git config tag.gpgSign true
-```
-
-All of it is set in the release clone only, not with `--global`. Add `~/.ssh/seedtag_signing.pub` on GitHub as a
-**Signing Key** (Settings › SSH and GPG keys), so the tags show as verified; it grants no access. The key isn't
-loaded into the SSH agent on purpose: VS Code forwards the agent into the container, so a key in it could sign a
-tag "as you" from there. Git reads the file and asks for its passphrase instead. Make sure nothing loads it for you
-(`AddKeysToAgent` in `~/.ssh/config`, a desktop keyring). (A hardware key, `-t ed25519-sk`, which needs a touch per
-signature, works too.) The same key and file can serve other projects released the same way, never from a
-container or CI. The release clone also needs a way to push the tag from the host: HTTPS with your credential
-manager, or an SSH login key.
-
-**For each release:**
-
-```sh
-# in the container: set the version (see CLAUDE.md, Releasing), commit, push main from VS Code; no tags
-make build                       # prints the SHA-256 of seedtag-unsigned.apk
-
-# on the host, in the release clone:
-cd ~/seedtag-release
-tools/release-tag.sh [--commit <sha>]     # review, signed tag, verify, push: asks before each step
-# the tag's GitHub Actions run shows the SHA-256 of its own build (see Build integrity); it should
-# match the container's. Use the run only if GitHub's run page shows a push of vX.Y.Z at the commit
-# release-tag.sh printed. Download the run's seedtag-unsigned.apk into the release clone, then:
-git checkout vX.Y.Z                       # release-tag.sh offers to do this
-tools/sign-release.sh --expect <ci-sha256> /path/to/your-key.jks   # writes seedtag.apk and seedtag.apk.sha256
-```
+What follows is what the scripts check, and why.
 
 Both scripts take `--remote <name>` if the GitHub remote isn't `origin`.
 
@@ -133,9 +103,8 @@ came from GitHub, so it asks you to confirm its commit from evidence the contain
 commit's first 12 characters: the APK of that release you signed or installed
 (`apksigner verify --print-certs` shows your certificate's digest, and
 `unzip -p <apk> META-INF/version-control-info.textproto` the commit it was built from), or your own notes. If the
-APK was built from a later commit than the tag (the signed 0.3.0 APK records `a8bff16`, 17 commits after `v0.3.0`),
-pass that commit instead: `--bootstrap <its full 40-character SHA>`. The review then starts where the release
-really was.
+APK was built from a later commit than the tag, pass that commit instead: `--bootstrap <its full 40-character SHA>`.
+The review then starts where the release really was. RELEASING.md has this for 0.4.2, where it applies.
 
 Everything on GitHub counts as untrusted, since the container can push as you. So the script fetches only `main`,
 never tags, names every ref in full (a tag called `origin/main` can't stand in for the branch), runs git without
@@ -336,7 +305,11 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
 
 Verify and Restore are two steps, like Back up: type the password and scan, then the result. Once the tag has
 been decrypted, the password field and keyboard are gone; **Verify another tag** or **Restore another tag** starts
-again from an empty password.
+again from an empty password. Writing a new backup clears both too, so what they show is never left over from
+before it.
+
+When a screen goes on below what's visible, for example above the word keypad or the password keyboard, its bottom
+edge fades out and a small round **↓** button scrolls further; the top edge fades when there's more above.
 
 Leaving or closing the app (home button, Recents, screen off) deletes everything typed or decrypted; nothing is
 ever saved on the phone. So that a screen timeout doesn't wipe a half-typed phrase, the screen stays on while

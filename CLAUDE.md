@@ -106,10 +106,20 @@ Two Gradle modules plus the Python tool:
   - `SeedTagViewModel.kt`: all UI state and flows. Argon2 runs on
     `Dispatchers.Default`. The pending tag operation is an `AtomicReference`
     because the reader callback runs on a binder thread. A failed tag operation
-    stays armed so the user can just tap again.
+    stays armed so the user can just tap again. `holdsSecrets` is true while
+    words, a password or restored words are in memory; `touched()` (every
+    `ACTION_DOWN` in `MainActivity`) restarts the idle timer, and
+    `idleTimeout()` wipes after `IDLE_WARN_MS` + `IDLE_GRACE_MS`. `back()` and
+    `backStaysInApp` decide what system Back does (`Dialog.ConfirmBack` before
+    anything is lost). A successful write resets Verify and Restore
+    (`readAnother()`).
   - `TagIo.kt`: blocking NFC I/O (check, write + read-back, read, lock), returns a
     `TagResult`, never throws.
   - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
+    `IdleWatch` keeps the screen on while `holdsSecrets` and shows *Still
+    there?* (`Dialog.StillThere`, background blurred on Android 12+, covered
+    below); `ScrollHints` adds the bottom/top fades and the ↓ button to a
+    `StepScreen` whose content goes on below what's visible.
 - **`tools/seedtag.py`**: single file, wordlist embedded, `encrypt` /
   `decrypt` / `verify`. Python 3.8+; uses `cryptography` (AES-GCM, and
   Argon2id from ≥ 44), with `argon2-cffi` as the Argon2id fallback. Without
@@ -184,7 +194,8 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   `tools/release-tag.sh` (review, signed tag `vX.Y.Z` with a key that isn't in
   the container or its agents, push), checks the tag's CI run and signs that
   run's `seedtag-unsigned.apk` with `tools/sign-release.sh` (README, "Signing a
-  release"). Never create or push a release tag from the container.
+  release"; the full checklist is `RELEASING.md`). Never create or push a
+  release tag from the container. Keep `RELEASING.md` in step with the scripts.
 - Branching: small fixes and changes go on the current branch; new features
   and bigger or more significant changes get a separate branch.
 - Never commit `*.p12` / `*.jks` / `*.keystore`, `.env` or an APK (`.gitignore`

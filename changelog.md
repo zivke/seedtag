@@ -27,7 +27,8 @@ All notable user-visible changes to SeedTag. The format follows
   lists only the release key, set in the clone, not globally (README,
   "Signing a release"). The README now says that the CI run page is the only
   link between your tag and the APK, and how to start again after a fresh
-  clone.
+  clone. `RELEASING.md` is the step-by-step manual, from the version bump to
+  the GitHub Release.
 
 ## [0.4.1] - 2026-11-12
 
