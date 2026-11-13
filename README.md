@@ -132,8 +132,8 @@ files and wrapper, the manifest and resources, the tests, which CI runs in the s
 (undiffable) changes except `art/*.png` and the Gradle wrapper jar, and a diff with NUL bytes (a binary file shown
 as text). A changed wrapper jar is code that runs in CI and no diff shows it, so you paste its "Wrapper JAR Checksum"
 from [gradle.org/release-checksums](https://gradle.org/release-checksums/), looked up in your browser. It warns
-about bidirectional-text and invisible characters and lists the code and config files with non-ASCII characters in
-added lines, where a lookalike letter could hide. If you skipped a view, it says which and you type `reviewed` to go on.
+about bidirectional-text and invisible characters, and shows the added lines (outside `*.md`) with Greek, Cyrillic or
+other letters that look like Latin ones, where a lookalike could make one name pass for another. If you skipped a view, it says which and you type `reviewed` to go on.
 Only after you type the tag name does it run `git tag -s`; it deletes the tag again unless it verifies with your
 signing key. Pushing (the tag only) is a separate confirmation. `--dry-run` stops before the tag. By hand, it
 amounts to `git fetch --no-tags origin main`, `git log` and `git diff vPREVIOUS <commit>`, `git tag -s`, `git verify-tag` and

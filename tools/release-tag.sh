@@ -41,8 +41,8 @@
 #  3. Review, each part on request in your pager: the commits, the changelog section, everything except the
 #     app's source code and docs, the whole diff. Refuses undiffable (binary) changes except art/*.png and
 #     the Gradle wrapper jar, whose checksum you paste from gradle.org, and a diff with NUL bytes (a binary
-#     shown as text); warns about bidirectional-text, invisible and other control characters, and lists the
-#     code and config files with non-ASCII characters in added lines.
+#     shown as text); warns about bidirectional-text, invisible and other control characters, and shows
+#     added lines (outside *.md) with letters that look like Latin ones.
 #  4. Type the tag name to create the signed tag; it must verify with your key.
 #  5. Confirm to push the tag (only the tag); otherwise offer to delete it again.
 #  6. Optionally check out the tag; print the next steps (CI run of exactly this commit, sign-release.sh).
@@ -101,6 +101,9 @@ BIDI_RE='\342\200[\216\217\252-\256]|\342\201[\246-\251]|\330\234'
 # Invisible or blank: U+00AD, U+034F, U+115F, U+1160, U+180E, U+200B-200D, U+2028, U+2029, U+2060-2065,
 # U+206A-206F, U+2800, U+3164, U+FEFF, U+FFA0, tag characters U+E0000-E007F.
 INV_RE='\302\255|\315\217|\341\205[\237\240]|\341\240\216|\342\200[\213-\215\250\251]|\342\201[\240-\245\252-\257]|\342\240\200|\343\205\244|\357\273\277|\357\276\240|\363\240[\200\201][\200-\277]'
+# Letters that look like Latin ones: IPA (U+0250-02AF), U+0340-05BF (Greek, Cyrillic, Armenian), fullwidth
+# forms (U+FF00-FF7F), mathematical letters (U+1D000-1DFFF).
+LOOK_RE='\311[\220-\277]|\312[\200-\257]|[\315-\326][\200-\277]|\357[\274\275][\200-\277]|\360\235[\200-\277][\200-\277]'
 clean() {
     LC_ALL=C tr -d '\000-\010\013\014\016-\037\177' | iconv -c -f UTF-8 -t UTF-8 2>/dev/null \
         | LC_ALL=C awk -v bidi="$BIDI_RE" -v inv="$INV_RE" '{ sub(/\r$/, ""); gsub(/\r/, "<CR>"); gsub(/\302[\200-\237]/, "<C1>")
@@ -417,7 +420,7 @@ nul="$(LC_ALL=C tr -cd '\000' < "$TMP/diff" | wc -c | tr -d ' ')"
         grep -q ' 00' && printf '%s %s\\n' \"\$r\" \"\$f\"; done; done"
 # One pass over the added lines. File names come only from the diff headers (diff --git, then +++): an added
 # line can itself start with "++ b/…".
-LC_ALL=C awk -v bidi="$BIDI_RE" -v inv="$INV_RE" '
+LC_ALL=C awk -v bidi="$BIDI_RE" -v inv="$INV_RE" -v look="$LOOK_RE" '
     /^diff --git / { h = 1; next }
     h && /^\+\+\+ / { f = substr($0, 5); h = 0; next }
     /^@@ / { h = 0 }
@@ -426,8 +429,7 @@ LC_ALL=C awk -v bidi="$BIDI_RE" -v inv="$INV_RE" '
     $0 ~ inv { print "inv\t" f }
     { sub(/\r$/, "") }
     /[\001-\010\013\014\016-\037\177]|\r|\302[\200-\237]/ { print "ctl\t" f }
-    /[\200-\377]/ && f !~ /\/res\// && (f ~ /\.(kt|kts|java|sh|py|gradle|ya?ml|toml|properties|pro|json|xml|txt|bat|sha256)"?$/ ||
-        f ~ /(^|\/)(Makefile|Dockerfile|gradlew|\.editorconfig|\.gitignore|\.gitattributes)"?$/) { print "nonascii\t" f }
+    $0 ~ look && f !~ /\.md"?$/ { print "look\t" f "\t" substr($0, 2, 150) }
 ' "$TMP/diff" > "$TMP/scan"
 # found <kind>: the files with added lines of that kind, cleaned and indented.
 found() { awk -F'\t' -v k="$1" '$1 == k { print $2 }' "$TMP/scan" | sort -u | clean | sed 's/^/  /'; }
@@ -443,12 +445,12 @@ ctl="$(found ctl)"
   a new line to compilers and shells, but not on screen) in added lines of these files. They're shown as <CR>
   and <C1>, or removed:
 $ctl"
-# Code, build and config files (not docs, not res/) with non-ASCII in added lines: where a lookalike letter
-# (Cyrillic а for Latin a) could hide.
-nonascii="$(awk -F'\t' '$1 == "nonascii" { n[$2]++ } END { for (f in n) print n[f] "\t" f }' "$TMP/scan" | sort -k2 | clean)"
-[ -z "$nonascii" ] || say "Non-ASCII characters in added lines of code and config files (lines, file); look there
-  for lookalike letters:
-$(printf '%s\n' "$nonascii" | sed 's/^/  /')"
+# The lines themselves, since one letter is enough (a Cyrillic a for a Latin one); at most 5 per file.
+look="$(awk -F'\t' '$1 == "look" { f = $2; if (++n[f] <= 5) { sub(/^look\t[^\t]*\t/, ""); print "  " f ": " $0 } }
+    END { for (f in n) if (n[f] > 5) print "  … and " n[f] - 5 " more in " f }' "$TMP/scan" | clean)"
+[ -z "$look" ] || warn "Letters that look like Latin ones (Greek, Cyrillic, fullwidth, …) in added lines outside *.md.
+  In code they make a name or string look like another:
+$look"
 
 say "$(git rev-list --count "$prev_sha..$sha") commits,$(git diff --shortstat "$prev_sha" "$sha")."
 # Everything but the app's source code and docs: what builds, checks, signs and configures. Tests stay in:

@@ -11,8 +11,9 @@ All notable user-visible changes to SeedTag. The format follows
   the checksum you paste from gradle.org. Refuses submodules, a diff with NUL
   bytes (a binary file shown as text) and a bare `diff` attribute in
   `.gitattributes`. Marks zero-width and other invisible characters (`<inv>`)
-  and more bidirectional marks, warns about them, and lists the code and
-  config files with non-ASCII characters in added lines. Also cleans the
+  and more bidirectional marks, warns about them, and shows added lines
+  outside `*.md` with letters that look like Latin ones (Greek, Cyrillic,
+  fullwidth). Also cleans the
   names of ignored tags, checks fetched objects, refuses a signing key or
   allowed-signers file inside the clone, warns about more git config and
   environment that choose programs git runs, shows the pager, and runs from
