@@ -128,10 +128,11 @@ step "1. This clone"
 if [ -f /.dockerenv ] || [ -f /run/.containerenv ] || [ -n "${REMOTE_CONTAINERS:-}${CODESPACES:-}${DEVCONTAINER:-}" ]; then
     die "This looks like a container. Run it on the host, in the release clone (README, \"Signing a release\")."
 fi
+case "$0" in /*) self="$0" ;; *) self="$PWD/$0" ;; esac
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || die "Not in a git repository."
 cd "$ROOT"
 case "$ROOT" in /workspaces/*) die "$ROOT is a dev container path. Use the separate release clone." ;; esac
-[ "$(git hash-object --no-filters -- "$0" 2>/dev/null)" = "$(git rev-parse --verify --quiet HEAD:tools/release-tag.sh)" ] \
+[ "$(git hash-object --no-filters -- "$self" 2>/dev/null)" = "$(git rev-parse --verify --quiet HEAD:tools/release-tag.sh)" ] \
     || die "$0 isn't tools/release-tag.sh as committed at HEAD in $ROOT. Run that one: cd $ROOT && tools/release-tag.sh"
 [ -f tools/sign-release.sh ] && [ -f app/build.gradle.kts ] || die "$ROOT isn't a SeedTag clone."
 git --version | awk '{ split($3, v, "."); exit !(v[1] > 2 || (v[1] == 2 && v[2] >= 34)) }' \
