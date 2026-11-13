@@ -155,6 +155,12 @@ for v in GIT_SSH GIT_SSH_COMMAND GIT_ASKPASS GIT_EXEC_PATH GIT_CONFIG_GLOBAL GIT
 done
 
 [ "$(git config gpg.format || true)" = ssh ] || die "gpg.format isn't ssh here: git config gpg.format ssh"
+# outside_clone <file> <setting>: the file must not be in this clone, where a checkout could replace it.
+outside_clone() {
+    _d="$(cd -P -- "$(dirname -- "$1")" && pwd -P)" || die "Can't find the folder of $2 ($1)."
+    case "$_d/" in "$(pwd -P)"/*) die "$2 ($1) is inside this clone, where a checkout (step 6) could
+  replace it. Keep it outside the clone." ;; esac
+}
 sk="$(git config --path user.signingkey || true)"
 case "$sk" in
     "") die "No user.signingkey: git config user.signingkey \"\$HOME/.keys/seedtag-signing.pub\"" ;;
@@ -163,6 +169,7 @@ case "$sk" in
     *) [ -f "$sk" ] || die "user.signingkey file $sk doesn't exist."; pub="$(head -n 1 "$sk")" ;;
 esac
 case "$pub" in ssh-*|ecdsa-*|sk-*) ;; *) die "user.signingkey must be the public key (the .pub file), not $sk." ;; esac
+outside_clone "$sk" user.signingkey
 material="$(printf '%s\n' "$pub" | awk '{ print $2 }')"
 fp="$(printf '%s\n' "$pub" | ssh-keygen -lf - 2>/dev/null | awk '{ print $2 }')" || fp=""
 [ -n "$material" ] && [ -n "$fp" ] || die "ssh-keygen can't read the public key in user.signingkey."
@@ -181,6 +188,7 @@ esac
 asf="$(git config --path gpg.ssh.allowedSignersFile || true)"
 [ -n "$asf" ] || die "No gpg.ssh.allowedSignersFile: git verify-tag (and sign-release.sh) can't check the tag."
 [ -f "$asf" ] || die "gpg.ssh.allowedSignersFile $asf doesn't exist."
+outside_clone "$asf" gpg.ssh.allowedSignersFile
 # Every entry must be the signing key: git verify-tag accepts any key in the file.
 signers="$(awk -v m="$material" '
     { sub(/\r$/, "") }
