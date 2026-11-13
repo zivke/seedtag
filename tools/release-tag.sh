@@ -24,19 +24,23 @@
 #   git verify-tag, which you run by hand after a fresh clone (README), accepts nothing else either.
 # - The script that runs is the one checked out here, and that must be a release tag signed with your key:
 #   a new version of this script shows up in the review instead of running unreviewed. Never pull main here.
-# - Commit messages and diffs are shown with control characters removed or marked (<CR>, <C1>, <bidi>), so
-#   they can't redraw the terminal or hide code.
+# - Commit messages and diffs are shown with control characters removed or marked (<CR>, <C1>, <bidi>,
+#   <inv> for invisible characters), so they can't redraw the terminal or hide code.
 # - git runs without hooks or fsmonitor, and refs are always given in full (refs/tags/…, refs/remotes/…).
 #
 # Steps:
 #  1. This clone: not a container, clean, checked out at a signed release, signing set up (gpg.format ssh,
-#     a signing key that isn't in the SSH agent and is the only key in gpg.ssh.allowedSignersFile).
-#  2. Fetch main. Show the commit to tag, its version and the previous release; refuse if the tag exists,
-#     the commit isn't on <remote>/main, the version isn't newer, the changelog has no section for it,
-#     versionCode didn't go up, or a .gitattributes in it sets a filter.
+#     a signing key that isn't in the SSH agent and is the only key in gpg.ssh.allowedSignersFile, both
+#     files outside the clone). Warns about git config and environment that choose programs git runs.
+#  2. Fetch main (objects checked with fsck). Show the commit to tag, its version and the previous release;
+#     refuse if the tag exists, the commit isn't on <remote>/main, the version isn't newer, the changelog
+#     has no section for it, versionCode didn't go up, it contains a submodule, or a .gitattributes in it
+#     sets a filter or a bare diff attribute.
 #  3. Review, each part on request in your pager: the commits, the changelog section, everything except the
 #     app's source code and docs, the whole diff. Refuses undiffable (binary) changes except art/*.png and
-#     the Gradle wrapper jar; warns about bidirectional-text and other control characters.
+#     the Gradle wrapper jar, whose checksum you paste from gradle.org, and a diff with NUL bytes (a binary
+#     shown as text); warns about bidirectional-text, invisible and other control characters, and lists the
+#     code and config files with non-ASCII characters in added lines.
 #  4. Type the tag name to create the signed tag; it must verify with your key.
 #  5. Confirm to push the tag (only the tag); otherwise offer to delete it again.
 #  6. Optionally check out the tag; print the next steps (CI run of exactly this commit, sign-release.sh).

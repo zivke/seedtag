@@ -116,7 +116,9 @@ tools/release-tag.sh                     # the same, then: type the tag name, pa
 ```
 
 Add `--commit <sha>` if the release commit isn't the tip of `main`, and `--remote <name>` if the GitHub remote isn't
-`origin`. The script asks before every step. Read the review: it shows everything since the last signed release. At
+`origin`. The script asks before every step. Read the review: it shows everything since the last signed release.
+If the Gradle wrapper jar changed, it asks you to paste the jar's checksum from
+[gradle.org/release-checksums](https://gradle.org/release-checksums/): look it up in your browser. At
 the end it offers to check out the new tag (say yes) and prints the commit to compare in the next step. If it stops,
 its message says why and what to do.
 

@@ -4,6 +4,20 @@ All notable user-visible changes to SeedTag. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are the
 `versionName` in `app/build.gradle.kts`.
 
+## [Unreleased]
+
+### Changed
+- Releasing, `tools/release-tag.sh`: a changed Gradle wrapper jar must match
+  the checksum you paste from gradle.org. Refuses submodules, a diff with NUL
+  bytes (a binary file shown as text) and a bare `diff` attribute in
+  `.gitattributes`. Marks zero-width and other invisible characters (`<inv>`)
+  and more bidirectional marks, warns about them, and lists the code and
+  config files with non-ASCII characters in added lines. Also cleans the
+  names of ignored tags, checks fetched objects, refuses a signing key or
+  allowed-signers file inside the clone, warns about more git config and
+  environment that choose programs git runs, shows the pager, and runs from
+  any folder of the clone.
+
 ## [0.4.2] - 2026-11-13
 
 ### Changed

@@ -108,13 +108,16 @@ The review then starts where the release really was. RELEASING.md has this for 0
 
 Everything on GitHub counts as untrusted, since the container can push as you. So the script fetches only `main`,
 never tags, names every ref in full (a tag called `origin/main` can't stand in for the branch), runs git without
-hooks, and shows commit messages and diffs with control characters removed or marked (`<CR>`, `<C1>`, `<bidi>`), so
-they can't redraw the terminal or hide code behind a carriage return; it lists the files whose added lines contain
-any. It
+hooks, and shows commit messages and diffs with control characters removed or marked (`<CR>`, `<C1>`, `<bidi>`,
+`<inv>` for zero-width and other invisible characters), so they can't redraw the terminal or hide code behind a
+carriage return; it lists the files whose added lines contain any. It
 refuses in a container, in a clone with uncommitted changes, with a signing key that's loaded in the SSH agent,
-with an allowed-signers file that lists any other key, and for a commit that isn't on `origin/main`, whose version
+with an allowed-signers file that lists any other key, with either file inside the clone, and for a commit that
+isn't on `origin/main`, whose version
 isn't newer than the previous release or whose tag exists already, whose changelog has no section for its version,
-whose `versionCode` didn't go up, or whose `.gitattributes` sets a filter (a program checkout would run). It
+whose `versionCode` didn't go up, that contains a submodule (its content can't be reviewed), or whose
+`.gitattributes` sets a filter (a program checkout would run) or a bare `diff` attribute (it would show a binary
+file as text in the next review). It
 also refuses to run any file but `tools/release-tag.sh` exactly as committed at the clone's `HEAD`. The
 previous release, where the review starts, is the newest `vX.Y.Z` tag in the commit's history **signed with your
 key** (with the message `SeedTag X.Y.Z`); any other tag is listed and ignored, so a tag pushed from the container
@@ -124,7 +127,11 @@ Then it shows the commits since the previous release, the changelog section, the
 app's source code and docs (what builds, checks, signs and configures the release: `tools/`, `.github/`, Gradle
 files and wrapper, the manifest and resources, the tests, which CI runs in the same tree before building,
 `.devcontainer/`, `.gitattributes`, …), each on request in your pager, and the whole diff. It refuses binary
-(undiffable) changes except `art/*.png` and the Gradle wrapper jar, and warns about bidirectional-text characters. If you skipped a view, it says which and you type `reviewed` to go on.
+(undiffable) changes except `art/*.png` and the Gradle wrapper jar, and a diff with NUL bytes (a binary file shown
+as text). A changed wrapper jar is code that runs in CI and no diff shows it, so you paste its "Wrapper JAR Checksum"
+from [gradle.org/release-checksums](https://gradle.org/release-checksums/), looked up in your browser. It warns
+about bidirectional-text and invisible characters and lists the code and config files with non-ASCII characters in
+added lines, where a lookalike letter could hide. If you skipped a view, it says which and you type `reviewed` to go on.
 Only after you type the tag name does it run `git tag -s`; it deletes the tag again unless it verifies with your
 signing key. Pushing (the tag only) is a separate confirmation. `--dry-run` stops before the tag. By hand, it
 amounts to `git fetch --no-tags origin main`, `git log` and `git diff vPREVIOUS <commit>`, `git tag -s`, `git verify-tag` and
