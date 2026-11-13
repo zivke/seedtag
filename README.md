@@ -69,7 +69,7 @@ and git on the host runs hooks and some settings from there (`.git/hooks/*`, `co
 | Where | What |
 |---|---|
 | Dev container | Work, commit, `make build`. Push `main` with VS Code's Source Control (in a container window it runs in the container, with your forwarded credentials). No tags. |
-| Release clone on the host (`~/seedtag-release`) | Review, signed tag, `sign-release.sh`, all through the scripts. `release-tag.sh` fetches `main` itself; never `git pull` or check out `main` there. Never opened in a container. |
+| Release clone on the host (`~/seedtag-release`) | Review, signed tag, `sign-release.sh`, all through the scripts. Cloned once; after that, `release-tag.sh` fetches `main` itself, so never `git pull` or check out `main` there (the first signed release is the one exception, see `RELEASING.md`). Never opened in a container. |
 
 **The steps, with every command, are in [RELEASING.md](RELEASING.md)**:
 - setting up the host once (tools, the release keystore, a tag-signing key that is never loaded into an SSH agent,
