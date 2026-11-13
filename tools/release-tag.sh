@@ -290,7 +290,7 @@ if [ -z "${prev_sha:-}" ]; then prev_sha="$(git rev-parse "refs/tags/$prev^{comm
 say "Commit:         $(subject "$sha" '%H%n                %s (%an, %ad)')"
 say "Version:        $ver (versionCode $code) → tag $B$TAG$N"
 say "Previous:       $prev → $prev_sha ($pver, $(subject "$prev_sha" %ad))"
-[ -z "$ignored" ] || warn "Ignored (not vX.Y.Z, or not signed with your key):$ignored"
+[ -z "$ignored" ] || warn "Ignored (not vX.Y.Z, or not signed with your key):$(printf '%s' "$ignored" | clean)"
 if [ -n "$BOOT" ]; then
     warn "$prev isn't a release signed with your key (--bootstrap) and came from GitHub, so nothing here proves
   it's the release you made: GitHub's tag page and the commit date can be forged too. Check the commit against
