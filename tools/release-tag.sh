@@ -215,7 +215,7 @@ purl="$(git remote get-url --push "$REMOTE")"
 main_ref="refs/remotes/$REMOTE/main"
 old="$(git rev-parse --verify --quiet "$main_ref^{commit}" || true)"
 say "Fetching main from $REMOTE ($url), no tags…"
-git fetch --no-tags "$REMOTE" "+refs/heads/main:$main_ref"
+git fetch --no-tags --no-recurse-submodules "$REMOTE" "+refs/heads/main:$main_ref"
 new="$(git rev-parse --verify "$main_ref^{commit}")"
 if [ -n "$old" ] && ! git merge-base --is-ancestor "$old" "$new"; then
     warn "$REMOTE/main was rewritten: it no longer contains $(short "$old"), which it had before this fetch.
@@ -311,6 +311,9 @@ section="$(git show "$sha:changelog.md" | awk -v v="$ver" '
 [ -n "$section" ] || die "changelog.md at $(short "$sha") has no '## [$ver] - YYYY-MM-DD' section."
 # A filter in .gitattributes would run a program on checkout (step 6, sign-release.sh's clone).
 git ls-tree -r "$sha" > "$TMP/tree" || die "Can't list the files of $(short "$sha")."
+subs="$(awk -F'\t' '$1 ~ /^160000 / { print $2 }' "$TMP/tree" | clean)"
+[ -z "$subs" ] || die "$(short "$sha") contains submodule(s), whose content this review can't show:
+$(printf '%s\n' "$subs" | sed 's/^/  /')"
 # Any case, quoted or not, and ignoring non-ASCII characters, which some file systems drop from names.
 LC_ALL=C awk -F'\t' '{ p = tolower($2); sub(/^"/, "", p); sub(/"$/, "", p); gsub(/\\[0-7][0-7][0-7]/, "", p)
     gsub(/[\200-\377]/, "", p)
