@@ -85,12 +85,17 @@ must() { ask "$1" || die "Stopped. Nothing was changed${2:-}."; }
 # sequences iconv rejects as UTF-8 (stray continuation bytes, truncated sequences; glibc lets a few
 # out-of-range ones through, which a UTF-8 terminal shows as replacement characters). Then, nothing removed
 # can join its neighbours into a new control: a CR at a line's end goes (CRLF files), any other CR is shown as <CR> (code after
-# it is a new line to compilers but not on screen), C1 controls (U+0080-U+009F) as <C1>, and
-# bidirectional-text controls as <bidi>.
+# it is a new line to compilers but not on screen), C1 controls (U+0080-U+009F) as <C1>,
+# bidirectional-text controls and marks as <bidi>, and invisible or blank characters as <inv>.
+# Bidirectional controls and marks: U+200E, U+200F, U+202A-202E, U+2066-2069, U+061C.
+BIDI_RE='\342\200[\216\217\252-\256]|\342\201[\246-\251]|\330\234'
+# Invisible or blank: U+00AD, U+034F, U+115F, U+1160, U+180E, U+200B-200D, U+2028, U+2029, U+2060-2065,
+# U+206A-206F, U+2800, U+3164, U+FEFF, U+FFA0, tag characters U+E0000-E007F.
+INV_RE='\302\255|\315\217|\341\205[\237\240]|\341\240\216|\342\200[\213-\215\250\251]|\342\201[\240-\245\252-\257]|\342\240\200|\343\205\244|\357\273\277|\357\276\240|\363\240[\200\201][\200-\277]'
 clean() {
     LC_ALL=C tr -d '\000-\010\013\014\016-\037\177' | iconv -c -f UTF-8 -t UTF-8 2>/dev/null \
-        | LC_ALL=C awk '{ sub(/\r$/, ""); gsub(/\r/, "<CR>"); gsub(/\302[\200-\237]/, "<C1>")
-            gsub(/\342\200[\252-\256]|\342\201[\246-\251]/, "<bidi>"); print }'
+        | LC_ALL=C awk -v bidi="$BIDI_RE" -v inv="$INV_RE" '{ sub(/\r$/, ""); gsub(/\r/, "<CR>"); gsub(/\302[\200-\237]/, "<C1>")
+            gsub(bidi, "<bidi>"); gsub(inv, "<inv>"); print }'
 }
 is_release() { printf '%s\n' "$1" | grep -qxE 'v[0-9]+\.[0-9]+\.[0-9]+'; }
 short() { git rev-parse --short "$1"; }
@@ -117,7 +122,8 @@ page() {
 # ---- 1. this clone ---------------------------------------------------------------------------------
 step "1. This clone"
 [ -t 0 ] || die "Run it in a terminal: it asks before every step."
-[ "$(printf 'a\342\200\256\302\302\233\233\033[1mb\rc\r\n' | clean)" = "a<bidi><C1>[1mb<CR>c" ] \
+[ "$(printf 'a\342\200\256\302\302\233\233\033[1mb\rc\342\200\217d\342\200\213e\330\234f\357\273\277g\363\240\201\201h\r\n' | clean)" \
+    = "a<bidi><C1>[1mb<CR>c<bidi>d<inv>e<bidi>f<inv>g<inv>h" ] \
     || die "This system's tr, iconv or awk ($(command -v awk)) can't filter bytes as needed; try others on PATH."
 if [ -f /.dockerenv ] || [ -f /run/.containerenv ] || [ -n "${REMOTE_CONTAINERS:-}${CODESPACES:-}${DEVCONTAINER:-}" ]; then
     die "This looks like a container. Run it on the host, in the release clone (README, \"Signing a release\")."
@@ -364,15 +370,28 @@ if printf '%s\n' "$bin" | grep -qxF "$JAR" && git cat-file -e "$sha:$JAR" 2>/dev
 fi
 # shellcheck disable=SC2086
 git diff $DIFF "$prev_sha" "$sha" > "$TMP/diff"
-bidi="$(LC_ALL=C awk '/^\+\+\+ / { f = substr($0, 5) } /^\+/ && /\342\200[\252-\256]|\342\201[\246-\251]/ { print f }' "$TMP/diff" | sort -u | clean)"
+bidi="$(LC_ALL=C awk -v re="$BIDI_RE" '/^\+\+\+ / { f = substr($0, 5) } /^\+/ && $0 ~ re { print f }' "$TMP/diff" | sort -u | clean)"
 [ -z "$bidi" ] || warn "Bidirectional-text control characters (they can make code read differently than it runs) in:
 $(printf '%s\n' "$bidi" | sed 's/^/  /')"
+inv="$(LC_ALL=C awk -v re="$INV_RE" '/^\+\+\+ / { f = substr($0, 5) } /^\+/ && $0 ~ re { print f }' "$TMP/diff" | sort -u | clean)"
+[ -z "$inv" ] || warn "Invisible characters in added lines of these files (shown as <inv>; they can hide in names
+  and strings):
+$(printf '%s\n' "$inv" | sed 's/^/  /')"
 ctl="$(LC_ALL=C awk '/^\+\+\+ / { f = substr($0, 5); next }
     /^\+/ { sub(/\r$/, ""); if ($0 ~ /[\001-\010\013\014\016-\037\177]|\r|\302[\200-\237]/) print f }' "$TMP/diff" | sort -u | clean)"
 [ -z "$ctl" ] || warn "Control characters (escape sequences, a carriage return inside a line: what follows it is
   a new line to compilers and shells, but not on screen) in added lines of these files. They're shown as <CR>
   and <C1>, or removed:
 $(printf '%s\n' "$ctl" | sed 's/^/  /')"
+# Code, build and config files (not docs, not res/) with non-ASCII in added lines: where a lookalike letter
+# (Cyrillic а for Latin a) could hide.
+nonascii="$(LC_ALL=C awk '/^\+\+\+ / { f = substr($0, 5); next }
+    /^\+/ && /[\200-\377]/ && f !~ /\/res\// && (f ~ /\.(kt|kts|java|sh|py|gradle|ya?ml|toml|properties|pro|json|xml|txt|bat|sha256)"?$/ ||
+        f ~ /(^|\/)(Makefile|Dockerfile|gradlew|\.editorconfig|\.gitignore|\.gitattributes)"?$/) { n[f]++ }
+    END { for (f in n) print n[f] "\t" f }' "$TMP/diff" | sort -k2 | clean)"
+[ -z "$nonascii" ] || say "Non-ASCII characters in added lines of code and config files (lines, file); look there
+  for lookalike letters:
+$(printf '%s\n' "$nonascii" | sed 's/^/  /')"
 
 say "$(git rev-list --count "$prev_sha..$sha") commits,$(git diff --shortstat "$prev_sha" "$sha")."
 # Everything but the app's source code and docs: what builds, checks, signs and configures. Tests stay in:
