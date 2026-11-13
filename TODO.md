@@ -81,7 +81,7 @@
     [reports/2026-11-12-release-tag-followup-review.md](reports/2026-11-12-release-tag-followup-review.md)),
     and the review of the whole flow ([reports/2026-11-13-release-flow-review.md](reports/2026-11-13-release-flow-review.md)).
   - [x] Close the gaps a later security review found in `release-tag.sh`'s review step (branch
-    `release-tag-review-gaps`): fixes 1–5 (wrapper jar checksum, submodules, invisible characters, a
+    `release-tag-review-gaps`, [the brief](reports/2026-11-13-release-tag-review-gaps-brief.md)): fixes 1–5 (wrapper jar checksum, submodules, invisible characters, a
     binary shown as text, raw tag names) and nits N1–N5 (script path, environment, config warnings, key
     files outside the clone, fsck on fetch).
   - [ ] The findings of the review of everything since 0.4.2
