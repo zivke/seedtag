@@ -7,8 +7,9 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
-- Releasing, `tools/release-tag.sh`: a changed Gradle wrapper jar must match
-  the checksum you paste from gradle.org. Refuses submodules, a diff with NUL
+- Releasing, `tools/release-tag.sh`: a changed Gradle wrapper jar, and the
+  Gradle distribution a changed `gradle-wrapper.properties` names (a release
+  on services.gradle.org), must match the checksum you paste from gradle.org. Refuses submodules, a diff with NUL
   bytes (a binary file shown as text) and a bare `diff` attribute in
   `.gitattributes`. Marks zero-width and other invisible characters (`<inv>`)
   and more bidirectional marks, warns about them, and shows added lines

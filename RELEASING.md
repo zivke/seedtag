@@ -121,7 +121,7 @@ tools/release-tag.sh --commit <release commit>             # the same, then: typ
 `<release commit>` is the full SHA of the "Release X.Y.Z" commit from step 1. Without `--commit` the script tags the
 tip of `main`; it refuses a commit whose parent already has the version, but name the commit anyway. Add
 `--remote <name>` if the GitHub remote isn't `origin`. The script asks before every step. Read the review: it shows everything since the last signed release.
-If the Gradle wrapper jar changed, it asks you to paste the jar's checksum from
+If the Gradle wrapper jar or `gradle-wrapper.properties` changed, it asks you to paste a checksum from
 [gradle.org/release-checksums](https://gradle.org/release-checksums/): look it up in your browser. At
 the end it offers to check out the new tag (say yes) and prints the commit to compare in the next step. If it stops,
 its message says why and what to do.

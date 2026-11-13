@@ -41,7 +41,8 @@
 #  3. Review, each part on request in your pager: the commits, the changelog section, everything except the
 #     app's source code and docs, the whole diff. Refuses undiffable (binary) changes except art/*.png and
 #     the Gradle wrapper jar, whose checksum you paste from gradle.org, and a diff with NUL bytes (a binary
-#     shown as text); warns about bidirectional-text, invisible and other control characters, and shows
+#     shown as text). A changed gradle-wrapper.properties must name a release on services.gradle.org, and you
+#     paste its checksum too; warns about bidirectional-text, invisible and other control characters, and shows
 #     added lines (outside *.md) with letters that look like Latin ones.
 #  4. Type the tag name to create the signed tag; it must verify with your key.
 #  5. Confirm to push the tag (only the tag); otherwise offer to delete it again.
@@ -393,6 +394,14 @@ badbin="$(printf '%s\n' "$bin" | grep -vxE '(art/[^/]+\.png|gradle/wrapper/gradl
 $(printf '%s\n' "$badbin" | sed 's/^/  /')"
 [ -z "$bin" ] || warn "Binary changes, not shown as text: $(printf '%s\n' "$bin" | clean | tr '\n' ' ')"
 sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi | awk '{ print $1 }'; }
+# paste_sum <sha256> <what>: you paste <what>, looked up outside this repository; it must be <sha256>.
+paste_sum() {
+    printf '%s\n' "$1" | grep -qxE '[0-9a-f]{64}' || die "No SHA-256 to compare $2 with."
+    printf '%sPaste %s (anything else stops):%s ' "$B" "$2" "$N"
+    read -r typed || typed=""
+    [ "$(printf '%s' "$typed" | tr -d '[:space:]' | tr 'A-F' 'a-f')" = "$1" ] \
+        || die "That isn't $2 for $(short "$sha") ($1). Stopped. Nothing was changed."
+}
 JAR=gradle/wrapper/gradle-wrapper.jar
 if printf '%s\n' "$bin" | grep -qxF "$JAR" && git cat-file -e "$sha:$JAR" 2>/dev/null; then
     git cat-file blob "$sha:$JAR" > "$TMP/jar" || die "Can't read $JAR at $(short "$sha")."
@@ -404,11 +413,30 @@ if printf '%s\n' "$bin" | grep -qxF "$JAR" && git cat-file -e "$sha:$JAR" 2>/dev
   Look up the \"Wrapper JAR Checksum\" for Gradle ${gver:-<version in gradle-wrapper.properties>} at
   https://gradle.org/release-checksums/ in a browser (not from this repository). If the jar was generated
   by another Gradle version, it must match that version's entry there; if it matches none, don't release."
-    printf '%sPaste that checksum (anything else stops):%s ' "$B" "$N"
-    read -r typed || typed=""
-    [ "$(printf '%s' "$typed" | tr -d '[:space:]' | tr 'A-F' 'a-f')" = "$jarsum" ] \
-        || die "That isn't the checksum of the jar at $(short "$sha") ($jarsum). Stopped. Nothing was changed."
+    paste_sum "$jarsum" "the jar's checksum"
     ok "$JAR matches the checksum you pasted."
+fi
+# The Gradle distribution: all the code CI's build runs. Its URL must be a release on services.gradle.org, and
+# distributionSha256Sum must be the one gradle.org publishes for it.
+PROPS=gradle/wrapper/gradle-wrapper.properties
+if awk -F'\t' -v p="$PROPS" '$3 == p { f = 1 } END { exit !f }' "$TMP/numstat" && git cat-file -e "$sha:$PROPS" 2>/dev/null; then
+    git show "$sha:$PROPS" | tr -d '\r' > "$TMP/props" || die "Can't read $PROPS at $(short "$sha")."
+    [ "$(grep -c distributionUrl "$TMP/props")" = 1 ] && [ "$(grep -c distributionSha256Sum "$TMP/props")" = 1 ] \
+        || die "$PROPS at $(short "$sha") must have exactly one distributionUrl and one distributionSha256Sum line."
+    dver="$(sed -nE 's#^distributionUrl=https\\?://services\.gradle\.org/distributions/gradle-([0-9]+(\.[0-9]+)*)-(bin|all)\.zip$#\1 \3#p' "$TMP/props")"
+    dsum="$(sed -nE 's#^distributionSha256Sum=([0-9a-f]{64})$#\1#p' "$TMP/props")"
+    [ -n "$dver" ] || die "distributionUrl at $(short "$sha") isn't a Gradle release on https://services.gradle.org/distributions/:
+  $(grep distributionUrl "$TMP/props" | clean)"
+    [ -n "$dsum" ] || die "distributionSha256Sum at $(short "$sha") isn't a SHA-256 in lower case."
+    case "${dver#* }" in bin) dkind="Binary-only (-bin) ZIP Checksum" ;; *) dkind="Complete (-all) ZIP Checksum" ;; esac
+    warn "$PROPS changed. CI's build will download and run Gradle ${dver% *} (${dver#* }). Look up its
+  \"$dkind\" at https://gradle.org/release-checksums/ in a browser (not from this repository)."
+    paste_sum "$dsum" "that checksum"
+    ok "distributionSha256Sum matches the checksum you pasted for Gradle ${dver% *}."
+fi
+if awk -F'\t' '$3 == "gradle/verification-metadata.xml" { f = 1 } END { exit !f }' "$TMP/numstat"; then
+    warn "gradle/verification-metadata.xml changed: the checksums CI accepts for every dependency it downloads. In
+  the build diff, check that each changed entry belongs to a dependency change you made (make deps-metadata)."
 fi
 # shellcheck disable=SC2086
 git diff $DIFF "$prev_sha" "$sha" > "$TMP/diff"

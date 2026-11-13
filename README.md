@@ -131,7 +131,10 @@ files and wrapper, the manifest and resources, the tests, which CI runs in the s
 `.devcontainer/`, `.gitattributes`, …), each on request in your pager, and the whole diff. It refuses binary
 (undiffable) changes except `art/*.png` and the Gradle wrapper jar, and a diff with NUL bytes (a binary file shown
 as text). A changed wrapper jar is code that runs in CI and no diff shows it, so you paste its "Wrapper JAR Checksum"
-from [gradle.org/release-checksums](https://gradle.org/release-checksums/), looked up in your browser. It warns
+from [gradle.org/release-checksums](https://gradle.org/release-checksums/), looked up in your browser. The same for
+a changed `gradle-wrapper.properties`, which picks the Gradle that CI downloads and runs: its URL must be a release on
+`services.gradle.org`, and you paste that release's ZIP checksum. A changed `verification-metadata.xml` gets a
+warning. It warns
 about bidirectional-text and invisible characters, and shows the added lines (outside `*.md`) with Greek, Cyrillic or
 other letters that look like Latin ones, where a lookalike could make one name pass for another. If you skipped a view, it says which and you type `reviewed` to go on.
 Only after you type the tag name does it run `git tag -s`; it deletes the tag again unless it verifies with your
