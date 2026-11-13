@@ -117,9 +117,9 @@ Two Gradle modules plus the Python tool:
     `TagResult`, never throws.
   - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
     `IdleWatch` keeps the screen on while `holdsSecrets` and shows *Still
-    there?* (`Dialog.StillThere`); behind it and behind *Leave SeedTag?*
-    (`Dialog.ConfirmBack`, not `toWords`) the screen is blurred on Android 12+
-    and covered below; `ScrollHints` adds the bottom/top fades and the ↓ button to a
+    there?* (`Dialog.StillThere`); behind it, both Back questions
+    (`Dialog.ConfirmBack`), the progress dialog (`busy`) and *Ready to scan*
+    (`scanPrompt`) the screen is blurred on Android 12+ and covered below; `ScrollHints` adds the bottom/top fades and the ↓ button to a
     `StepScreen` whose content goes on below what's visible.
 - **`tools/seedtag.py`**: single file, wordlist embedded, `encrypt` /
   `decrypt` / `verify`. Python 3.8+; uses `cryptography` (AES-GCM, and

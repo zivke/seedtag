@@ -7,8 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
-- *Leave SeedTag?* (Back while something would be lost) blurs the screen
-  behind it, as *Still there?* does. Both blur it a little less than before.
+- The screen is blurred behind *Ready to scan*, the progress dialog (for
+  example while encrypting) and both questions Back asks (*Leave SeedTag?*,
+  *Clear the password?*), as behind *Still there?*; before Android 12 it's
+  covered. All blur it a little less than *Still there?* did before.
 - Releasing, `tools/release-tag.sh`: treats everything on GitHub as
   untrusted. It fetches only `main`, never tags, and starts the review at the
   newest release tag signed with your release key (others are listed and
