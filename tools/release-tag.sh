@@ -404,13 +404,19 @@ badbin="$(printf '%s\n' "$bin" | grep -vxE '(art/[^/]+\.png|gradle/wrapper/gradl
 $(printf '%s\n' "$badbin" | sed 's/^/  /')"
 [ -z "$bin" ] || warn "Binary changes, not shown as text: $(printf '%s\n' "$bin" | clean | tr '\n' ' ')"
 sha256() { if command -v sha256sum >/dev/null 2>&1; then sha256sum; else shasum -a 256; fi | awk '{ print $1 }'; }
-# paste_sum <sha256> <what>: you paste <what>, looked up outside this repository; it must be <sha256>.
+# paste_sum <sha256> <what>: you paste <what>, looked up outside this repository; it must be <sha256>. Two
+# tries; the hash is shown only after two wrong ones, to search gradle.org's page for.
 paste_sum() {
     printf '%s\n' "$1" | grep -qxE '[0-9a-f]{64}' || die "No SHA-256 to compare $2 with."
-    printf '%sPaste %s (anything else stops):%s ' "$B" "$2" "$N"
-    read -r typed || typed=""
-    [ "$(printf '%s' "$typed" | tr -d '[:space:]' | tr 'A-F' 'a-f')" = "$1" ] \
-        || die "That isn't $2 for $(short "$sha") ($1). Stopped. Nothing was changed."
+    for _try in 1 2; do
+        printf '%sPaste %s (an empty answer stops):%s ' "$B" "$2" "$N"
+        read -r typed || typed=""
+        [ "$(printf '%s' "$typed" | tr -d '[:space:]' | tr 'A-F' 'a-f')" != "$1" ] || return 0
+        [ -n "$typed" ] || die "Stopped. Nothing was changed."
+        [ "$_try" = 1 ] || break
+        warn "That doesn't match. Check that you copied the right entry (Gradle version, kind of checksum)."
+    done
+    die "That isn't $2 for $(short "$sha") ($1). Stopped. Nothing was changed."
 }
 JAR=gradle/wrapper/gradle-wrapper.jar
 if printf '%s\n' "$bin" | grep -qxF "$JAR" && git cat-file -e "$sha:$JAR" 2>/dev/null; then
