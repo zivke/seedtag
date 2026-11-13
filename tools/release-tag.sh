@@ -7,7 +7,8 @@
 #
 #   tools/release-tag.sh [--dry-run] [--commit <rev>] [--remote <name>] [--bootstrap <vX.Y.Z | commit>]
 #
-#   --commit     what to tag (default: <remote>/main). The version comes from versionName in that commit.
+#   --commit     what to tag: the release commit (default: <remote>/main). The version comes from versionName
+#                in that commit, and its parent must have an older one.
 #   --remote     default origin
 #   --dry-run    all the checks and the review, then stop before creating the tag
 #   --bootstrap  only for the first signed release: review against <vX.Y.Z> although it isn't signed with
@@ -33,8 +34,9 @@
 #     a signing key that isn't in the SSH agent and is the only key in gpg.ssh.allowedSignersFile, both
 #     files outside the clone). Warns about git config and environment that choose programs git runs.
 #  2. Fetch main (objects checked with fsck). Show the commit to tag, its version and the previous release;
-#     refuse if the tag exists, the commit isn't on <remote>/main, the version isn't newer, the changelog
-#     has no section for it, versionCode didn't go up, it contains a submodule, or a .gitattributes in it
+#     refuse if the tag exists, the commit isn't on <remote>/main or isn't the one that set the version (its
+#     parent has it already), the version isn't newer, the changelog has no section for it, versionCode
+#     didn't go up, it contains a submodule, or a .gitattributes in it
 #     sets a filter or a bare diff attribute.
 #  3. Review, each part on request in your pager: the commits, the changelog section, everything except the
 #     app's source code and docs, the whole diff. Refuses undiffable (binary) changes except art/*.png and
@@ -264,6 +266,16 @@ ver="$(gradle_value "$sha" versionName)"
 code="$(gradle_value "$sha" versionCode)"
 is_release "v$ver" || die "versionName at $(short "$sha") isn't X.Y.Z (or not on a line of its own)."
 case "$code" in ''|*[!0-9]*) die "versionCode at $(short "$sha") isn't a number (or not on a line of its own)." ;; esac
+# The release commit itself: a later commit on main has the same version and changelog, so every other check
+# would pass for it too, and a pushed tag can't be moved.
+pv=""
+if git rev-parse --verify --quiet "$sha^" >/dev/null; then pv="$(gradle_value "$sha^" versionName)"; fi
+if [ "$pv" = "$ver" ]; then
+    rel="$(git log -1 --format=%H -G versionName "$sha" -- app/build.gradle.kts)"
+    die "$(short "$sha") isn't the commit that set versionName to $ver: its parent has $ver already. Tag the
+  release commit: --commit <its full SHA>. The newest commit that changed versionName is
+    $(subject "$rel" '%H %s')"
+fi
 TAG="v$ver"
 # remote_tag <tag>: the object id of refs/tags/<tag> on the remote (exact match), empty if it has none.
 # Use only in a plain assignment, so that its die stops the script.

@@ -98,7 +98,8 @@ The release clone stays checked out at the last release tag, so the copy of `rel
 reviewed: the script refuses to run unless `HEAD` is a `vX.Y.Z` tag signed with your key, and a new version of it
 shows up in the review instead. **The first signed release** has no such tag yet (and `v0.3.0` has no
 `release-tag.sh`), so stay on the commit the fresh clone gave you: read the script as checked out there,
-then run `tools/release-tag.sh --bootstrap vPREVIOUS` (the last, unsigned release tag, e.g. `v0.3.0`). That tag
+then run `tools/release-tag.sh --bootstrap vPREVIOUS --commit <release commit>` (the last, unsigned release tag,
+e.g. `v0.3.0`, and the full SHA of the "Release X.Y.Z" commit). That tag
 came from GitHub, so it asks you to confirm its commit from evidence the container couldn't change, by typing the
 commit's first 12 characters: the APK of that release you signed or installed
 (`apksigner verify --print-certs` shows your certificate's digest, and
@@ -115,7 +116,8 @@ refuses in a container, in a clone with uncommitted changes, with a signing key 
 with an allowed-signers file that lists any other key, with either file inside the clone, and for a commit that
 isn't on `origin/main`, whose version
 isn't newer than the previous release or whose tag exists already, whose changelog has no section for its version,
-whose `versionCode` didn't go up, that contains a submodule (its content can't be reviewed), or whose
+whose `versionCode` didn't go up, whose parent already has its version (a commit after the release commit), that
+contains a submodule (its content can't be reviewed), or whose
 `.gitattributes` sets a filter (a program checkout would run) or a bare `diff` attribute (it would show a binary
 file as text in the next review). It
 also refuses to run any file but `tools/release-tag.sh` exactly as committed at the clone's `HEAD`. The

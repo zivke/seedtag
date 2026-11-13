@@ -95,8 +95,11 @@ The first signed release is the exception (see below).
    - rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`;
    - in `app/build.gradle.kts`, add 1 to `versionCode` and set `versionName` to `X.Y.Z`;
    - commit as "Release X.Y.Z";
-   - `make build`, and note the SHA-256 it prints for `seedtag-unsigned.apk`.
-4. **Push `main`** with VS Code's Source Control. Don't create or push any tag from the container.
+   - `make build`, and note the SHA-256 it prints for `seedtag-unsigned.apk` and the commit it was built from (the
+     release commit's full SHA).
+4. **Push `main`** with VS Code's Source Control. Don't create or push any tag from the container. Push nothing
+   after the release commit until its tag is pushed (step 3): step 2 builds the tip of `main`, and a later commit
+   still has the same version and changelog.
 
 ## 2. Check CI before tagging
 
@@ -111,12 +114,13 @@ SHA-256 of `seedtag-unsigned.apk` for the release commit.
 ```sh
 cd ~/seedtag-release
 git describe --exact-match HEAD          # should name the last release tag
-tools/release-tag.sh --dry-run           # every check and the review, no tag
-tools/release-tag.sh                     # the same, then: type the tag name, passphrase, push
+tools/release-tag.sh --dry-run --commit <release commit>   # every check and the review, no tag
+tools/release-tag.sh --commit <release commit>             # the same, then: type the tag name, passphrase, push
 ```
 
-Add `--commit <sha>` if the release commit isn't the tip of `main`, and `--remote <name>` if the GitHub remote isn't
-`origin`. The script asks before every step. Read the review: it shows everything since the last signed release.
+`<release commit>` is the full SHA of the "Release X.Y.Z" commit from step 1. Without `--commit` the script tags the
+tip of `main`; it refuses a commit whose parent already has the version, but name the commit anyway. Add
+`--remote <name>` if the GitHub remote isn't `origin`. The script asks before every step. Read the review: it shows everything since the last signed release.
 If the Gradle wrapper jar changed, it asks you to paste the jar's checksum from
 [gradle.org/release-checksums](https://gradle.org/release-checksums/): look it up in your browser. At
 the end it offers to check out the new tag (say yes) and prints the commit to compare in the next step. If it stops,
@@ -209,12 +213,16 @@ Tags up to `v0.3.0` aren't signed; 0.4.0 and 0.4.1 were never tagged or publishe
 3. **Run with `--bootstrap`.** If your APK shows that commit too:
 
    ```sh
-   tools/release-tag.sh --dry-run --bootstrap a8bff1674849bda3c24223ce24b6b33c986d5ffd
-   tools/release-tag.sh --bootstrap a8bff1674849bda3c24223ce24b6b33c986d5ffd
+   tools/release-tag.sh --dry-run --bootstrap a8bff1674849bda3c24223ce24b6b33c986d5ffd \
+       --commit a23c13eedcb5de02559b196bd894875f06f6789b
+   tools/release-tag.sh --bootstrap a8bff1674849bda3c24223ce24b6b33c986d5ffd \
+       --commit a23c13eedcb5de02559b196bd894875f06f6789b
    ```
 
    If it shows `38cb4db…`, use `--bootstrap v0.3.0` instead. The script shows the commit and asks you to type its
-   first 12 characters, after checking it against your evidence.
+   first 12 characters, after checking it against your evidence. `a23c13e…` is the "Release 0.4.2" commit. The
+   script that runs here is 0.4.2's, which doesn't yet refuse a later commit, so `--commit` is what makes sure the
+   tag lands on it.
 4. **Steps 4–8 as usual.** The release notes should include the 0.4.0 and 0.4.1 sections of the changelog: anyone
    updating comes from 0.3.0.
 5. **From now on,** the clone sits at `v0.4.2`, signed with your key, and later releases need no `--bootstrap`.
