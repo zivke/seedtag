@@ -4,6 +4,15 @@ All notable user-visible changes to SeedTag. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Versions are the
 `versionName` in `app/build.gradle.kts`.
 
+## [Unreleased]
+
+### Changed
+- README: *Recommended procedure*, the safest way to use SeedTag from a
+  spare phone's setup to keeping it afterwards: install without adb,
+  practise with a throwaway seed, back up, verify, restore and compare, check
+  the tag off the phone, lock last, two tags, the written password with a
+  copy of `seedtag.py`.
+
 ## [0.4.2] - 2026-11-13
 
 ### Changed

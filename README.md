@@ -249,6 +249,38 @@ wireless debugging is on. Android lets the app see those settings without any pe
 so those you have to check yourself. The accessibility banner also updates while SeedTag is open, not only when you
 come back to it.
 
+### Recommended procedure
+
+The safest way to use SeedTag, from start to finish:
+
+1. **Prepare a spare phone while it may still go online.** Install all system updates, then factory-reset it. In
+   setup, skip Wi-Fi and don't add a Google account (if the setup wizard insists on Wi-Fi, do the updates before
+   the reset instead). Take the SIM out. From now on it never goes online.
+2. **Install SeedTag without adb.** On a computer, check the APK: its SHA-256 against the release notes, and its
+   certificate with `apksigner verify --print-certs seedtag.apk` (SHA-256 `29370bf9…`, see
+   [Signing a release](#signing-a-release)). Copy it to the phone over USB file transfer or an SD card, install it
+   with the Files app, then turn *Install unknown apps* off again for that app. Leave Developer options off.
+3. **Practise with a throwaway seed and a spare tag**, for example a [Trezor test phrase](https://github.com/trezor/python-mnemonic/blob/master/vectors.json):
+   back up, verify, restore and make the spare tag read-only, so you know every screen and what the lock does.
+4. **The real backup**, in a private room with no cameras: airplane mode on, Wi-Fi and Bluetooth off, NFC on.
+   - **Back up** with the generated passphrase. Write it down and label it "SeedTag password".
+   - **Verify**, typing the password from your written copy: ✓, and note the fingerprint.
+   - **Restore** once and compare every word with your paper copy of the seed. This catches a mistyped word that
+     still passes the checksum, which Back up can't. Then leave the words screen.
+5. **Check the tag off the phone.** Read it with any NFC reader app,
+   on any phone: it holds only ciphertext. It should hold one Text record and nothing else. Move the Base64 text to
+   an offline computer (a live USB system is ideal) and run `python3 -I -S seedtag.py verify <BASE64>`: it must
+   print the same fingerprint.
+6. **Lock last; it's permanent.** Only after steps 4 and 5 pass, use **Make tag read-only**. A write password for
+   the tag is planned; once it's in the app, its instructions here will say where it fits, before the read-only
+   lock.
+7. **Make at least two tags** this way and keep them in different places, out of strangers' reach (a metal box or
+   shielding sleeve). Keep your paper or metal copy of the seed too, somewhere else again. Keep the written
+   password apart from the tags, together with a copy of `seedtag.py` (printed or on a USB stick).
+8. **Keep the phone** offline in a drawer, with SeedTag on it, for the yearly Verify: that means typing the password
+   again, and this phone is the safest place to do it. SeedTag stores nothing, and powering the phone off clears
+   its memory. If the phone is ever going to go online or be given away, factory-reset it first.
+
 ## Using it
 
 **Read every instruction on screen carefully before you actually do anything**, including the *Learn more*
