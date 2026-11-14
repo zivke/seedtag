@@ -7,6 +7,11 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- README: *Recommended procedure*, the safest way to use SeedTag from a
+  spare phone's setup to keeping it afterwards: install without adb,
+  practise with a throwaway seed, back up, verify, restore and compare, check
+  the tag off the phone, lock last, two tags, the written password with a
+  copy of `seedtag.py`.
 - README, *Using it safely*: check a new tag on another, offline computer with
   `seedtag.py`'s own code (`python3 -I -S seedtag.py verify`), which a
   poisoned library in the app couldn't fool, and read it with another NFC
