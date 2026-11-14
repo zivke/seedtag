@@ -8,6 +8,7 @@ import android.nfc.NdefMessage
 import android.nfc.NdefRecord
 import android.nfc.Tag
 import android.nfc.TagLostException
+import android.nfc.tech.MifareClassic
 import android.nfc.tech.MifareUltralight
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
@@ -50,6 +51,8 @@ enum class TagContent { Empty, Backup, NewerBackup, Other }
  * What the first Back up step found. [supported]: the tag can hold NDEF at all. [ndef]: it's
  * NDEF-formatted; if not, it's blank and gets formatted on the first write. [capacity]: bytes
  * for the NDEF message, null if unknown; for a blank tag it's [estimated] from the chip's memory.
+ * [classic]: a MIFARE Classic tag, which many phones can't read at all, so the backup might not be
+ * readable when it's needed.
  */
 data class TagCheck(
     val supported: Boolean,
@@ -58,6 +61,7 @@ data class TagCheck(
     val estimated: Boolean = false,
     val writable: Boolean = true,
     val content: TagContent = TagContent.Empty,
+    val classic: Boolean = false,
 ) {
     /** Longest backup that fits, null if none does or the size is unknown. */
     val maxWords: Int? get() = capacity?.let(SeedBox::maxWordsFor)
@@ -171,6 +175,8 @@ object TagIo {
     }
 
     private fun check(tag: Tag): TagResult {
+        // Android lists MifareClassic only on phones that support it; no I/O needed.
+        val classic = MifareClassic::class.java.name in tag.techList
         val ndef = Ndef.get(tag)
         if (ndef != null) {
             ndef.use {
@@ -186,13 +192,15 @@ object TagIo {
                         SeedBox.Kind.NotBackup -> TagContent.Other
                     }
                 }
-                return TagResult.Checked(TagCheck(true, ndef = true, capacity = it.maxSize, writable = it.isWritable, content = content))
+                return TagResult.Checked(
+                    TagCheck(true, ndef = true, capacity = it.maxSize, writable = it.isWritable, content = content, classic = classic),
+                )
             }
         }
         if (NdefFormatable.get(tag) == null) return TagResult.Checked(TagCheck(supported = false, ndef = false, capacity = null))
         if (looksNdefFormatted(tag)) return TagResult.Failed(NOT_READ)
         val capacity = blankCapacity(tag)
-        return TagResult.Checked(TagCheck(true, ndef = false, capacity = capacity, estimated = capacity != null))
+        return TagResult.Checked(TagCheck(true, ndef = false, capacity = capacity, estimated = capacity != null, classic = classic))
     }
 
     /** A SeedTag backup, of this format or a newer one ([SeedBox.kindOf]). */

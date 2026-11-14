@@ -516,7 +516,7 @@ class SeedTagViewModel : ViewModel() {
                 if (stale) return
                 scanPrompt = null
                 tagCheck = r.check
-                _haptics.tryEmit(if (r.check.usable) Haptic.Success else Haptic.Failure)
+                _haptics.tryEmit(if (r.check.usable && !r.check.classic) Haptic.Success else Haptic.Failure)
             }
             is TagResult.Failed -> {
                 if (stale) return

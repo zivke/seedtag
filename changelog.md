@@ -6,6 +6,12 @@ All notable user-visible changes to SeedTag. The format follows
 
 ## [Unreleased]
 
+### Added
+- Back up warns when the tag you check is MIFARE Classic: many phones can't
+  read it at all, so a backup on it might not be readable on the phone you
+  have when you need it. It suggests another tag; **Use this tag anyway**
+  still goes on (for practice, say).
+
 ### Changed
 - README: *Recommended procedure*, the safest way to use SeedTag from a
   spare phone's setup to keeping it afterwards: install without adb,

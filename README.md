@@ -434,7 +434,8 @@ an on-metal version.
 
 - Original MIFARE Ultralight, NTAG210 and Ultralight EV1 MF0UL11: 48 bytes, too small even for 12 words.
 - MIFARE Classic: not an NFC Forum type. Android support for it is optional, so many phones can't read it at
-  all, and its Crypto1 security is broken.
+  all, and its Crypto1 security is broken. Back up warns when the tag you check is one (on a phone that can read
+  it), and suggests another tag.
 - Type 1 (Topaz): rarely sold any more. The original Topaz has only 96 bytes; Topaz 512 is big enough but
   untested with SeedTag.
 

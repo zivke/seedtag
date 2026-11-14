@@ -987,6 +987,10 @@ private fun TagStep(vm: SeedTagViewModel) {
         bottom = {
             when {
                 check == null -> PrimaryButton("Scan tag", vm::scanToCheck)
+                check.usable && check.classic -> {
+                    PrimaryButton("Check another tag", vm::scanToCheck)
+                    SecondaryButton("Use this tag anyway", vm::continueAfterCheck)
+                }
                 check.usable -> {
                     PrimaryButton("Continue with this tag", vm::continueAfterCheck)
                     SecondaryButton("Check another tag", vm::scanToCheck)
@@ -1016,13 +1020,18 @@ private fun TagCheckResult(c: TagCheck) {
             "It doesn't support NDEF, the standard way of storing data on NFC tags. Use another tag (an NTAG215 or NTAG216, for example)."
         !c.writable -> "This tag can't be used" to "It's read-only, so nothing can be written to it. Use another tag."
         c.tooSmall -> "This tag is too small" to "Use a bigger tag (an NTAG215 or NTAG216, for example)."
+        c.classic -> "Better use another tag" to
+            "This is a MIFARE Classic tag. Many phones can't read MIFARE Classic at all, so a backup on it may not be " +
+            "readable on the phone you have when you need it. Use another tag (a MIFARE Ultralight C or an NTAG216, for " +
+            "example), or use this one only to practise."
         else -> "This tag works" to null
     }
+    val good = c.usable && !c.classic
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            val t = colorsOf(if (c.usable) Tone.Success else Tone.Caution)
+            val t = colorsOf(if (good) Tone.Success else Tone.Caution)
             Box(Modifier.size(40.dp).background(t.container, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(iconOf(if (c.usable) Tone.Success else Tone.Caution), null, tint = t.accent, modifier = Modifier.size(22.dp))
+                Icon(iconOf(if (good) Tone.Success else Tone.Caution), null, tint = t.accent, modifier = Modifier.size(22.dp))
             }
             Text(title, style = MaterialTheme.typography.titleMedium)
         }
