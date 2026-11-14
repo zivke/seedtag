@@ -7,6 +7,12 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Changed
+- README, *Using it safely*: check a new tag on another, offline computer with
+  `seedtag.py`'s own code (`python3 -I -S seedtag.py verify`), which a
+  poisoned library in the app couldn't fool, and read it with another NFC
+  app to see that it holds nothing else. *Recovering on a computer* says how
+  to run `seedtag.py` without any installed package. A new report lists every
+  dependency and what it could do if poisoned.
 - Releasing, `tools/release-tag.sh`: tags only the release commit itself
   (it refuses a later commit, whose parent already has the version), and
   RELEASING.md passes it with `--commit`. A changed Gradle wrapper jar, and

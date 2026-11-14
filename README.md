@@ -256,6 +256,12 @@ seed. From safest down:
    the phone, such as a computer or dev container it was ever paired with, can silently swap SeedTag for a
    look-alike (SeedTag keeps no data, so you wouldn't notice) or turn on an accessibility service. Don't enter a
    real seed on a phone you develop or test apps with.
+5. **Check a new tag on another computer.** Any library inside SeedTag could, if it were poisoned, weaken the
+   encryption so that the tag looks fine but opens for anyone. To rule that out, verify the tag with `seedtag.py`'s
+   own code on another, offline computer: `python3 -I -S seedtag.py verify <BASE64>` (`-I -S` keeps installed
+   packages out; about a minute). It must print the fingerprint the app shows. Read the tag with another NFC app
+   too: it should hold one Text record and nothing else. [The dependency report](reports/2026-11-14-dependency-risk.md)
+   lists what else a poisoned library could do.
 
 The Back up, Verify and Restore screens remind you of this, say whether airplane mode is on, and warn when USB or
 wireless debugging is on. Android lets the app see those settings without any permission, but not Wi-Fi or Bluetooth,
@@ -461,7 +467,9 @@ argon2-cffi`), and it says which one it used.
 
 Without either package, `decrypt` and `verify` still work with a built-in Argon2id and AES-GCM in plain Python,
 tested against the same vectors: about a minute per password tried (a password that needs the spaces or capitals
-retry takes two or three), and around 90 MB of memory. `encrypt` needs `cryptography`.
+retry takes two or three), and around 90 MB of memory. `encrypt` needs `cryptography`. To make sure only
+`seedtag.py`'s own code runs, even where packages are installed, start it with `python3 -I -S seedtag.py …`: a
+poisoned package then can't see the password or the words.
 
 **Keep a copy of `seedtag.py` with your written password**, printed or on a USB stick. With it and any Python 3.8
 or later, recovering a tag needs neither this app, nor this website, nor any package. The packages' installers
