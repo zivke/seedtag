@@ -7,7 +7,7 @@
 #
 #   tools/check-apk.sh seedtag.apk
 #   tools/check-apk.sh --unsigned seedtag-unsigned.apk   # no signature to check
-#   tools/check-apk.sh --debug seedtag-debug.apk         # a debug build: debuggable, Compose's preview activity
+#   tools/check-apk.sh --debug seedtag-debug.apk         # a debug build: debuggable
 #
 # The no-network guarantee is the app's main security property, and a library
 # update can quietly add a permission through manifest merging. This fails the

@@ -53,9 +53,9 @@ without notice (see [Using it safely](#using-it-safely)).
 Every build ends with `tools/check-apk.sh`. It verifies the signature, prints the APK's SHA-256, and **fails the
 build if the APK requests any permission other than NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`**, so a library
 can't quietly add network access. It also fails a release APK that is debuggable or test-only, allows backups, or
-declares any component besides SeedTag's activity and the two that AndroidX adds (the startup initializer, not
-exported, and the profile installer's receiver, which only adb can call). A new one has to be looked at and added
-to the script. `--debug` (for `make debug`) allows what debug builds have: debuggable, and Compose's preview activity.
+declares any component besides SeedTag's activity, or a component factory: no library code may start by itself.
+A library that adds one fails the build until it's been looked at (and removed in the manifest, or added to the
+script). `--debug` (for `make debug`) allows what debug builds have: debuggable.
 (`HIDE_OVERLAY_WINDOWS` and `VIBRATE` are granted at install without a prompt and give no access to anything: one
 only lets SeedTag hide other apps' overlays, the other only runs the vibration motor.)
 
