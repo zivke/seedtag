@@ -81,19 +81,18 @@ if has_attr testOnly true; then problems="$problems
 android:testOnly is true"; fi
 if ! has_attr allowBackup false; then problems="$problems
 android:allowBackup isn't false"; fi
-# Components: SeedTag's one activity, androidx.startup's initializer (not exported) and
-# profileinstaller's receiver (only callable with the DUMP permission, i.e. over adb). Debug builds
-# also have Compose's preview activity. Anything else (a library's service, an extra exported
-# activity) is an error, until it's been looked at and added here.
+# No library code may run before SeedTag's own: no component factory, which would create every
+# component (androidx.core's is removed in the manifest).
+if printf '%s\n' "$app_attrs" | grep -q ':appComponentFactory('; then problems="$problems
+android:appComponentFactory is set (a library instantiating the app's components)"; fi
+# Components: SeedTag's one activity and nothing else. A library's provider, receiver or service
+# (androidx.startup's initializer, the profile installer's receiver) is an error, until it's been
+# looked at and added here.
 components="$(printf '%s\n' "$manifest" | awk '
     /^ *E: (activity|activity-alias|service|receiver|provider) /{ want = $2; next }
     want && /^ *E: /{ print want, "(unnamed)"; want = "" }
     want && /:name\(0x01010003\)="/{ match($0, /="[^"]*"/); print want, substr($0, RSTART + 2, RLENGTH - 3); want = "" }')"
-allowed="activity rs.zivke.seedtag.MainActivity
-provider androidx.startup.InitializationProvider
-receiver androidx.profileinstaller.ProfileInstallReceiver"
-if [ "$DEBUG" = 1 ]; then allowed="$allowed
-activity androidx.compose.ui.tooling.PreviewActivity"; fi
+allowed="activity rs.zivke.seedtag.MainActivity"
 unknown="$(printf '%s\n' "$components" | grep -vxF "$allowed" || true)"
 if [ -n "$unknown" ]; then problems="$problems
 $(printf '%s\n' "$unknown" | sed 's/^/component it must not have: /')"; fi
@@ -108,7 +107,7 @@ fi
 if [ "$UNSIGNED" = 1 ]; then state="unsigned"; else state="signed"; fi
 if [ "$DEBUG" = 1 ]; then state="$state debug build"; fi
 echo ">> $APK: $state, permissions OK (NFC, HIDE_OVERLAY_WINDOWS and VIBRATE only, no network)"
-echo ">> manifest OK: $(if [ "$DEBUG" = 1 ]; then echo "debuggable (debug build)"; else echo "not debuggable"; fi), not test-only, no backups, known components only"
+echo ">> manifest OK: $(if [ "$DEBUG" = 1 ]; then echo "debuggable (debug build)"; else echo "not debuggable"; fi), not test-only, no backups, only MainActivity, no component factory"
 if command -v sha256sum >/dev/null 2>&1; then sum="$(sha256sum "$APK")"; else sum="$(shasum -a 256 "$APK")"; fi
 echo ">> SHA-256: ${sum%% *}"
 ls -l "$APK"

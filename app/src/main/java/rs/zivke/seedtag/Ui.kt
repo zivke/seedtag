@@ -952,6 +952,7 @@ private fun GuardDialogWindow() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             view.rootView.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
         }
+        view.rootView.excludeFromCaptureAndAutofill()
         onDispose {}
     }
 }

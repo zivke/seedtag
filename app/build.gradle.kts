@@ -49,6 +49,16 @@ android {
     }
 }
 
+// Libraries that only exist to start themselves at launch (see the manifest): kept off the
+// classpath entirely. If a later androidx version calls one from live code, R8 stops the build.
+configurations.configureEach {
+    exclude(group = "androidx.profileinstaller", module = "profileinstaller")
+    exclude(group = "androidx.startup", module = "startup-runtime")
+    exclude(group = "androidx.lifecycle", module = "lifecycle-process")
+    exclude(group = "androidx.concurrent", module = "concurrent-futures")
+    exclude(group = "com.google.guava", module = "listenablefuture")
+}
+
 dependencies {
     implementation(project(":core"))
     implementation(libs.bouncycastle)
@@ -57,8 +67,6 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
-    implementation(libs.compose.ui.tooling.preview)
-    debugImplementation(libs.compose.ui.tooling)
     implementation(libs.activity.compose)
-    implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.lifecycle.viewmodel)
 }

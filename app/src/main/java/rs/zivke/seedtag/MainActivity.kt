@@ -64,9 +64,10 @@ class MainActivity : ComponentActivity() {
     private val accessibilityHidden = mutableStateOf<List<String>>(emptyList())
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        // No screenshots, no screen recording, blank thumbnail in Recents.
+        // No screenshots, no screen recording, blank thumbnail in Recents. Set before anything else
+        // runs, so the window is never shown or captured without it.
         window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE)
+        super.onCreate(savedInstanceState)
         // All typing uses the app's own keyboards and there are no text fields. On top of that,
         // this window never takes input from a keyboard app, so none can open over the app.
         window.addFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
@@ -102,6 +103,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             window.decorView.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
         }
+        window.decorView.excludeFromCaptureAndAutofill()
     }
 
     override fun onResume() {
@@ -250,5 +252,18 @@ class MainActivity : ComponentActivity() {
         // screen doesn't time out meanwhile (IdleWatch in Ui.kt keeps it on, with the app's own timeout).
         if (!isChangingConfigurations) vm.wipeAll()
         super.onStop()
+    }
+}
+
+/**
+ * Compose reports the text on screen to the system's content-capture service (Android 10+) and
+ * registers the window with autofill (Android 8+). FLAG_SECURE should already stop content
+ * capture; this doesn't depend on it: the window and everything in it are left out of both.
+ * Used for the activity's window and for every dialog (GuardDialogWindow in Ui.kt).
+ */
+internal fun View.excludeFromCaptureAndAutofill() {
+    importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        importantForContentCapture = View.IMPORTANT_FOR_CONTENT_CAPTURE_NO_EXCLUDE_DESCENDANTS
     }
 }

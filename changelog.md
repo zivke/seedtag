@@ -13,6 +13,17 @@ All notable user-visible changes to SeedTag. The format follows
   still goes on (for practice, say).
 
 ### Changed
+- Less library code runs: nothing starts by itself at launch any more (no
+  startup provider, so no emoji font lookup in Play services, no profile
+  installer and its receiver, no component factory); the APK declares only
+  SeedTag's own screen, and the build fails if a library adds anything.
+  Five unused libraries are left out of the build, and two unused ones
+  (Compose preview tooling) are gone.
+- The screen and every dialog are excluded from Android's content capture
+  and autofill, so no text on them is handed to those services, and
+  screenshots are blocked before the screen is first set up.
+- Dev container: no GitHub CLI (only needed on the host), and the two
+  Android SDK files the compiler reads are checked by SHA-256.
 - README: *Recommended procedure*, the safest way to use SeedTag from a
   spare phone's setup to keeping it afterwards: install without adb,
   practise with a throwaway seed, back up, verify, restore and compare, check

@@ -27,7 +27,17 @@
         android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@style/Theme.SeedTag"
+        tools:remove="android:appComponentFactory"
         tools:targetApi="31">
+
+        <!-- Nothing starts by itself: no androidx.startup provider (it ran emoji2's font-provider
+             query to Play services, the profile installer and ProcessLifecycleOwner at launch).
+             The profile installer and its exported receiver are excluded in build.gradle.kts. -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            tools:ignore="MissingClass"
+            tools:node="remove" />
 
         <!-- taskAffinity "": no other app can put its activities into SeedTag's task
              (task hijacking / StrandHogg, which Android 8 and 9 are open to). -->

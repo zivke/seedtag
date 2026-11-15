@@ -1,16 +1,12 @@
 {
   "name": "seedtag",
   // Dockerfile rather than a bare image: the Android SDK is installed with
-  // sdkmanager, which no feature does. Features still apply on top.
+  // sdkmanager, which no feature does. No features: each one installs more
+  // unpinned software that can edit the source (the GitHub CLI was one; `gh`
+  // is only needed on the host, to publish a release).
   "build": {
     "dockerfile": "Dockerfile",
     "context": "."
-  },
-
-  "features": {
-    "ghcr.io/devcontainers/features/github-cli:1": {
-      "version": "latest"
-    }
   },
 
   "customizations": {

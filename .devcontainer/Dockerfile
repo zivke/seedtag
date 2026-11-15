@@ -25,6 +25,12 @@ ARG CMDLINE_TOOLS_BUILD=15859902
 ARG CMDLINE_TOOLS_SHA256=4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583
 ARG ANDROID_PLATFORM=android-35
 ARG ANDROID_BUILD_TOOLS=34.0.0
+# SHA-256 of the two SDK files that go into the APK's compilation: android.jar (the
+# platform R8 compiles against, android-35 revision 2) and core-lambda-stubs.jar (D8's).
+# sdkmanager installs whatever revision Google's index currently lists, so a new revision
+# fails the build here instead of slipping in. Change them with the ARGs above.
+ARG ANDROID_JAR_SHA256=4566663c3876e022b4fa4ced8c8697c4ab1688267f090114fd92d027b32e619b
+ARG LAMBDA_STUBS_SHA256=f0404cf634498aec268ad9a3967b5ae8f0005280de0504e264a2a65b8f19745e
 
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}:${PATH}
@@ -42,6 +48,10 @@ RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
     && rm /tmp/cmdline-tools.zip \
     && yes | sdkmanager --licenses >/dev/null \
     && sdkmanager "platform-tools" "platforms;${ANDROID_PLATFORM}" "build-tools;${ANDROID_BUILD_TOOLS}" \
+    && printf '%s  %s\n' \
+         "${ANDROID_JAR_SHA256}" "${ANDROID_HOME}/platforms/${ANDROID_PLATFORM}/android.jar" \
+         "${LAMBDA_STUBS_SHA256}" "${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}/core-lambda-stubs.jar" \
+       | sha256sum -c - \
     && chown -R vscode:vscode ${ANDROID_HOME}
 
 USER vscode

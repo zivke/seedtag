@@ -5,7 +5,8 @@ plus a single-file Python tool to recover it on any computer. Source: <https://g
 
 - Encrypts the raw seed entropy (not the words) → 77 bytes for 24 words, fits a 137-byte MIFARE Ultralight C.
 - Argon2id (64 MiB) + AES-256-GCM. Documented, versioned format.
-- **No `INTERNET` permission.** Screenshots blocked, no backups, no clipboard.
+- **No `INTERNET` permission.** Screenshots blocked, no backups, no clipboard, nothing handed to autofill or
+  content capture. No library starts by itself: the app declares only its own screen.
 - **Other apps' overlays are hidden** (Android 12+), and taps that come through another app's window are ignored.
 - **No system keyboard.** Seed words and passwords are typed on the app's own keyboards, so no keyboard app ever sees them.
 - The encrypted backup is decrypted once before it's written, and every write is read back and compared before it's
@@ -209,7 +210,8 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
   diff of the XML before committing it. Source and javadoc jars, which only the IDE downloads to show library
   code, aren't checked: they're never compiled into the app.
 - **Dev container:** the base image is pinned by digest, and the Android command-line tools zip is checked against
-  the SHA-256 Google publishes; `sdkmanager` checks the SDK packages itself.
+  the SHA-256 Google publishes; `sdkmanager` checks the SDK packages itself, and the two SDK files the compiler
+  reads (`android.jar`, `core-lambda-stubs.jar`) are checked against SHA-256s in the Dockerfile.
 
 - **Independent build:** the release build is reproducible: two clones of the same commit build byte-identical
   unsigned APKs, wherever they're checked out. The GitHub Actions workflow (`.github/workflows/build.yml`) runs

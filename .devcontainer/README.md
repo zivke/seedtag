@@ -69,7 +69,15 @@ accepts the Android SDK license agreements (`sdkmanager --licenses`).
 The base image is pinned by digest and the command-line tools zip by its
 SHA-256 (from the download table on developer.android.com/studio). When
 changing either, update the digest or checksum next to it; the Dockerfile says
-how to look up the digest.
+how to look up the digest. The two SDK files the compiler reads,
+`android.jar` and `core-lambda-stubs.jar`, are checked by SHA-256 after
+`sdkmanager` installs them: if Google publishes a new revision of the
+platform, the image build fails until the checksum is updated (run
+`sha256sum` on the new file and compare it with a second, independent
+install, such as the CI build's).
+
+There are no devcontainer features: the GitHub CLI isn't in the image, since
+it's only used on the host to publish a release.
 
 Gradle itself is not in the image: `./gradlew` downloads the version pinned in
 `gradle/wrapper/gradle-wrapper.properties` into the `gradle-cache` volume, and
