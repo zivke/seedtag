@@ -625,6 +625,9 @@ SeedTag is free and has no ads. If you've found it useful, you can support its d
 - The app and everything else in this repository: [GNU GPL v3 or later](LICENSE) (`GPL-3.0-or-later`). You may use,
   share and change it, but anything you distribute that's based on it must be released under the same license, with
   its source.
+- The five icons in `app/src/main/res/drawable/ic_*.xml` (all but the launcher icon): Google's
+  [Material Symbols](https://github.com/google/material-design-icons), `Apache-2.0`. Each file names its source
+  commit and what was changed.
 - `tools/seedtag.py`: [BSD Zero Clause](tools/seedtag.py) (`0BSD`, the full text is in the file's header), so
   anyone can always use it to recover a tag, for any purpose.
 

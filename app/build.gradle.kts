@@ -73,8 +73,6 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
-    // The five icons in Ui.kt. material3 brought this in until 1.4; Google has frozen it at 1.7.8.
-    implementation(libs.compose.material.icons.core)
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel)
 }

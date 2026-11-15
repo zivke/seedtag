@@ -51,12 +51,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Info
-import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -105,6 +99,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
@@ -401,7 +396,7 @@ private fun Header(page: Page?, onBack: () -> Unit, onFindSpot: () -> Unit, onAb
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (page != null) {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
+            IconButton(onClick = onBack) { Icon(ImageVector.vectorResource(R.drawable.ic_arrow_back), "Back") }
             Spacer(Modifier.width(4.dp))
         } else {
             Spacer(Modifier.width(12.dp))
@@ -419,7 +414,7 @@ private fun Header(page: Page?, onBack: () -> Unit, onFindSpot: () -> Unit, onAb
             TextButton(onClick = onFindSpot) {
                 Text(Page.Antenna.button, style = MaterialTheme.typography.labelLarge.centered())
             }
-            IconButton(onClick = onAbout) { Icon(Icons.Outlined.Info, Page.About.title) }
+            IconButton(onClick = onAbout) { Icon(iconOf(Tone.Info), Page.About.title) }
         }
     }
 }
@@ -526,11 +521,15 @@ private fun colorsOf(tone: Tone): ToneColors {
     }
 }
 
-private fun iconOf(tone: Tone): ImageVector = when (tone) {
-    Tone.Info -> Icons.Outlined.Info
-    Tone.Caution -> Icons.Outlined.Warning
-    Tone.Success -> Icons.Outlined.CheckCircle
-}
+/** The icons are Material Symbols, copied into res/drawable (Apache-2.0; source in each file). */
+@Composable
+private fun iconOf(tone: Tone): ImageVector = ImageVector.vectorResource(
+    when (tone) {
+        Tone.Info -> R.drawable.ic_info
+        Tone.Caution -> R.drawable.ic_warning
+        Tone.Success -> R.drawable.ic_check_circle
+    },
+)
 
 /**
  * A message that matters before a step. Caution (risky, permanent, or a security risk) is red with
@@ -729,7 +728,7 @@ private fun BoxScope.ScrollHints(scroll: ScrollState) {
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(
-                    Icons.Filled.KeyboardArrowDown,
+                    ImageVector.vectorResource(R.drawable.ic_keyboard_arrow_down),
                     "More below: scroll down",
                     tint = MaterialTheme.colorScheme.onSecondaryContainer,
                     modifier = Modifier.size(22.dp),
@@ -1808,7 +1807,7 @@ private fun Detector(found: Boolean) {
             contentAlignment = Alignment.Center,
         ) {
             if (found) {
-                Icon(Icons.Outlined.CheckCircle, null, tint = x.success, modifier = Modifier.size(44.dp))
+                Icon(iconOf(Tone.Success), null, tint = x.success, modifier = Modifier.size(44.dp))
             } else {
                 Text("NFC", style = MaterialTheme.typography.titleMedium, color = c.onSurfaceVariant)
             }
@@ -1905,7 +1904,7 @@ private fun AboutSection(title: String, text: String, link: Pair<String, String>
 /** Icon for dialogs that confirm something risky or permanent. */
 @Composable
 private fun WarningIcon() {
-    Icon(Icons.Outlined.Warning, null, tint = MaterialTheme.colorScheme.error)
+    Icon(iconOf(Tone.Caution), null, tint = MaterialTheme.colorScheme.error)
 }
 
 @Composable

@@ -31,6 +31,9 @@ All notable user-visible changes to SeedTag. The format follows
   app in landscape: Android ignores the portrait lock there for apps that
   target it. The build also fails if a library makes the system load a
   shared library into the app that hasn't been looked at.
+- The icons are Google's current Material Symbols, kept in the app's own
+  files instead of coming from a library Google no longer updates, so they
+  look slightly different (rounder, lighter).
 - README: *Recommended procedure*, the safest way to use SeedTag from a
   spare phone's setup to keeping it afterwards: install without adb,
   practise with a throwaway seed, back up, verify, restore and compare, check
