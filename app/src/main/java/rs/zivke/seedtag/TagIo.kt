@@ -30,6 +30,10 @@ sealed interface TagRequest {
     data object Read : TagRequest
     /** Make the tag read-only, but only if it holds exactly [expected]. */
     data class Lock(val expected: String) : TagRequest
+    /** The Erase tab, first tap: what the tag holds and whether it can be erased. Writes nothing. */
+    data object Inspect : TagRequest
+    /** Erase [target]: overwrite all of its NDEF data with zeros, then leave it empty. */
+    data class Erase(val target: OverwriteTarget) : TagRequest
 }
 
 /**
@@ -38,14 +42,32 @@ sealed interface TagRequest {
  * to be confirmed again.
  */
 class OverwriteTarget(private val uid: ByteArray, private val message: ByteArray) {
-    fun matches(tag: Tag, current: NdefMessage): Boolean {
+    /** [current] null: the tag holds no NDEF message, which matches a target that held none either. */
+    fun matches(tag: Tag, current: NdefMessage?): Boolean {
         // Random UIDs (ISO 14443-3 NUIDs start with 08h) change on every tap: only the content can tell.
         val uidStable = uid.isNotEmpty() && !(uid.size == 4 && uid[0] == 0x08.toByte())
-        return current.toByteArray().contentEquals(message) && (!uidStable || tag.id.contentEquals(uid))
+        val bytes = current?.toByteArray() ?: ByteArray(0)
+        return bytes.contentEquals(message) && (!uidStable || tag.id.contentEquals(uid))
     }
 }
 
 enum class TagContent { Empty, Backup, NewerBackup, Other }
+
+/**
+ * What the Erase tab's scan found. [ndef]: it's NDEF-formatted (a blank tag has nothing to erase).
+ * [text]: the first Text record (for a backup, the Base64 blob: not secret, anyone can read it from
+ * the tag), so the password check needs no second scan. [target]: the tag and content an erase is
+ * bound to, null if it can't be erased.
+ */
+data class EraseCheck(
+    val supported: Boolean,
+    val ndef: Boolean,
+    val writable: Boolean,
+    val content: TagContent,
+    val capacity: Int?,
+    val text: String?,
+    val target: OverwriteTarget?,
+)
 
 /**
  * What the first Back up step found. [supported]: the tag can hold NDEF at all. [ndef]: it's
@@ -81,6 +103,9 @@ sealed interface TagResult {
     data object AlreadyReadOnly : TagResult
     /** Tag already holds data; [existing] is its text if it was a Text record; [target] identifies it. */
     data class NotEmpty(val existing: String?, val target: OverwriteTarget) : TagResult
+    data class Inspected(val check: EraseCheck) : TagResult
+    /** Every byte of the tag's NDEF data was overwritten with zeros, and the tag is now empty. */
+    data object Erased : TagResult
     data class Failed(val message: String) : TagResult
 }
 
@@ -96,6 +121,8 @@ object TagIo {
             is TagRequest.CheckWritten -> checkWritten(tag, request.expected)
             TagRequest.Read -> read(tag)
             is TagRequest.Lock -> lock(tag, request.expected)
+            TagRequest.Inspect -> inspect(tag)
+            is TagRequest.Erase -> erase(tag, request.target)
         }
     } catch (e: TagLostException) {
         TagResult.Failed("The tag moved away too early. Hold it still against the phone and try again.")
@@ -183,15 +210,7 @@ object TagIo {
                 it.connect()
                 val msg = readMessage(it)
                 if (msg == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
-                val content = if (msg == null || msg.records.all { r -> r.tnf == NdefRecord.TNF_EMPTY }) {
-                    TagContent.Empty
-                } else {
-                    when (SeedBox.kindOf(runCatching { firstText(msg) }.getOrNull())) {
-                        SeedBox.Kind.Current -> TagContent.Backup
-                        SeedBox.Kind.Newer -> TagContent.NewerBackup
-                        SeedBox.Kind.NotBackup -> TagContent.Other
-                    }
-                }
+                val content = contentOf(msg)
                 return TagResult.Checked(
                     TagCheck(true, ndef = true, capacity = it.maxSize, writable = it.isWritable, content = content, classic = classic),
                 )
@@ -201,6 +220,102 @@ object TagIo {
         if (looksNdefFormatted(tag)) return TagResult.Failed(NOT_READ)
         val capacity = blankCapacity(tag)
         return TagResult.Checked(TagCheck(true, ndef = false, capacity = capacity, estimated = capacity != null, classic = classic))
+    }
+
+    private fun contentOf(msg: NdefMessage?): TagContent =
+        if (msg == null || isEmpty(msg)) {
+            TagContent.Empty
+        } else {
+            when (SeedBox.kindOf(runCatching { firstText(msg) }.getOrNull())) {
+                SeedBox.Kind.Current -> TagContent.Backup
+                SeedBox.Kind.Newer -> TagContent.NewerBackup
+                SeedBox.Kind.NotBackup -> TagContent.Other
+            }
+        }
+
+    private fun isEmpty(msg: NdefMessage) = msg.records.all { r -> r.tnf == NdefRecord.TNF_EMPTY }
+
+    private fun inspect(tag: Tag): TagResult {
+        val ndef = Ndef.get(tag)
+            ?: return TagResult.Inspected(
+                EraseCheck(NdefFormatable.get(tag) != null, ndef = false, writable = false, TagContent.Empty, null, null, null),
+            )
+        ndef.use {
+            it.connect()
+            val msg = readMessage(it)
+            // A read that failed looks like an empty tag: don't call a tag empty that may hold a backup.
+            if (msg == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
+            val target = if (it.isWritable) OverwriteTarget(tag.id ?: ByteArray(0), msg?.toByteArray() ?: ByteArray(0)) else null
+            return TagResult.Inspected(
+                EraseCheck(
+                    true, ndef = true, writable = it.isWritable, content = contentOf(msg), capacity = it.maxSize,
+                    text = runCatching { firstText(msg) }.getOrNull(), target = target,
+                ),
+            )
+        }
+    }
+
+    /**
+     * Writing a short NDEF message only rewrites as many bytes as it needs: on a Type 2 tag the rest
+     * of the old message (the encrypted backup) stays in memory, readable by any raw-read app. So
+     * the whole NDEF area is first filled by one record of zeros exactly [Ndef.getMaxSize] long
+     * (read back to be sure), and only then is the empty message written.
+     */
+    private fun erase(tag: Tag, target: OverwriteTarget): TagResult {
+        val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
+        ndef.use {
+            it.connect()
+            val current = readMessage(it)
+            if (current == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
+            // Only the tag that was scanned, with what it held then. A tag already holding the zeros
+            // is one whose erase was interrupted: it holds nothing any more, so it may be finished.
+            if (!target.matches(tag, current) && !(current != null && isFiller(current))) {
+                return TagResult.Failed(
+                    "This isn't the tag you scanned, or what it holds has changed since. Nothing was changed. Cancel and scan it again.",
+                )
+            }
+            if (!it.isWritable) return TagResult.Failed("This tag is read-only: it can't be erased.")
+            val filler = fillerFor(it.maxSize)
+            try {
+                it.writeNdefMessage(filler)
+            } catch (e: IOException) {
+                return TagResult.Failed(
+                    "The tag moved away while it was being erased, so part of what it held may already be gone. Nothing " +
+                        "here can tell how much: Cancel, scan the tag again and erase it again.",
+                )
+            }
+            val back = it.ndefMessage
+            if (back == null || !back.toByteArray().contentEquals(filler.toByteArray())) {
+                return TagResult.Failed(
+                    "Couldn't confirm that the whole tag was overwritten. Hold the same tag still and tap again to finish.",
+                )
+            }
+            it.writeNdefMessage(EMPTY)
+            val after = it.ndefMessage
+            if (after != null && !isEmpty(after)) {
+                return TagResult.Failed("The tag was overwritten with zeros but isn't empty yet. Hold the same tag still and tap again to finish.")
+            }
+            return TagResult.Erased
+        }
+    }
+
+    private val EMPTY = NdefMessage(NdefRecord(NdefRecord.TNF_EMPTY, null, null, null))
+
+    /**
+     * One record of zeros (TNF unknown, no type) whose message is as close to [maxSize] bytes as an
+     * NDEF record can be: exactly, except for a few sizes just above 255 bytes, where the short
+     * record format ends and up to 3 bytes at the end stay as they were.
+     */
+    private fun fillerFor(maxSize: Int): NdefMessage {
+        fun msg(n: Int) = NdefMessage(NdefRecord(NdefRecord.TNF_UNKNOWN, null, null, ByteArray(n)))
+        var n = (maxSize - 3).coerceAtLeast(0)
+        while (n > 0 && msg(n).byteArrayLength > maxSize) n--
+        return msg(n)
+    }
+
+    /** A message that is one of [fillerFor]'s records: what an interrupted erase leaves behind. */
+    private fun isFiller(msg: NdefMessage): Boolean = msg.records.size == 1 && msg.records[0].let { r ->
+        r.tnf == NdefRecord.TNF_UNKNOWN && r.type.isEmpty() && r.payload.all { b -> b == 0.toByte() }
     }
 
     /** A SeedTag backup, of this format or a newer one ([SeedBox.kindOf]). */

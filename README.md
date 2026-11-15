@@ -357,6 +357,15 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    It stops the backup from being overwritten or erased, but not, on most chips, from being locked against reading
    by someone who gets hold of the tag (see [Choosing a tag](#choosing-a-tag)).
 5. **Restore**: same as Verify, but the words are shown.
+6. **Erase**, the fourth tab, to retire a tag or reuse it. Scan it first (nothing is written): the app
+   shows what it holds, a SeedTag backup, other data or nothing, and whether it can be erased at all (a read-only
+   tag can't). For a backup you can **Check the password first**: the app decrypts what it just read (no second
+   scan), shows the fingerprint and whether it's the backup from this session, so you know it's the one you mean.
+   Or **Erase without checking**. Either way it asks, then you hold the same tag to the phone again: another tag,
+   or this one with different content, is refused. Erasing first overwrites the tag's whole NDEF area with zeros
+   and reads that back, then leaves the tag empty. Writing an empty message alone wouldn't do: on NTAG and MIFARE
+   Ultralight tags it only rewrites the first few bytes, and the rest of the old ciphertext stays in the chip,
+   readable by any app that reads its memory directly.
 
 Verify and Restore are two steps, like Back up: type the password and scan, then the result. Once the tag has
 been decrypted, the password field and keyboard are gone; **Verify another tag** or **Restore another tag** starts

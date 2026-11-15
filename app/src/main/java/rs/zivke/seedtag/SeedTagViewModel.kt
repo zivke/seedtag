@@ -27,16 +27,19 @@ import android.nfc.tech.NdefFormatable
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
-enum class Screen(val title: String) { Backup("Back up"), Verify("Verify"), Restore("Restore") }
+enum class Screen(val title: String) { Backup("Back up"), Verify("Verify"), Restore("Restore"), Erase("Erase") }
 /** Pages opened from the top bar ([button]), shown instead of the tabs. */
-enum class Page(val title: String, val button: String) { Antenna("Where to hold the tag", "Find NFC spot"), About("About", "About") }
+enum class Page(val title: String, val button: String) {
+    Antenna("Where to hold the tag", "Find NFC spot"),
+    About("About", "About"),
+}
 
 /** What the NFC-spot finder saw, from the tag's discovery info only: nothing is read from its memory. */
 data class ProbeResult(val count: Int, val ndef: Boolean, val formatable: Boolean, val ndefSize: Int?, val writable: Boolean?)
 /** [Tag]: scan the tag first, to see whether it can take a backup, and how many words. */
 enum class BackupStep { Tag, Length, Words, Password, Done }
-/** The three password fields: the new password and its repeat (Back up), and Verify / Restore. */
-enum class PwField { Password, Repeat, Read }
+/** The password fields: the new password and its repeat (Back up), Verify / Restore, and the Erase tag check. */
+enum class PwField { Password, Repeat, Read, Erase }
 
 sealed interface MnemonicStatus {
     data class Incomplete(val count: Int) : MnemonicStatus
@@ -65,6 +68,8 @@ sealed interface Dialog {
     data class Info(val title: String, val message: String) : Dialog
     data class ConfirmOverwrite(val looksLikeSeedTag: Boolean) : Dialog
     data object ConfirmLock : Dialog
+    /** Erase the scanned tag, which holds [content]; [checked] if its backup was decrypted with its password first. */
+    data class ConfirmErase(val content: TagContent, val checked: Boolean, val fingerprint: String?) : Dialog
     /** Generate a passphrase over a password that's already there; [generated] if that one was generated too. */
     data class ConfirmNewPassphrase(val generated: Boolean) : Dialog
     /** Back would drop what was entered: [toWords] for the Password step's Back (clears the passwords), else leaving the app. */
@@ -87,7 +92,7 @@ sealed interface Dialog {
  */
 enum class Haptic { Tick, Success, Failure, Found }
 
-private enum class Purpose { Check, BackupWrite, Verify, Restore, Lock }
+private enum class Purpose { Check, BackupWrite, Verify, Restore, Lock, Inspect, Erase }
 
 const val STRAY_SPACES =
     "The password starts or ends with a space, or has two spaces in a row. A written copy rarely shows that, " +
@@ -110,7 +115,14 @@ private data class Pending(val request: TagRequest, val purpose: Purpose, val id
 
 class SeedTagViewModel : ViewModel() {
 
-    var tab by mutableStateOf(Screen.Backup)
+    private var shownTab by mutableStateOf(Screen.Backup)
+    /** The tab shown. Leaving Erase starts it afresh: its scan canceled, its password and result gone. */
+    var tab: Screen
+        get() = shownTab
+        set(value) {
+            if (shownTab == Screen.Erase && value != Screen.Erase) resetErase()
+            shownTab = value
+        }
     /** An open top-bar page, or null for the tabs. */
     var page by mutableStateOf<Page?>(null)
 
@@ -156,6 +168,7 @@ class SeedTagViewModel : ViewModel() {
     private val password = SecretChars()
     private val passwordRepeat = SecretChars()
     private val readPassword = SecretChars()
+    private val erasePassword = SecretChars()
     /** Bumped on every password change, so Compose redraws what depends on the buffers. */
     private var passwordEdits by mutableIntStateOf(0)
 
@@ -163,6 +176,7 @@ class SeedTagViewModel : ViewModel() {
         PwField.Password -> password
         PwField.Repeat -> passwordRepeat
         PwField.Read -> readPassword
+        PwField.Erase -> erasePassword
     }
 
     fun passwordLength(f: PwField): Int { passwordEdits; return buffer(f).length }
@@ -219,6 +233,18 @@ class SeedTagViewModel : ViewModel() {
         private set
     var restoredWords by mutableStateOf<List<String>?>(null)
         private set
+
+    // ---- erase ----------------------------------------------------------------
+    /** What the Erase scan found (nothing secret), null before the scan. */
+    var eraseCheck by mutableStateOf<EraseCheck?>(null)
+        private set
+    /** The backup on [eraseCheck], decrypted with the password typed: word count and fingerprint. */
+    var eraseVerified by mutableStateOf<VerifyResult?>(null)
+        private set
+    /** The user chose to check the backup's password before erasing it. */
+    var eraseWithPassword by mutableStateOf(false)
+    /** Bumped by [resetErase]: a password check that finishes after it is thrown away. */
+    private var eraseSession = 0L
 
     // ---- shared ---------------------------------------------------------------
     var busy by mutableStateOf<String?>(null)
@@ -463,6 +489,68 @@ class SeedTagViewModel : ViewModel() {
 
     fun cancelScan() { scanId++; pending.set(null); scanPrompt = null }
 
+    // ---- erase ----------------------------------------------------------------
+
+    /** Erase, first tap: see what the tag holds. Nothing is written. */
+    fun scanToErase() {
+        resetErase()
+        arm(TagRequest.Inspect, Purpose.Inspect, "Hold the tag to the phone to see what it holds")
+    }
+
+    /** Decrypts the backup the scan read (no second scan), to be sure it's the one to erase. */
+    fun checkErasePassword() {
+        val text = eraseCheck?.text ?: return
+        if (erasePassword.isEmpty()) return showError("Enter the password first.")
+        if (busy != null) return
+        val pw = erasePassword.copy()
+        val wipesAtStart = wipes
+        val session = eraseSession
+        busy = "Checking the password… (Argon2id takes a few seconds, longer if the password needs a second try)"
+        viewModelScope.launch {
+            try {
+                val (count, fp, fix) = withContext(Dispatchers.Default) {
+                    val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)
+                    try {
+                        Triple(Bip39.entropyToWords(opened.entropy).size, SeedBox.fingerprint(opened.entropy), opened.fix)
+                    } finally { opened.entropy.fill(0) }
+                }
+                if (wipes != wipesAtStart || session != eraseSession) return@launch
+                eraseVerified = VerifyResult(count, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix)
+                clearPasswords(PwField.Erase)
+                _haptics.tryEmit(Haptic.Success)
+            } catch (e: SeedTagException) {
+                showError(e.message ?: "Decryption failed.")
+            } catch (e: OutOfMemoryError) {
+                showError(OUT_OF_MEMORY)
+            } finally {
+                pw.fill(' ')
+                busy = null
+            }
+        }
+    }
+
+    fun requestErase() {
+        val c = eraseCheck ?: return
+        if (c.target == null) return
+        dialog = Dialog.ConfirmErase(c.content, eraseVerified != null, eraseVerified?.fingerprint)
+    }
+
+    fun confirmErase() {
+        dialog = null
+        val target = eraseCheck?.target ?: return
+        arm(TagRequest.Erase(target), Purpose.Erase, "Hold the same tag to erase it")
+    }
+
+    /** Back to the start of Erase: nothing scanned, no password, and its scan canceled. */
+    private fun resetErase() {
+        eraseSession++
+        val p = pending.get()?.purpose
+        if (p == Purpose.Inspect || p == Purpose.Erase) cancelScan()
+        eraseCheck = null; eraseVerified = null; eraseWithPassword = false
+        clearPasswords(PwField.Erase)
+        if (dialog is Dialog.ConfirmErase) dialog = null
+    }
+
     fun hideRestored() { restoredWords = null }
 
     /** "Verify another tag" / "Restore another tag": back to the password step, nothing kept. */
@@ -577,6 +665,24 @@ class SeedTagViewModel : ViewModel() {
                         "some tags are only marked read-only and can still be rewritten with other tools.",
                 )
             }
+            is TagResult.Inspected -> {
+                if (stale) return
+                scanPrompt = null
+                eraseCheck = r.check
+                _haptics.tryEmit(Haptic.Tick)
+            }
+            is TagResult.Erased -> {
+                closePrompt()
+                _haptics.tryEmit(Haptic.Success)
+                // Lock must not be offered for a tag that no longer holds that backup.
+                if (eraseCheck?.text != null && eraseCheck?.text == lockTarget) lockTarget = null
+                if (!stale) resetErase()
+                dialog = Dialog.Info(
+                    "Tag erased",
+                    "Everything the tag held was overwritten with zeros and read back, and the tag is now empty. Nothing " +
+                        "of what it held can be read from it any more. It can take a new backup.",
+                )
+            }
             is TagResult.Read -> {
                 if (stale) return
                 scanPrompt = null
@@ -626,7 +732,7 @@ class SeedTagViewModel : ViewModel() {
         get() {
             prefixEdits; passwordEdits
             return words.isNotEmpty() || !prefixBuf.isEmpty() || !password.isEmpty() || !passwordRepeat.isEmpty() ||
-                !readPassword.isEmpty() || restoredWords != null
+                !readPassword.isEmpty() || !erasePassword.isEmpty() || restoredWords != null
         }
 
     /** System Back is handled by [back] rather than leaving the app. */
@@ -690,7 +796,7 @@ class SeedTagViewModel : ViewModel() {
         cancelScan()
         if (step != BackupStep.Done && step != BackupStep.Tag) step = BackupStep.Length
         wipeBackup()
-        clearPasswords(PwField.Read); restoredWords = null
+        clearPasswords(PwField.Read, PwField.Erase); restoredWords = null
         val d = dialog
         if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
             d is Dialog.ConfirmBack || d == Dialog.StillThere

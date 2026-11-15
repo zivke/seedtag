@@ -7,6 +7,13 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- **Erase**, a fourth tab after Back up, Verify and Restore: scan a tag to see what it holds, then
+  erase it. For a SeedTag backup you can first check its password, to be
+  sure it's the backup you mean, or erase it without checking. It asks
+  first, and only erases the same tag, with the same content, that was
+  scanned. The tag's whole NDEF area is overwritten with zeros and read
+  back before it's left empty, so no part of the old backup stays in the
+  chip.
 - Back up warns when the tag you check is MIFARE Classic: many phones can't
   read it at all, so a backup on it might not be readable on the phone you
   have when you need it. It suggests another tag; **Use this tag anyway**

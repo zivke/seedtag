@@ -334,6 +334,7 @@ fun SeedTagApp(
                             Screen.Backup -> BackupScreen(vm)
                             Screen.Verify -> ReadScreen(vm, reveal = false)
                             Screen.Restore -> ReadScreen(vm, reveal = true)
+                            Screen.Erase -> EraseScreen(vm)
                         }
                     }
                 }
@@ -1479,6 +1480,129 @@ private fun LockButton(vm: SeedTagViewModel) {
     DangerButton("Make tag read-only", vm::requestLock)
 }
 
+// ============================================================ erase tag ===
+
+/**
+ * The Erase tab: scan (nothing written), see what the tag holds, optionally check a backup's
+ * password, then erase that very tag. Erasing fills the whole NDEF area with zeros before leaving
+ * it empty.
+ */
+@Composable
+private fun EraseScreen(vm: SeedTagViewModel) {
+    val c = vm.eraseCheck
+    val verified = vm.eraseVerified
+    val backup = c?.content == TagContent.Backup && c.target != null
+    val typing = backup && verified == null && vm.eraseWithPassword
+    StepScreen(
+        bottom = {
+            when {
+                c == null -> PrimaryButton("Scan tag", vm::scanToErase)
+                c.target == null -> PrimaryButton("Scan another tag", vm::scanToErase)
+                typing -> {
+                    SecretField("Password", vm, PwField.Erase, revealDefault = false, active = true) {}
+                    PasswordKeyboard(vm, PwField.Erase)
+                    PrimaryButton("Check password", vm::checkErasePassword, enabled = vm.passwordLength(PwField.Erase) > 0)
+                    TextButton(onClick = { vm.eraseWithPassword = false }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Don't check the password")
+                    }
+                }
+                backup && verified == null -> {
+                    PrimaryButton("Check the password first", { vm.eraseWithPassword = true })
+                    DangerButton("Erase without checking", vm::requestErase)
+                    SecondaryButton("Scan another tag", vm::scanToErase)
+                }
+                else -> {
+                    DangerButton("Erase this tag", vm::requestErase)
+                    SecondaryButton("Scan another tag", vm::scanToErase)
+                }
+            }
+        },
+    ) {
+        if (!typing) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Erase a tag", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "Erasing overwrites everything the tag holds with zeros, then leaves it empty, so nothing of an old " +
+                        "backup can be read from it, not even with apps that read the chip's memory directly. It can't be " +
+                        "undone. A read-only (locked) tag can't be erased.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        when {
+            c == null -> Steps(
+                listOf(
+                    "Scan the tag. Nothing is written: the app only shows what it holds.",
+                    "If it holds a SeedTag backup, you can check its password first, to be sure it's the backup you mean " +
+                        "to erase. Without the password, the app can only tell it's a backup, not whose.",
+                    "Erase it: the app asks first, then you hold the same tag to the phone again. Any other tag, or this one " +
+                        "with different content, is refused.",
+                ),
+            )
+            typing -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Check the password", style = MaterialTheme.typography.headlineSmall)
+                Text(
+                    "Type the backup's password. The tag isn't scanned again: the app decrypts what it already read, and " +
+                        "the words stay hidden.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            else -> EraseCheckResult(c, verified)
+        }
+    }
+}
+
+@Composable
+private fun EraseCheckResult(c: EraseCheck, verified: VerifyResult?) {
+    val (tone, title, hint) = when {
+        !c.supported -> Triple(Tone.Caution, "Nothing to erase", "This tag doesn't support NDEF, the only data SeedTag reads or writes.")
+        !c.ndef -> Triple(Tone.Info, "Nothing to erase", "This tag is blank: it has never been formatted, so it holds no NDEF data.")
+        !c.writable -> Triple(
+            Tone.Caution, "Can't be erased",
+            "This tag is read-only. If it was locked, that's permanent: nothing can rewrite or erase it. To get rid of " +
+                "what it holds, destroy the tag (cut through its antenna and chip).",
+        )
+        verified != null -> Triple(Tone.Success, "Password checked", "Your password decrypts this tag to a valid ${verified.wordCount}-word seed.")
+        c.content == TagContent.Backup -> Triple(
+            Tone.Caution, "A SeedTag backup",
+            "Erasing destroys it for good. Make sure it isn't your only copy of the seed. To be sure it's the backup you " +
+                "mean, check its password first.",
+        )
+        c.content == TagContent.NewerBackup -> Triple(
+            Tone.Caution, "A backup from a newer SeedTag",
+            "This version can't read it, so it can't check its password. Erasing destroys it for good: make sure it isn't " +
+                "your only copy of the seed.",
+        )
+        c.content == TagContent.Other -> Triple(Tone.Info, "Other data", "Not a SeedTag backup. Erasing replaces it with nothing.")
+        else -> Triple(
+            Tone.Info, "Empty",
+            "It holds no data, but leftovers of something it held before may still be in its memory. Erasing overwrites them.",
+        )
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Notice(tone, title, hint)
+        if (c.ndef) {
+            Facts(
+                buildList {
+                    c.capacity?.let { add(Fact("Size", "$it bytes")) }
+                    add(Fact("State", if (c.writable) "Can be erased" else "Read-only", if (c.writable) null else Tone.Caution))
+                    verified?.let { v ->
+                        add(Fact("Fingerprint", v.fingerprint, mono = true))
+                        when (v.matchesBackup) {
+                            true -> add(Fact("Backup from this session", "Same seed", Tone.Caution))
+                            false -> add(Fact("Backup from this session", "A different seed", null))
+                            null -> Unit
+                        }
+                    }
+                },
+            )
+        }
+        verified?.let { v -> passwordFixNote(v.passwordFix)?.let { Notice(Tone.Caution, "Check your written password", it) } }
+    }
+}
+
 // ===================================================== verify / restore ===
 
 /**
@@ -2097,6 +2221,27 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
             },
             confirmButton = { TextButton(onClick = vm::stillThere) { Text("Keep") } },
             dismissButton = { TextButton(onClick = vm::wipeAll) { Text("Clear now") } },
+        )
+        is Dialog.ConfirmErase -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            icon = { WarningIcon() },
+            title = { Text(if (d.content == TagContent.Backup || d.content == TagContent.NewerBackup) "Erase this backup?" else "Erase this tag?") },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    when {
+                        d.checked -> "This destroys the backup you just checked (fingerprint ${d.fingerprint}) for good. " +
+                            "Make sure you have the seed somewhere else."
+                        d.content == TagContent.Backup || d.content == TagContent.NewerBackup ->
+                            "This tag holds a SeedTag backup, and its password wasn't checked, so it may not be the one you " +
+                                "think. Erasing destroys it for good. Make sure it isn't your only copy of the seed."
+                        d.content == TagContent.Other -> "Everything the tag holds is overwritten and can't be recovered."
+                        else -> "Any leftovers of earlier data in the tag's memory are overwritten."
+                    } + " Then hold the same tag to the phone.",
+                )
+            },
+            confirmButton = { TextButton(onClick = vm::confirmErase) { DangerText("Erase") } },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
         )
         Dialog.ConfirmLock -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
