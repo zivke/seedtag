@@ -55,7 +55,9 @@ build if the APK requests any permission other than NFC, `HIDE_OVERLAY_WINDOWS` 
 can't quietly add network access. It also fails a release APK that is debuggable or test-only, allows backups, or
 declares any component besides SeedTag's activity, or a component factory: no library code may start by itself.
 A library that adds one fails the build until it's been looked at (and removed in the manifest, or added to the
-script). `--debug` (for `make debug`) allows what debug builds have: debuggable.
+script). The same goes for shared libraries the system would load into the app: only `androidx.window`'s two
+optional ones, which Compose uses to ask the phone's own window extensions about folds (they're part of the system
+image, and only some phones have them). `--debug` (for `make debug`) allows what debug builds have: debuggable.
 (`HIDE_OVERLAY_WINDOWS` and `VIBRATE` are granted at install without a prompt and give no access to anything: one
 only lets SeedTag hide other apps' overlays, the other only runs the vibration motor.)
 
@@ -201,7 +203,7 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
 
 - **Gradle:** `make` checks the wrapper jar against `gradle/wrapper/gradle-wrapper.jar.sha256` (the official
   wrapper jar of Gradle 8.14) before every Gradle run; the wrapper downloads the Gradle version set in
-  `gradle-wrapper.properties` (8.11.1) and checks it against `distributionSha256Sum`.
+  `gradle-wrapper.properties` (9.9.1) and checks it against `distributionSha256Sum`.
 - **Dependencies:** Gradle checks every library and plugin file against `gradle/verification-metadata.xml`.
   After adding or updating a dependency, run `make deps-metadata`: it downloads everything again into an empty,
   temporary Gradle home (so it records every file a fresh machine like CI fetches, not just what's missing from

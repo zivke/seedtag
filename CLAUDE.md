@@ -19,7 +19,7 @@ BIP39 seed phrase on an NFC tag and reads it back:
 `tools/seedtag.py` is the desktop counterpart: it must stay able to encrypt and
 decrypt exactly what the app writes, so a backup survives the app.
 
-`minSdk` 26, `targetSdk` / `compileSdk` 35. Tested hardware: MIFARE Ultralight C
+`minSdk` 26, `targetSdk` 36, `compileSdk` 37 (AGP 9.5, Gradle 9.9, Kotlin 2.4). Tested hardware: MIFARE Ultralight C
 (137 bytes of NDEF space), which a 24-word blob (104 Base64 chars) fits.
 
 ## Build & run

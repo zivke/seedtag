@@ -1,6 +1,9 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
+// AGP 9 compiles Kotlin itself (no org.jetbrains.kotlin.android plugin); it uses the Kotlin
+// version the root build puts on the classpath (libs.versions.toml).
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
@@ -11,12 +14,12 @@ plugins {
 
 android {
     namespace = "rs.zivke.seedtag"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "rs.zivke.seedtag"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 7
         versionName = "0.4.2"
     }
@@ -34,7 +37,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
 
     buildFeatures { compose = true }
 
@@ -47,6 +49,10 @@ android {
         includeInApk = false
         includeInBundle = false
     }
+}
+
+kotlin {
+    compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 
 // Libraries that only exist to start themselves at launch (see the manifest): kept off the
@@ -67,6 +73,8 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.compose.foundation)
     implementation(libs.compose.material3)
+    // The five icons in Ui.kt. material3 brought this in until 1.4; Google has frozen it at 1.7.8.
+    implementation(libs.compose.material.icons.core)
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.viewmodel)
 }

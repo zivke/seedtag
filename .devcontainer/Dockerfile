@@ -18,19 +18,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Android SDK. No login is needed, so it lives in the image rather than a
-# volume: command-line tools first, then the packages AGP 8.7 builds with.
+# volume: command-line tools first, then the packages AGP 9.5 builds with
+# (compileSdk 37 and AGP's default build-tools).
 # Build number and SHA-256 of the Linux command-line tools, both from the
 # download table on https://developer.android.com/studio. Change them together.
 ARG CMDLINE_TOOLS_BUILD=15859902
 ARG CMDLINE_TOOLS_SHA256=4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583
-ARG ANDROID_PLATFORM=android-35
-ARG ANDROID_BUILD_TOOLS=34.0.0
+ARG ANDROID_PLATFORM=android-37.0
+ARG ANDROID_BUILD_TOOLS=36.0.0
 # SHA-256 of the two SDK files that go into the APK's compilation: android.jar (the
-# platform R8 compiles against, android-35 revision 2) and core-lambda-stubs.jar (D8's).
+# platform R8 compiles against, android-37.0 revision 2) and core-lambda-stubs.jar (D8's).
 # sdkmanager installs whatever revision Google's index currently lists, so a new revision
 # fails the build here instead of slipping in. Change them with the ARGs above.
-ARG ANDROID_JAR_SHA256=4566663c3876e022b4fa4ced8c8697c4ab1688267f090114fd92d027b32e619b
-ARG LAMBDA_STUBS_SHA256=f0404cf634498aec268ad9a3967b5ae8f0005280de0504e264a2a65b8f19745e
+ARG ANDROID_JAR_SHA256=bf1b4387cc7ca94fc6ef684f040d9d16fbf16248e181819f020736ea2053f177
+ARG LAMBDA_STUBS_SHA256=2feb8df434cae3218ed9ffe9bae01ddec101d1dc5e12824c4209f61e283e0d3d
 
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/build-tools/${ANDROID_BUILD_TOOLS}:${PATH}

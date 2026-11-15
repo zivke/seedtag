@@ -24,6 +24,13 @@ All notable user-visible changes to SeedTag. The format follows
   screenshots are blocked before the screen is first set up.
 - Dev container: no GitHub CLI (only needed on the host), and the two
   Android SDK files the compiler reads are checked by SHA-256.
+- Built with current tools and libraries: AGP 9.5, Gradle 9.9, Kotlin 2.4,
+  Compose 1.12 (BOM 2026.09.00), activity 1.13, lifecycle 2.11; compiled
+  against Android 17 (API 37) and targeting Android 16 (API 36). On
+  Android 16, large screens (tablets, unfolded foldables) may now show the
+  app in landscape: Android ignores the portrait lock there for apps that
+  target it. The build also fails if a library makes the system load a
+  shared library into the app that hasn't been looked at.
 - README: *Recommended procedure*, the safest way to use SeedTag from a
   spare phone's setup to keeping it afterwards: install without adb,
   practise with a throwaway seed, back up, verify, restore and compare, check

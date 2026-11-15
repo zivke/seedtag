@@ -29,7 +29,7 @@ OUT       := app/build/outputs/apk
         connect install install-test install-debug run run-test run-debug stop uninstall logcat clean help
 
 # Every Gradle run first checks the wrapper jar against its pinned SHA-256 (the official wrapper
-# jar of Gradle 8.14, which runs the 8.11.1 distribution set in gradle-wrapper.properties); the
+# jar of Gradle 8.14, which runs the 9.9.1 distribution set in gradle-wrapper.properties); the
 # wrapper then checks the Gradle download (distributionSha256Sum)
 # and Gradle checks every dependency (gradle/verification-metadata.xml).
 wrapper-check:

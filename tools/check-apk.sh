@@ -96,6 +96,18 @@ allowed="activity rs.zivke.seedtag.MainActivity"
 unknown="$(printf '%s\n' "$components" | grep -vxF "$allowed" || true)"
 if [ -n "$unknown" ]; then problems="$problems
 $(printf '%s\n' "$unknown" | sed 's/^/component it must not have: /')"; fi
+# Shared libraries the system would load into the app's process. Only androidx.window's two
+# optional ones (Compose asks the phone's own window extensions about folds and screen areas;
+# they're part of the system image, and only present on some phones).
+libraries="$(printf '%s\n' "$manifest" | awk '
+    /^ *E: (uses-library|uses-native-library) /{ want = $2; next }
+    want && /^ *E: /{ print want, "(unnamed)"; want = "" }
+    want && /:name\(0x01010003\)="/{ match($0, /="[^"]*"/); print want, substr($0, RSTART + 2, RLENGTH - 3); want = "" }')"
+allowed_libraries="uses-library androidx.window.extensions
+uses-library androidx.window.sidecar"
+unknown="$(printf '%s\n' "$libraries" | sed '/^$/d' | grep -vxF "$allowed_libraries" || true)"
+if [ -n "$unknown" ]; then problems="$problems
+$(printf '%s\n' "$unknown" | sed 's/^/library it must not load: /')"; fi
 if ! printf '%s\n' "$components" | grep -qxF "activity rs.zivke.seedtag.MainActivity"; then problems="$problems
 no rs.zivke.seedtag.MainActivity (couldn't read the manifest?)"; fi
 if [ -n "$problems" ]; then
@@ -107,7 +119,7 @@ fi
 if [ "$UNSIGNED" = 1 ]; then state="unsigned"; else state="signed"; fi
 if [ "$DEBUG" = 1 ]; then state="$state debug build"; fi
 echo ">> $APK: $state, permissions OK (NFC, HIDE_OVERLAY_WINDOWS and VIBRATE only, no network)"
-echo ">> manifest OK: $(if [ "$DEBUG" = 1 ]; then echo "debuggable (debug build)"; else echo "not debuggable"; fi), not test-only, no backups, only MainActivity, no component factory"
+echo ">> manifest OK: $(if [ "$DEBUG" = 1 ]; then echo "debuggable (debug build)"; else echo "not debuggable"; fi), not test-only, no backups, only MainActivity, no component factory, known libraries only"
 if command -v sha256sum >/dev/null 2>&1; then sum="$(sha256sum "$APK")"; else sum="$(shasum -a 256 "$APK")"; fi
 echo ">> SHA-256: ${sum%% *}"
 ls -l "$APK"

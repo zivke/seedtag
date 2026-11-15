@@ -52,9 +52,16 @@
   - [x] A message that says an interrupted overwrite may have destroyed the old content.
 - [ ] **#12 (Low): maintenance.**
   - [x] Bouncy Castle 1.78.1 → 1.86.
-  - [ ] Update AGP (8.7.3; 8.13.2 / 9.5.1 out), Kotlin (2.0.21; 2.4.21 out), the Compose BOM (2024.12.01;
-    2026.09.00 out), activity and lifecycle; check the Play target-API requirement. Needs a newer
-    platform and build-tools in the Dockerfile, so a container rebuild.
+  - [x] Update AGP (8.7.3 → 9.5.1), Gradle (8.11.1 → 9.9.1), Kotlin (2.0.21 → 2.4.21), the Compose BOM
+    (2024.12.01 → 2026.09.00), activity (→ 1.13.0) and lifecycle (→ 2.11.0); compileSdk 37, targetSdk 36
+    (Play requires 36 for new apps and updates since 2026-08-31). Platform and build-tools in the
+    Dockerfile updated, so a container rebuild. Still to test on the phone (test plan 1.34–1.35).
+  - [ ] Bouncy Castle 1.86 → 1.87 (out 2026-11-11), once it has matured: not before mid-December 2026,
+    and only if no problem has been reported against it. The Argon2 code zeroes its working memory
+    after each run in 1.87; output is unchanged (checked by reading the 1.86 → 1.87 source diff of
+    the classes the app uses). After updating: `make test` (the vectors decide), `make deps-metadata`,
+    one back up and restore on the phone. Moot if the app gets its own Argon2id (dependency-reduction
+    report, item 6).
   - [x] CI running `make test`, `make build` and `check-apk` (`.github/workflows/build.yml`).
   - [ ] Split `Ui.kt` by screen, after `tag-write-password` is merged (it changes `Ui.kt` a lot).
   - [ ] Move the tag-flow logic into a pure-Kotlin state machine with tests, after `tag-write-password` is
