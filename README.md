@@ -312,7 +312,10 @@ details. Some steps, such as overwriting or locking a tag, can't be undone.
 **Have the NFC tag ready before you start, but hold it to the phone only when the app asks.** You don't need to
 hold it while you read or type: the app only reads or writes the tag while it's held there. When asked, hold it
 flat against the back of the phone, over its NFC spot (usually near the middle or the top), and keep it still until
-the app says it's done. If it moves away too early, just hold it there again. A thick or metal case can block it.
+the app says it's done. As soon as the phone finds the tag, it buzzes once and *Ready to scan* turns into *Tag
+found*, with what's being done and, for a write, erase or lock, the step it's on (Erase takes five). While a tag is
+being written there's no Cancel: the write can't be stopped halfway, and moving the tag away is what would leave the
+job half-done (Cancel comes back if a step hangs for 15 seconds). If it moves away too early, just hold it there again. A thick or metal case can block it.
 Small tags and rings have a small NFC symbol on them: put that side right against the spot. Not sure where the spot
 is? **Find NFC spot** in the top bar opens a finder (*Where to hold the tag*): first it checks that NFC is on, then
 you slide a tag or any contactless card over the back of the phone until it vibrates and says *Tag detected*, and

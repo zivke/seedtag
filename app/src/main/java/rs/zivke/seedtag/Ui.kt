@@ -55,6 +55,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
@@ -235,29 +236,31 @@ private val Haptic.constant: Int
         Haptic.Failure ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) HapticFeedbackConstants.REJECT else HapticFeedbackConstants.LONG_PRESS
         Haptic.Found -> HapticFeedbackConstants.LONG_PRESS
+        Haptic.Detected -> HapticFeedbackConstants.KEYBOARD_TAP
     }
 
-/** Plays [h]: [Haptic.Found] as a real vibration, the rest as the system's own touch feedback. */
+/** Plays [h]: [Haptic.Found] and [Haptic.Detected] as a real vibration, the rest as the system's own touch feedback. */
 private fun View.play(h: Haptic) {
-    if (h == Haptic.Found && foundBuzz(context)) return
+    if (h == Haptic.Found && buzz(context, longArrayOf(0, 150, 90, 250))) return
+    if (h == Haptic.Detected && buzz(context, longArrayOf(0, 70))) return
     performHapticFeedback(h.constant)
 }
 
 /**
- * Two firm pulses, 150 ms and 250 ms at full strength (where the motor can vary it), so a found tag
- * is felt through the hand holding the phone. Played as touch feedback, so it follows the phone's
+ * Firm pulses at full strength (where the motor can vary it): [timings] alternate off and on, in ms,
+ * starting with off. Found: 150 and 250 ms, so a found tag is felt through the hand holding the phone;
+ * Detected: one short 70 ms pulse. Played as touch feedback, so it follows the phone's
  * touch-vibration setting. False if the phone has no vibrator.
  */
-private fun foundBuzz(context: Context): Boolean {
+private fun buzz(context: Context, timings: LongArray): Boolean {
     val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         context.getSystemService(VibratorManager::class.java)?.defaultVibrator
     } else {
         context.getSystemService(Vibrator::class.java)
     }
     if (vibrator == null || !vibrator.hasVibrator()) return false
-    val timings = longArrayOf(0, 150, 90, 250)
     val effect = if (vibrator.hasAmplitudeControl()) {
-        VibrationEffect.createWaveform(timings, intArrayOf(0, 255, 0, 255), -1)
+        VibrationEffect.createWaveform(timings, IntArray(timings.size) { if (it % 2 == 1) 255 else 0 }, -1)
     } else {
         VibrationEffect.createWaveform(timings, -1)
     }
@@ -358,8 +361,10 @@ private fun IdleWatch(vm: SeedTagViewModel) {
         view.keepScreenOn = holding
         onDispose { view.keepScreenOn = false }
     }
-    LaunchedEffect(holding, vm.touches, vm.busy != null) {
-        if (!holding || vm.busy != null) return@LaunchedEffect
+    // Not idle while Argon2 runs or a tag is being read or written.
+    val working = vm.busy != null || vm.scanPrompt?.working != null
+    LaunchedEffect(holding, vm.touches, working) {
+        if (!holding || working) return@LaunchedEffect
         delay(IDLE_WARN_MS)
         vm.idleWarning()
         delay(IDLE_GRACE_MS)
@@ -2050,6 +2055,34 @@ private fun ScanPulse() {
     }
 }
 
+/** A tag step taking this long has hung: Cancel comes back. Real steps take well under a second. */
+private const val STUCK_MS = 15_000L
+
+/** The scan prompt once the tag is found: what's being done, the step, and to keep the tag still. */
+@Composable
+private fun TagWorking(step: TagStep) {
+    val c = MaterialTheme.colorScheme
+    Box(Modifier.size(88.dp), contentAlignment = Alignment.Center) {
+        CircularProgressIndicator(Modifier.size(64.dp), strokeWidth = 4.dp)
+    }
+    Text(step.label + "…", textAlign = TextAlign.Center, style = MaterialTheme.typography.titleSmall)
+    if (step.of > 1) {
+        LinearProgressIndicator(progress = { step.step.toFloat() / step.of }, modifier = Modifier.fillMaxWidth())
+        Text("Step ${step.step} of ${step.of}", style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
+    }
+    Text(
+        if (step.writes) {
+            "Don't move the tag until this window closes: taking it away now could leave the job half-done."
+        } else {
+            "Keep the tag still until this window closes."
+        },
+        textAlign = TextAlign.Center,
+        style = MaterialTheme.typography.bodyMedium,
+        fontWeight = FontWeight.SemiBold,
+        color = if (step.writes) c.error else c.onSurface,
+    )
+}
+
 @Composable
 private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
     vm.busy?.let { msg ->
@@ -2070,10 +2103,22 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
     }
 
     vm.scanPrompt?.let { p ->
+        val working = p.working
+        // While the tag is being written, Cancel couldn't stop it anyway (the I/O runs to its end),
+        // and moving the tag away is what would leave the job half-done: no Cancel, no Back. Unless a
+        // step takes far longer than any tag needs (a hung NFC service), so the user isn't stuck.
+        var stuck by remember { mutableStateOf(false) }
+        LaunchedEffect(working) {
+            stuck = false
+            if (working?.writes == true) { delay(STUCK_MS); stuck = true }
+        }
+        val writing = working?.writes == true && !stuck
         AlertDialog(
-            onDismissRequest = vm::cancelScan,
+            onDismissRequest = { if (!writing) vm.cancelScan() },
             properties = DialogProperties(dismissOnClickOutside = false),
-            title = { Text("Ready to scan", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+            title = {
+                Text(if (working != null) "Tag found" else "Ready to scan", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            },
             text = {
                 GuardDialogWindow()
                 Column(
@@ -2081,22 +2126,27 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    ScanPulse()
-                    Text(p.title, textAlign = TextAlign.Center, style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "Hold it flat over the phone's NFC spot and keep it still until this window closes. The app " +
-                            "only reads or writes the tag while it's held there.",
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    p.error?.let {
-                        Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
+                    if (working == null) {
+                        ScanPulse()
+                        Text(p.title, textAlign = TextAlign.Center, style = MaterialTheme.typography.titleSmall)
+                        Text(
+                            "Hold it flat over the phone's NFC spot and keep it still until this window closes. The app " +
+                                "only reads or writes the tag while it's held there. When the phone finds the tag, it " +
+                                "buzzes once and this window says so.",
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        p.error?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    } else {
+                        TagWorking(working)
                     }
                 }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = vm::cancelScan) { Text("Cancel") } },
+            dismissButton = { if (!writing) TextButton(onClick = vm::cancelScan) { Text("Cancel") } },
         )
         return
     }

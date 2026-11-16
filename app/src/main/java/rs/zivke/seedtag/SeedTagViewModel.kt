@@ -47,7 +47,8 @@ sealed interface MnemonicStatus {
     data class Valid(val count: Int) : MnemonicStatus
 }
 
-data class ScanPrompt(val title: String, val error: String? = null)
+/** [working]: a tag was found and is being read or written, null while waiting for one. */
+data class ScanPrompt(val title: String, val error: String? = null, val working: TagStep? = null)
 /**
  * [matchesBackup]: compared with the backup written in this session ([backupFingerprint]), null if
  * there was none.
@@ -93,8 +94,9 @@ sealed interface Dialog {
 /**
  * Vibration for things that happen without a tap: a tag was handled, something succeeded or failed.
  * [Found]: the NFC-spot finder saw a tag; a longer buzz, so it's felt through a hand on the phone.
+ * [Detected]: a scan's tag was found and the app is working with it; one short, firm pulse.
  */
-enum class Haptic { Tick, Success, Failure, Found }
+enum class Haptic { Tick, Success, Failure, Found, Detected }
 
 private enum class Purpose { Check, BackupWrite, Verify, Restore, Lock, Inspect, Erase }
 
@@ -617,8 +619,17 @@ class SeedTagViewModel : ViewModel() {
             if (probing.get()) probed(tag)
             return
         }
-        val result = TagIo.perform(tag, p.request)
+        // Steps and the result are posted to the main thread in order, so the result always comes last.
+        val result = TagIo.perform(tag, p.request) { step -> viewModelScope.launch { working(p, step) } }
         viewModelScope.launch { handle(p, result) }
+    }
+
+    /** The scan [p]'s tag is being worked with: say so at once (the first step comes before any I/O). */
+    private fun working(p: Pending, step: TagStep) {
+        if (p.id != scanId) return
+        val prompt = scanPrompt ?: return
+        if (prompt.working == null) _haptics.tryEmit(Haptic.Detected)
+        scanPrompt = prompt.copy(working = step, error = null)
     }
 
     /** Only the info Android hands over with the tag (no I/O): its type, NDEF size and lock state. */
@@ -652,7 +663,7 @@ class SeedTagViewModel : ViewModel() {
                 _haptics.tryEmit(Haptic.Failure)
                 // stay armed so the user can simply tap again
                 pending.set(p)
-                scanPrompt = scanPrompt?.copy(error = r.message) ?: ScanPrompt("Hold the tag to the phone", r.message)
+                scanPrompt = scanPrompt?.copy(error = r.message, working = null) ?: ScanPrompt("Hold the tag to the phone", r.message)
             }
             is TagResult.NotEmpty -> {
                 if (stale) return
@@ -699,7 +710,6 @@ class SeedTagViewModel : ViewModel() {
             is TagResult.AlreadyReadOnly -> {
                 if (stale) return
                 scanPrompt = null
-                _haptics.tryEmit(Haptic.Tick)
                 dialog = Dialog.Info(
                     "Already read-only",
                     "This tag was already read-only, so SeedTag didn't change it. It can't tell whether that's permanent: " +
@@ -710,7 +720,6 @@ class SeedTagViewModel : ViewModel() {
                 if (stale) return
                 scanPrompt = null
                 eraseCheck = r.check
-                _haptics.tryEmit(Haptic.Tick)
             }
             is TagResult.Erased -> {
                 closePrompt()
@@ -727,7 +736,6 @@ class SeedTagViewModel : ViewModel() {
             is TagResult.Read -> {
                 if (stale) return
                 scanPrompt = null
-                _haptics.tryEmit(Haptic.Tick)
                 decrypt(r.text, reveal = p.purpose == Purpose.Restore)
             }
         }
@@ -802,6 +810,8 @@ class SeedTagViewModel : ViewModel() {
 
     /** The idle timeout ran out: ask, with a scan that's waiting for a tag canceled. */
     fun idleWarning() {
+        // A tag is being read or written right now: that isn't idle, and the scan mustn't be canceled.
+        if (scanPrompt?.working != null) { touched(); return }
         cancelScan()
         dialog = Dialog.StillThere
         _haptics.tryEmit(Haptic.Found) // the longer buzz: felt even with the phone lying on the table

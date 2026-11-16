@@ -14,6 +14,11 @@ All notable user-visible changes to SeedTag. The format follows
   scanned. The tag's whole NDEF area is overwritten with zeros and read
   back before it's left empty, so no part of the old backup stays in the
   chip.
+- As soon as the phone finds the tag, it buzzes once and the scan window
+  says *Tag found*, with what's being done and, for writing, erasing or
+  locking a tag, which step it's on, until it's done or fails. So you know
+  you've found the NFC spot and to keep the tag there. While a tag is being
+  written, the window has no Cancel: the write can't be stopped halfway.
 - Back up warns when the tag you check is MIFARE Classic: many phones can't
   read it at all, so a backup on it might not be readable on the phone you
   have when you need it. It suggests another tag; **Use this tag anyway**

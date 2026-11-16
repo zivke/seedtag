@@ -91,6 +91,12 @@ data class TagCheck(
     val usable: Boolean get() = supported && writable && !tooSmall
 }
 
+/**
+ * What the tag I/O is doing right now, for the scan prompt: [step] of [of], or a single read when [of]
+ * is 0. [writes]: the operation changes the tag, so it mustn't be interrupted (no Cancel meanwhile).
+ */
+data class TagStep(val label: String, val step: Int = 0, val of: Int = 0, val writes: Boolean = false)
+
 sealed interface TagResult {
     data class Checked(val check: TagCheck) : TagResult
     /** [text] was written and read back. */
@@ -114,15 +120,20 @@ object TagIo {
 
     private const val NOT_READ = "Couldn't read the tag properly (it may have moved away too soon). Hold it still against the phone and try again."
 
-    fun perform(tag: Tag, request: TagRequest): TagResult = try {
+    /**
+     * Does [request] with [tag]. [report] is called with each [TagStep], the first one before any I/O
+     * (so the UI can say at once that the tag was found), on this thread.
+     */
+    fun perform(tag: Tag, request: TagRequest, report: (TagStep) -> Unit = {}): TagResult = try {
+        report(firstStep(tag, request))
         when (request) {
             TagRequest.Check -> check(tag)
-            is TagRequest.Write -> write(tag, request)
+            is TagRequest.Write -> write(tag, request, report)
             is TagRequest.CheckWritten -> checkWritten(tag, request.expected)
             TagRequest.Read -> read(tag)
-            is TagRequest.Lock -> lock(tag, request.expected)
+            is TagRequest.Lock -> lock(tag, request.expected, report)
             TagRequest.Inspect -> inspect(tag)
-            is TagRequest.Erase -> erase(tag, request.target)
+            is TagRequest.Erase -> erase(tag, request.target, report)
         }
     } catch (e: TagLostException) {
         TagResult.Failed("The tag moved away too early. Hold it still against the phone and try again.")
@@ -140,7 +151,22 @@ object TagIo {
         TagResult.Failed("Something went wrong talking to the tag (${e.javaClass.simpleName}). Try again.")
     }
 
-    private fun write(tag: Tag, req: TagRequest.Write): TagResult {
+    /** No I/O: what [perform] starts with, and how many steps the request takes on this tag. */
+    private fun firstStep(tag: Tag, request: TagRequest): TagStep = when (request) {
+        TagRequest.Check, TagRequest.Inspect, TagRequest.Read -> TagStep("Reading the tag")
+        is TagRequest.CheckWritten -> TagStep("Reading the backup back to check it")
+        is TagRequest.Write -> TagStep(CHECKING, 1, if (Ndef.get(tag) == null) WRITE_BLANK_STEPS else WRITE_STEPS, writes = true)
+        is TagRequest.Lock -> TagStep(CHECKING, 1, LOCK_STEPS, writes = true)
+        is TagRequest.Erase -> TagStep(CHECKING, 1, ERASE_STEPS, writes = true)
+    }
+
+    private const val CHECKING = "Checking the tag"
+    private const val WRITE_BLANK_STEPS = 2
+    private const val WRITE_STEPS = 3
+    private const val LOCK_STEPS = 2
+    private const val ERASE_STEPS = 5
+
+    private fun write(tag: Tag, req: TagRequest.Write, report: (TagStep) -> Unit): TagResult {
         val message = NdefMessage(NdefRecord.createTextRecord("en", req.text))
         val ndef = Ndef.get(tag)
         if (ndef == null) {
@@ -151,6 +177,7 @@ object TagIo {
             val needed = message.byteArrayLength
             val capacity = blankCapacity(tag)
             if (capacity != null && needed > capacity) return TagResult.Failed(tooSmall(req.text, needed, capacity, estimated = true))
+            report(TagStep("Formatting the tag and writing the backup", 2, WRITE_BLANK_STEPS, writes = true))
             try {
                 formatable.use { it.connect(); it.format(message) }
             } catch (e: TagLostException) {
@@ -182,6 +209,7 @@ object TagIo {
                 }
             }
             val overwriting = existing != null && existing.records.any { r -> r.tnf != NdefRecord.TNF_EMPTY }
+            report(TagStep("Writing the backup", 2, WRITE_STEPS, writes = true))
             try {
                 it.writeNdefMessage(message)
             } catch (e: IOException) {
@@ -194,6 +222,7 @@ object TagIo {
             }
             // Read back over the same connection; getNdefMessage() re-reads the tag. Not the
             // cached message: that's what the tag held before this write.
+            report(TagStep("Reading it back to check it", 3, WRITE_STEPS, writes = true))
             val back = it.ndefMessage ?: it.ndefMessage
                 ?: return TagResult.WrittenUnchecked(req.text) // couldn't read: check on the next tap
             if (firstText(back) != req.text) return TagResult.Failed("What was read back doesn't match what was written. The tag may be faulty – don't use it.")
@@ -261,7 +290,7 @@ object TagIo {
      * the whole NDEF area is first filled by one record of zeros exactly [Ndef.getMaxSize] long
      * (read back to be sure), and only then is the empty message written.
      */
-    private fun erase(tag: Tag, target: OverwriteTarget): TagResult {
+    private fun erase(tag: Tag, target: OverwriteTarget, report: (TagStep) -> Unit): TagResult {
         val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
         ndef.use {
             it.connect()
@@ -276,6 +305,7 @@ object TagIo {
             }
             if (!it.isWritable) return TagResult.Failed("This tag is read-only: it can't be erased.")
             val filler = fillerFor(it.maxSize)
+            report(TagStep("Overwriting it with zeros", 2, ERASE_STEPS, writes = true))
             try {
                 it.writeNdefMessage(filler)
             } catch (e: IOException) {
@@ -284,13 +314,16 @@ object TagIo {
                         "here can tell how much: Cancel, scan the tag again and erase it again.",
                 )
             }
+            report(TagStep("Reading the zeros back", 3, ERASE_STEPS, writes = true))
             val back = it.ndefMessage
             if (back == null || !back.toByteArray().contentEquals(filler.toByteArray())) {
                 return TagResult.Failed(
                     "Couldn't confirm that the whole tag was overwritten. Hold the same tag still and tap again to finish.",
                 )
             }
+            report(TagStep("Emptying the tag", 4, ERASE_STEPS, writes = true))
             it.writeNdefMessage(EMPTY)
+            report(TagStep("Checking that it's empty", 5, ERASE_STEPS, writes = true))
             val after = it.ndefMessage
             if (after != null && !isEmpty(after)) {
                 return TagResult.Failed("The tag was overwritten with zeros but isn't empty yet. Hold the same tag still and tap again to finish.")
@@ -352,7 +385,7 @@ object TagIo {
         }
     }
 
-    private fun lock(tag: Tag, expected: String): TagResult {
+    private fun lock(tag: Tag, expected: String, report: (TagStep) -> Unit): TagResult {
         val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
         ndef.use {
             it.connect()
@@ -370,6 +403,7 @@ object TagIo {
                         "and 2 tags (NTAG, MIFARE Ultralight). Nothing was changed.",
                 )
             }
+            report(TagStep("Making it read-only", 2, LOCK_STEPS, writes = true))
             return if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Locking failed. The tag is unchanged.")
         }
     }
