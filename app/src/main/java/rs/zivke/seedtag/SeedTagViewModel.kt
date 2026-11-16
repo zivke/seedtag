@@ -74,6 +74,8 @@ sealed interface Dialog {
     data class ConfirmNewPassphrase(val generated: Boolean) : Dialog
     /** Back would drop what was entered: [toWords] for the Password step's Back (clears the passwords), else leaving the app. */
     data class ConfirmBack(val toWords: Boolean) : Dialog
+    /** The Words step's Clear would drop the [count] words entered so far. */
+    data class ConfirmClearWords(val count: Int) : Dialog
     /** Switching to tab [to] would hide the restored [words] and/or clear a typed [password]. */
     data class ConfirmTab(val to: Screen, val words: Boolean, val password: Boolean) : Dialog
     /** Nothing was touched for [IDLE_WARN_MS] while secrets are in memory: they're wiped [IDLE_GRACE_MS] later. */
@@ -344,7 +346,18 @@ class SeedTagViewModel : ViewModel() {
         if (words.size < wordCount && Bip39.isWord(w)) { words += w; clearPrefix() }
     }
 
-    fun clearWords() { words.clear(); clearPrefix() }
+    /** The Words step's Clear: asks first ([Dialog.ConfirmClearWords]) when there are words to lose. */
+    fun requestClearWords() {
+        if (words.isEmpty()) clearWords() else dialog = Dialog.ConfirmClearWords(words.size)
+    }
+
+    /** "Clear words" in [Dialog.ConfirmClearWords]. */
+    fun confirmClearWords() {
+        dialog = null
+        clearWords()
+    }
+
+    private fun clearWords() { words.clear(); clearPrefix() }
 
     /** Word counts the checked tag has room for (all of them if its size is unknown). */
     fun fitsTag(n: Int): Boolean = tagCheck?.maxWords?.let { n <= it } ?: true
@@ -827,7 +840,7 @@ class SeedTagViewModel : ViewModel() {
         clearPasswords(PwField.Read, PwField.Erase); restoredWords = null
         val d = dialog
         if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
-            d is Dialog.ConfirmBack || d is Dialog.ConfirmTab || d == Dialog.StillThere
+            d is Dialog.ConfirmBack || d is Dialog.ConfirmTab || d is Dialog.ConfirmClearWords || d == Dialog.StillThere
         ) dialog = null
     }
 

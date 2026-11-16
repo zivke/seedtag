@@ -299,11 +299,11 @@ fun SeedTagApp(
     var actionsDone by remember { mutableIntStateOf(0) }
     LaunchedEffect(prompting) { if (!prompting) actionsDone++ }
     // What's behind some prompts (words, a password) is blurred while they're up: "Still there?" (nobody
-    // is watching the screen, which is kept on), the two Back questions, the tab-switch question, the
-    // progress dialog and "Ready to scan" (the phone is held to a tag, often in view of others). Blur needs
-    // Android 12; before that, it's covered.
+    // is watching the screen, which is kept on), the two Back questions, the tab-switch and clear-words
+    // questions, the progress dialog and "Ready to scan" (the phone is held to a tag, often in view of
+    // others). Blur needs Android 12; before that, it's covered.
     val veiled = vm.busy != null || vm.scanPrompt != null ||
-        vm.dialog.let { it == Dialog.StillThere || it is Dialog.ConfirmBack || it is Dialog.ConfirmTab }
+        vm.dialog.let { it == Dialog.StillThere || it is Dialog.ConfirmBack || it is Dialog.ConfirmTab || it is Dialog.ConfirmClearWords }
     val blurs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     Box(if (veiled && blurs) Modifier.blur(20.dp) else Modifier) {
         CompositionLocalProvider(
@@ -1146,7 +1146,7 @@ private fun WordsStep(vm: SeedTagViewModel) {
             Keypad(onLetter = vm::typeLetter, onBackspace = vm::backspace, onBackspaceHeld = vm::backspaceLetter)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = vm::backToLength) { Text("Back") }
-                TextButton(onClick = vm::clearWords, enabled = vm.words.isNotEmpty()) { Text("Clear") }
+                TextButton(onClick = vm::requestClearWords, enabled = vm.words.isNotEmpty()) { Text("Clear") }
                 Spacer(Modifier.weight(1f))
                 Button(onClick = vm::toPasswordStep, enabled = vm.mnemonicStatus is MnemonicStatus.Valid, modifier = Modifier.height(48.dp)) {
                     Text("Next")
@@ -2208,6 +2208,20 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
                 }
             },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Stay") } },
+        )
+        is Dialog.ConfirmClearWords -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            icon = { WarningIcon() },
+            title = { Text(if (d.count == 1) "Clear the word?" else "Clear all ${d.count} words?") },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    (if (d.count == 1) "This removes the word entered so far." else "This removes all ${d.count} words entered so far.") +
+                        " They aren't kept anywhere: you'll have to type them again from the start.",
+                )
+            },
+            confirmButton = { TextButton(onClick = vm::confirmClearWords) { DangerText("Clear words") } },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text(if (d.count == 1) "Keep it" else "Keep them") } },
         )
         is Dialog.ConfirmTab -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
