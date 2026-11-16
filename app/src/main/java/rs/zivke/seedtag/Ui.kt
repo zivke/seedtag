@@ -299,11 +299,11 @@ fun SeedTagApp(
     var actionsDone by remember { mutableIntStateOf(0) }
     LaunchedEffect(prompting) { if (!prompting) actionsDone++ }
     // What's behind some prompts (words, a password) is blurred while they're up: "Still there?" (nobody
-    // is watching the screen, which is kept on), the two Back questions, the progress dialog and "Ready to
-    // scan" (the phone is held to a tag, often in view of others). Blur needs Android 12; before that,
-    // it's covered.
+    // is watching the screen, which is kept on), the two Back questions, the tab-switch question, the
+    // progress dialog and "Ready to scan" (the phone is held to a tag, often in view of others). Blur needs
+    // Android 12; before that, it's covered.
     val veiled = vm.busy != null || vm.scanPrompt != null ||
-        vm.dialog.let { it == Dialog.StillThere || it is Dialog.ConfirmBack }
+        vm.dialog.let { it == Dialog.StillThere || it is Dialog.ConfirmBack || it is Dialog.ConfirmTab }
     val blurs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     Box(if (veiled && blurs) Modifier.blur(20.dp) else Modifier) {
         CompositionLocalProvider(
@@ -435,7 +435,7 @@ private fun ModeSwitch(vm: SeedTagViewModel) {
         Screen.entries.forEachIndexed { i, t ->
             SegmentedButton(
                 selected = vm.tab == t,
-                onClick = { vm.tab = t },
+                onClick = { vm.selectTab(t) },
                 shape = SegmentedButtonDefaults.itemShape(i, Screen.entries.size),
                 icon = {},
                 colors = SegmentedButtonDefaults.colors(
@@ -1440,7 +1440,7 @@ private fun StrengthMeter(bits: Int, generated: Boolean) {
 private fun DoneStep(vm: SeedTagViewModel) {
     StepScreen(
         bottom = {
-            PrimaryButton("Verify now", { vm.tab = Screen.Verify })
+            PrimaryButton("Verify now", { vm.selectTab(Screen.Verify) })
             SecondaryButton("Back up another seed", vm::startOver)
         },
     ) {
@@ -2207,6 +2207,29 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
                     DangerText(if (d.toWords) "Clear and go back" else "Leave")
                 }
             },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Stay") } },
+        )
+        is Dialog.ConfirmTab -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            icon = { WarningIcon() },
+            title = { Text(if (d.words) "Hide the restored words?" else "Clear the password?") },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    when {
+                        d.words && d.password ->
+                            "Switching to ${d.to.title} hides the restored words and clears the password you typed. " +
+                                "Neither is kept anywhere: to see the words again, restore the tag once more."
+                        d.words ->
+                            "Switching to ${d.to.title} hides the restored words. They aren't kept anywhere: to see " +
+                                "them again, restore the tag once more."
+                        else ->
+                            "Switching to ${d.to.title} clears the password you typed. It isn't kept anywhere: " +
+                                "you'll have to type it again."
+                    },
+                )
+            },
+            confirmButton = { TextButton(onClick = { vm.confirmTab(d.to) }) { DangerText("Clear and switch") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Stay") } },
         )
         Dialog.StillThere -> AlertDialog(

@@ -20,6 +20,9 @@ All notable user-visible changes to SeedTag. The format follows
   still goes on (for practice, say).
 
 ### Changed
+- Switching tabs clears a password typed on Verify, Restore or Erase and
+  hides restored words, so they don't stay in memory behind another tab.
+  When there's one to lose, the app asks first.
 - Less library code runs: nothing starts by itself at launch any more (no
   startup provider, so no emoji font lookup in Play services, no profile
   installer and its receiver, no component factory); the APK declares only

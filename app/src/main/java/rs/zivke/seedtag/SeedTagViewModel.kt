@@ -74,6 +74,8 @@ sealed interface Dialog {
     data class ConfirmNewPassphrase(val generated: Boolean) : Dialog
     /** Back would drop what was entered: [toWords] for the Password step's Back (clears the passwords), else leaving the app. */
     data class ConfirmBack(val toWords: Boolean) : Dialog
+    /** Switching to tab [to] would hide the restored [words] and/or clear a typed [password]. */
+    data class ConfirmTab(val to: Screen, val words: Boolean, val password: Boolean) : Dialog
     /** Nothing was touched for [IDLE_WARN_MS] while secrets are in memory: they're wiped [IDLE_GRACE_MS] later. */
     data object StillThere : Dialog
     /**
@@ -115,14 +117,40 @@ private data class Pending(val request: TagRequest, val purpose: Purpose, val id
 
 class SeedTagViewModel : ViewModel() {
 
-    private var shownTab by mutableStateOf(Screen.Backup)
-    /** The tab shown. Leaving Erase starts it afresh: its scan canceled, its password and result gone. */
-    var tab: Screen
-        get() = shownTab
-        set(value) {
-            if (shownTab == Screen.Erase && value != Screen.Erase) resetErase()
-            shownTab = value
+    /** The tab shown; changed with [selectTab]. */
+    var tab by mutableStateOf(Screen.Backup)
+        private set
+
+    /**
+     * A tab was tapped. Leaving a tab clears its secrets: Verify and Restore lose the typed password,
+     * Restore hides the restored words, Erase loses its password (and starts afresh: scan canceled,
+     * result gone). If any of that is in memory, ask first ([Dialog.ConfirmTab]).
+     */
+    fun selectTab(to: Screen) {
+        if (to == tab) return
+        val words = tab == Screen.Restore && restoredWords != null
+        val password = when (tab) {
+            Screen.Verify, Screen.Restore -> !readPassword.isEmpty()
+            Screen.Erase -> !erasePassword.isEmpty()
+            Screen.Backup -> false
         }
+        if (words || password) dialog = Dialog.ConfirmTab(to, words, password) else switchTab(to)
+    }
+
+    /** "Clear and switch" in [Dialog.ConfirmTab]. */
+    fun confirmTab(to: Screen) {
+        dialog = null
+        switchTab(to)
+    }
+
+    private fun switchTab(to: Screen) {
+        when (tab) {
+            Screen.Verify, Screen.Restore -> { clearPasswords(PwField.Read); restoredWords = null }
+            Screen.Erase -> resetErase()
+            Screen.Backup -> Unit
+        }
+        tab = to
+    }
     /** An open top-bar page, or null for the tabs. */
     var page by mutableStateOf<Page?>(null)
 
@@ -799,7 +827,7 @@ class SeedTagViewModel : ViewModel() {
         clearPasswords(PwField.Read, PwField.Erase); restoredWords = null
         val d = dialog
         if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
-            d is Dialog.ConfirmBack || d == Dialog.StillThere
+            d is Dialog.ConfirmBack || d is Dialog.ConfirmTab || d == Dialog.StillThere
         ) dialog = null
     }
 
