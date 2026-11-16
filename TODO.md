@@ -128,6 +128,110 @@
 - [x] **#15 (Info): build checks.** `check-apk.sh` could reject `debuggable` / `testOnly` and extra
   components; check the two action SHAs by hand against their release tags.
 
+## Expert board (open items from [the 2026-11-16 expert board review](reports/2026-11-16-expert-board-review.md))
+
+Nothing was tested on a device; *(device)* marks items whose premise a device test must confirm first (the
+report's tests N1–N12, A1–A3, H1).
+
+### High
+
+- [ ] **B1: one GitHub account is a first-time installer's only channel and only anchor.** Partly expert #3 again
+  (the container's push credential stays, by decision); what's new is that release assets, notes and
+  `release-cert.sha256` hang on it too. Check what the container's credential can do; add a `v*` tag ruleset and
+  immutable releases; publish the certificate digest somewhere the account can't edit (F-Droid reproducible build,
+  or a personal site).
+
+### Medium
+
+- [ ] **B2: Lock probably leaves NTAG215/216 data pages writable** *(device: N1)*. Read the lock bytes back after
+  every Lock and say "data locked" or "only marked read-only"; stop recommending 215/216 in the too-small hint and
+  correct README:434-436 until then. Write the real dynamic lock bytes on 215/216 on a branch, with spare tags.
+- [ ] **B3: an interrupted Lock leaves the tag half-locked and both messages are false** *(device: N3)*. Same
+  read-back; finish the lock with raw WRITEs; reword "unchanged" and "SeedTag didn't change it". Do the read-back
+  now, not after `tag-write-password` (it needs only READs).
+- [ ] **B4: the process outlives the wipe.** Correct README:592 ("Everything is dropped") now and advise a
+  force-stop or restart. Decide whether to end the process in `onStop`, only when no tag I/O is pending, and what
+  Done and Verify show afterwards.
+- [ ] **B5: salt and nonce are a 28-byte covert channel `verify` can't detect.** Reword README step 5 now (it
+  rules out a weak key, not a hidden channel). Deriving them from the secrets is a format decision: it makes
+  password guesses cheap for anyone who knows the seed. Design review first.
+- [ ] **B6: the app never has the user compare the words it encrypts.** A review step before Password, or at least
+  "Restore once and compare every word" in the Done steps and the Verify checklist.
+- [ ] **B7: no path to a second tag; retyping the generated passphrase scores "Weak".** "Write the same backup to
+  another tag" after Done and Verify (ciphertext only); README: identical copies are fine.
+- [ ] **B8: one Base64 typo in `seedtag.py` looks like a wrong password.** A non-secret check value of the text in
+  the app and the tool; plain error messages; re-pad and accept `-_`; accept a file; shared `blob-text.tsv`.
+- [ ] **B9: custody model and heir instructions not written down.** README "What the tag is for" with a loss
+  table; two password copies, never with a tag; a printable heir sheet.
+- [ ] **B10: `seedtag.py` long-term.** Drop `from __future__ import annotations`; catch any backend exception and
+  fall back to the built-in code; `--builtin`; the `-I -S` hint in the failure message; CI on the newest Python
+  with `-W error`.
+- [ ] **B11: the APK-to-tag binding is one person reading a run header.** Build-provenance attestation checked by
+  `sign-release.sh`, or a host rebuild from a throwaway clone for `--expect`.
+- [ ] **B12: raw empty check and format guard skip non-NXP Type 2 tags** *(device: N4)*. Raw reads through `NfcA`.
+- [ ] **B13: Erase over-promises.** "The tag's whole NDEF area was overwritten and read back"; erasing doesn't undo
+  copies already read (move the funds if the password may be known); replace a backup by writing over it.
+- [ ] **B14: reproducibility not shown since the toolchain bump.** Run CI on `develop`, compare with `make build`,
+  record both hashes; repeat after every toolchain change.
+- [ ] **B15: tag results read live view-model fields.** Carry fingerprint, target and text in the request and
+  result; `Failed` with `changedTag`, always shown; `resetErase()` and closing ConfirmErase / ConfirmLock in
+  `wipeAll()`; a dialog priority queue; clear stale Done / Verified after Erase.
+- [ ] **B16: no automated tests for the tag flow.** Pure helpers into `core` with tests, then the `TagFlow` reducer
+  (the TODO lines on the state machine say both "before" and "after" the branch merge: pick one).
+- [ ] **B17: `tag-write-password` drift and design gaps.** Drop `7e99a92`, re-apply `c235d3c`, land the pure
+  additions first; fresh-tap check before "Protected"; compare all of CFG0/CFG1; map a NAK after AUTH to "wrong
+  key"; Erase aware of protection; README: the NTAG password goes over the air in the clear.
+- [ ] **B18: no key-loss, rotation or succession plan.** Write it (backups, spare certificate, `apksigner rotate`
+  and minSdk); explicit signature-scheme flags; "If SeedTag is abandoned"; SECURITY.md, CONTRIBUTING.md.
+- [ ] **B19: third-party licence texts not shipped.** `LICENSES/` (REUSE), an "Open-source licences" section in
+  About, `THIRD-PARTY.md`, the GPL text reachable from About.
+
+### Medium-Low and Low
+
+- [ ] **B20: Erase edge cases** *(device: N5, N6)*. Shared probe for `check()` and `inspect()`; continue an
+  interrupted erase (no message, raw length 0, same UID); wrap the final empty write; confirmed re-format for CC
+  E1h without an NDEF TLV; clear the erase password on "Don't check the password".
+- [ ] **B21: no known-answer self-test** for Argon2id and AES-GCM before the first seal.
+- [ ] **B22: write down the format envelope** a v2 must keep; `FORMAT.md` and the vectors under 0BSD or CC0.
+- [ ] **B23: system screen readers and accessibility overlays are outside every warning.** Neutral notice when any
+  service or touch exploration is on; README line on accessibility overlays.
+- [ ] **B24: adb can probably mirror secure windows on Android ≤ 11.** Say so in the debugging notice and README.
+- [ ] **B25: Android 16 ignores the portrait lock on large screens** *(device: A2)*. `field` into the view model;
+  veil on `onPause` without focus.
+- [ ] **B26: seed words may be clipped at large font sizes** *(device: H1)*. Two columns when needed.
+- [ ] **B27: Restore and `decrypt` end at the words.** "BIP39 words only, no wallet passphrase or account"; a
+  better checksum message for non-BIP39 phrases; "not your wallet's fingerprint".
+- [ ] **B28: not ready for screen readers** *(device: A3)*. Content descriptions and roles, announcements, idle
+  timer on accessibility actions, README "Accessibility".
+- [ ] **B29: settings links wipe secrets without warning, and two of them can crash.** Leave dialog while
+  `holdsSecrets`; `runCatching` with `ACTION_SETTINGS` as fallback.
+- [ ] **B30: the typed-back passphrase check can be got around** (Show during Repeat; editing after "Show it
+  again").
+- [ ] **B31: warning fatigue; idle timeout short for Restore.**
+- [ ] **B32: a refused write reads as "moved away"; one bad read-back calls the tag faulty** *(device: N10)*.
+- [ ] **B33: SDK, JDK and apt not pinned; AGP may download SDK packages.**
+- [ ] **B34: RELEASING.md:129-133 stale** ("0.4.3"; add the Dockerfile and the metadata `<configuration>` block).
+- [ ] **B35: one Gradle cache volume shared by every project's container** (`gradle-cache-${devcontainerId}`).
+- [ ] **B36: gaps in `check-apk.sh`, `check-workflows.py` and the metadata `<configuration>` check.**
+- [ ] **B37: no CI on branch pushes** (tests-only workflow).
+- [ ] **B38: reproducible only in this image; nothing durable recorded per release** (`keepDebugSymbols`,
+  `.gitattributes`, unsigned hash and `seedtag.py` in the release, README verification section).
+- [ ] **B39: licence headers and provenance** (`REUSE.toml`, missing headers, wordlist source and licence).
+- [ ] **B40: storage advice** (heat, wireless chargers, bending, refresh every ~5 years).
+- [ ] **B41: wording and numbers** (111/91 vs ~114/~94, step order in "Using it", one name for Lock, "Verified"
+  for a different seed).
+- [ ] **B42: unexpected exceptions in the Argon2 paths crash the app** (one `runKdf` helper; map
+  `GeneralSecurityException`).
+- [ ] **B43: dialog guards applied late and to the root view only.**
+- [ ] **B44: branch hygiene.** Delete `toolchain-update` and `dependency-trim`; merge `main` into `develop`.
+- [ ] **B45: "Wrong password, or the tag data is corrupted" is a dead end** (hints).
+- [ ] **B46: small screens, contrast, English-only strings.**
+- [ ] **B47: test gaps** (wordlist hash, `NdefText` paths, long and non-BMP password vectors, a differential test).
+- [ ] **Info I1–I14:** see the report; none needs action before the items above.
+- [ ] **Owner questions** (report, last section): 0.4.2 signed from a CI build with a matching hash? The
+  container credential's scope; F-Droid; keystore backups and succession; Lock on unconfirmed chips; blocking
+  "destroyed content" messages; a trademark check on the name.
+
 ## App and docs
 
 - [x] Make the on-screen warnings more prominent.
