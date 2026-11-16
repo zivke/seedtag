@@ -25,6 +25,12 @@ All notable user-visible changes to SeedTag. The format follows
   still goes on (for practice, say).
 
 ### Changed
+- The *Before you start* checklist on Back up, Verify and Restore now
+  starts, right after *Read every screen carefully*, with *Safest on a
+  spare phone*: its *Learn more* explains why a phone that's never online
+  is safest and how to prepare one, and points to *Go offline first* for
+  using your everyday phone offline, which now also says what that can't
+  protect against. The About page has the same explanation.
 - Switching tabs clears a password typed on Verify, Restore or Erase and
   hides restored words, so they don't stay in memory behind another tab.
   When there's one to lose, the app asks first.

@@ -267,7 +267,8 @@ seed. From safest down:
    too: it should hold one Text record and nothing else. [The dependency report](reports/2026-11-14-dependency-risk.md)
    lists what else a poisoned library could do.
 
-The Back up, Verify and Restore screens remind you of this, say whether airplane mode is on, and warn when USB or
+The Back up, Verify and Restore screens remind you of this (*Safest on a spare phone*, second in their checklist,
+explains it under *Learn more*, and so does the About page), say whether airplane mode is on, and warn when USB or
 wireless debugging is on. Android lets the app see those settings without any permission, but not Wi-Fi or Bluetooth,
 so those you have to check yourself. The accessibility banner also updates while SeedTag is open, not only when you
 come back to it.

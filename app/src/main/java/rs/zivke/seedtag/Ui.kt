@@ -849,10 +849,11 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
             Tone.Caution,
             "Go offline first",
             "SeedTag can't go online, but other apps on this phone can – and malware could send out whatever you type or see here.",
-            "The safest way to use this application is on a spare phone that's never online. If you don't have " +
-                "one, you can also use your everyday phone, but be aware that it carries a risk that can be reduced, " +
-                "not completely removed, by doing the following: restart the phone, turn on airplane mode and check " +
-                "that Wi-Fi and Bluetooth are off (NFC normally stays on). When you're done, $restart",
+            "On a spare phone that's never online, nothing can be sent out anyway. On your everyday phone, this " +
+                "reduces the risk but can't remove it: restart the phone, turn on airplane mode and check that Wi-Fi " +
+                "and Bluetooth are off (NFC normally stays on). When you're done, $restart That stops malware that " +
+                "sends data out right away, but not malware that survives the restart and sends what it caught later: " +
+                "only a phone that's never online protects against that.",
         )
     }
     val items = buildList {
@@ -865,6 +866,7 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
                     "undone.",
             ),
         )
+        add(Item(Tone.Caution, SPARE_PHONE_TITLE, SPARE_PHONE_SUMMARY, SPARE_PHONE_DETAILS))
         if (flow == Flow.Restore) {
             add(
                 Item(
@@ -976,6 +978,25 @@ private fun BackupScreen(vm: SeedTagViewModel) {
         BackupStep.Done -> DoneStep(vm)
     }
 }
+
+/** The checklist item that comes right after "Read every screen carefully", and the About section. */
+private const val SPARE_PHONE_TITLE = "Safest on a spare phone"
+private const val SPARE_PHONE_SUMMARY =
+    "Use SeedTag on a spare phone that's never online, not on the phone you use every day."
+private const val SPARE_PHONE_DETAILS =
+    "SeedTag itself can't go online, but other apps on the same phone can. If one of them is malware, it could " +
+        "capture the words you type in Back up, see them on the Restore screen, or catch the password you type in " +
+        "Verify – and the password plus the tag is the seed. An everyday phone has many apps and accounts and is " +
+        "online almost all the time, so that risk can't be ruled out there.\n\n" +
+        "A spare phone that's never online removes it: whatever might be on it has no way to send anything out. Any " +
+        "old Android phone will do, though Android 12 and later hide other apps' overlays and Android 14 and later " +
+        "also shut out accessibility services. To prepare it, while it may still go online: install all system " +
+        "updates, then factory-reset it. In setup, skip Wi-Fi and don't add an account, and take the SIM out. Copy " +
+        "SeedTag over by USB or an SD card instead of downloading it on the phone, and leave Developer options off. " +
+        "From then on it never goes online. Keep it in a drawer for the yearly Verify, and factory-reset it before it " +
+        "ever goes online again or is given away.\n\n" +
+        "If you don't have a spare phone, you can use your everyday phone offline. That's less safe: Go offline first, " +
+        "in the checklist on Back up, Verify and Restore, says how and what it can't protect against."
 
 private const val DISCLAIMER =
     "SeedTag comes without any warranty, and its developer isn't responsible for any loss or damage resulting from " +
@@ -1967,6 +1988,7 @@ private fun AboutPage() {
             )
         }
         Column {
+            AboutSection(SPARE_PHONE_TITLE, SPARE_PHONE_SUMMARY + "\n\n" + SPARE_PHONE_DETAILS)
             AboutSection(
                 "Open source",
                 "SeedTag's full source code, including seedtag.py, is public on GitHub, so anyone can check what it " +
