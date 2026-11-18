@@ -20,8 +20,8 @@ All notable user-visible changes to SeedTag. The format follows
   it, after asking you.
 - As soon as the phone finds the tag, it buzzes once and the scan window
   says *Tag found*, with what's being done and, for writing, erasing or
-  locking a tag, which step it's on, until it's done or fails. So you know
-  you've found the NFC spot and to keep the tag there. While a tag is being
+  making a tag read-only, which step it's on, until it's done or fails. So
+  you know you've found the NFC spot and to keep the tag there. While a tag is being
   written, the window has no Cancel: the write can't be stopped halfway.
 - Back up warns when the tag you check is MIFARE Classic: many phones can't
   read it at all, so a backup on it might not be readable on the phone you
@@ -29,6 +29,15 @@ All notable user-visible changes to SeedTag. The format follows
   still goes on (for practice, say).
 
 ### Changed
+- Making a tag read-only has one name everywhere: the confirm button says
+  *Make read-only* instead of *Lock forever*, the result *Tag is now
+  read-only*, and the Verify section *Make it read-only*. A Verify or
+  Restore that finds a different seed from the backup just written is
+  headed *Not the backup you just wrote* instead of *Verified* or
+  *Restored*. README: the space table gives the exact byte counts the app
+  checks (111 for 24 words, not ~114), for every phrase length, and *Using
+  it* lists Restore before making the tag read-only, as the recommended
+  procedure does.
 - Restore and `seedtag.py decrypt` now say, next to the words, that only
   the seed's words are stored: a wallet passphrase (a "25th word") isn't,
   and a wallet can also look empty when the funds are under another account

@@ -222,7 +222,7 @@ report's tests N1–N12, A1–A3, H1).
   `.gitattributes`, unsigned hash and `seedtag.py` in the release, README verification section).
 - [ ] **B39: licence headers and provenance** (`REUSE.toml`, missing headers, wordlist source and licence).
 - [ ] **B40: storage advice** (heat, wireless chargers, bending, refresh every ~5 years).
-- [ ] **B41: wording and numbers** (111/91 vs ~114/~94, step order in "Using it", one name for Lock, "Verified"
+- [x] **B41: wording and numbers** (111/91 vs ~114/~94, step order in "Using it", one name for Lock, "Verified"
   for a different seed).
 - [ ] **B42: unexpected exceptions in the Argon2 paths crash the app** (one `runKdf` helper; map
   `GeneralSecurityException`).

@@ -404,7 +404,7 @@ object TagIo {
                 )
             }
             report(TagStep("Making it read-only", 2, LOCK_STEPS, writes = true))
-            return if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Locking failed. The tag is unchanged.")
+            return if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Making it read-only failed. The tag is unchanged.")
         }
     }
 

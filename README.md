@@ -289,7 +289,7 @@ The safest way to use SeedTag, from start to finish:
    [Signing a release](#signing-a-release)). Copy it to the phone over USB file transfer or an SD card, install it
    with the Files app, then turn *Install unknown apps* off again for that app. Leave Developer options off.
 3. **Practise with a throwaway seed and a spare tag**, for example a [Trezor test phrase](https://github.com/trezor/python-mnemonic/blob/master/vectors.json):
-   back up, verify, restore and make the spare tag read-only, so you know every screen and what the lock does.
+   back up, verify, restore and make the spare tag read-only, so you know every screen and what making a tag read-only does.
 4. **The real backup**, in a private room with no cameras: airplane mode on, Wi-Fi and Bluetooth off, NFC on.
    - **Back up** with the generated passphrase. Write it down and label it "SeedTag password".
    - **Verify**, typing the password from your written copy: ✓, and note the fingerprint.
@@ -299,9 +299,9 @@ The safest way to use SeedTag, from start to finish:
    on any phone: it holds only ciphertext. It should hold one Text record and nothing else. Move the Base64 text to
    an offline computer (a live USB system is ideal) and run `python3 -I -S seedtag.py verify <BASE64>`: it must
    print the same fingerprint.
-6. **Lock last; it's permanent.** Only after steps 4 and 5 pass, use **Make tag read-only**. A write password for
-   the tag is planned; once it's in the app, its instructions here will say where it fits, before the read-only
-   lock.
+6. **Read-only comes last; it's permanent.** Only after steps 4 and 5 pass, use **Make tag read-only**. A write
+   password for the tag is planned; once it's in the app, its instructions here will say where it fits, before
+   making the tag read-only.
 7. **Make at least two tags** this way and keep them in different places, out of strangers' reach (a metal box or
    shielding sleeve). Keep your paper or metal copy of the seed too, somewhere else again. Keep the written
    password apart from the tags, together with a copy of `seedtag.py` (printed or on a USB stick).
@@ -312,13 +312,13 @@ The safest way to use SeedTag, from start to finish:
 ## Using it
 
 **Read every instruction on screen carefully before you actually do anything**, including the *Learn more*
-details. Some steps, such as overwriting or locking a tag, can't be undone.
+details. Some steps, such as overwriting a tag or making it read-only, can't be undone.
 
 **Have the NFC tag ready before you start, but hold it to the phone only when the app asks.** You don't need to
 hold it while you read or type: the app only reads or writes the tag while it's held there. When asked, hold it
 flat against the back of the phone, over its NFC spot (usually near the middle or the top), and keep it still until
 the app says it's done. As soon as the phone finds the tag, it buzzes once and *Ready to scan* turns into *Tag
-found*, with what's being done and, for a write, erase or lock, the step it's on (Erase takes five). While a tag is
+found*, with what's being done and, for writing, erasing or making a tag read-only, the step it's on (Erase takes five). While a tag is
 being written there's no Cancel: the write can't be stopped halfway, and moving the tag away is what would leave the
 job half-done (Cancel comes back if a step hangs for 15 seconds). If it moves away too early, just hold it there again. A thick or metal case can block it.
 Small tags and rings have a small NFC symbol on them: put that side right against the spot. Not sure where the spot
@@ -361,14 +361,15 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    to make sure the tag still reads.
    If the password is wrong, the app tries it again without extra spaces, then in lower case, and tells you if that
    worked, so you can correct your written copy.
-3. Optionally recover once with `seedtag.py` on an offline computer.
-4. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
+3. **Restore**: same as Verify, but the words are shown. After a backup, restore once and compare every word with
+   your paper copy of the seed: that catches a mistyped word that still passes the checksum. They're only the seed's
+   words: if your wallet also used a passphrase of its own (a "25th word"), it isn't on the tag, and without it the
+   wallet opens empty. A wallet can also look empty when the funds are under another account or address type: check
+   its settings before you assume anything is lost. The app and `seedtag.py decrypt` say this next to the words.
+4. Optionally recover once with `seedtag.py` on an offline computer.
+5. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
    It stops the backup from being overwritten or erased, but not, on most chips, from being locked against reading
    by someone who gets hold of the tag (see [Choosing a tag](#choosing-a-tag)).
-5. **Restore**: same as Verify, but the words are shown. They're only the seed's words: if your wallet also used a
-   passphrase of its own (a "25th word"), it isn't on the tag, and without it the wallet opens empty. A wallet can
-   also look empty when the funds are under another account or address type: check its settings before you assume
-   anything is lost. The app and `seedtag.py decrypt` say this next to the words.
 6. **Erase**, the fourth tab, to retire a tag or reuse it. Scan it first (nothing is written): the app
    shows what it holds, a SeedTag backup, other data or nothing, and whether it can be erased at all (a read-only
    tag can't). For a backup you can **Check the password first**: the app decrypts what it just read (no second
@@ -418,13 +419,16 @@ and -V. Back up checks the tag's size before anything is typed, and every write 
 NDEF-formatted) Type 2 tag has no size on it, so the app works it out from the chip's memory for MIFARE Ultralight,
 Ultralight C, EV1 and AES, NTAG203 and NTAG21x; for any other blank tag the size is only known once it's formatted. Tested hardware: MIFARE Ultralight C.
 
-**Space needed** (whole NDEF area, including the 3-byte TLV wrapper):
+**Space needed** (the NDEF message: what the app and Android call the tag's NDEF space, and what Back up's size
+check compares; in the chip's raw memory, the TLV wrapper around it takes 3 bytes more):
 
 | Words | Base64 on tag | NDEF bytes |
 |---|---|---|
-| 12 | 84 chars | ~94 |
-| 18 | 92 chars | ~102 |
-| 24 | 104 chars | ~114 |
+| 12 | 84 chars | 91 |
+| 15 | 88 chars | 95 |
+| 18 | 92 chars | 99 |
+| 21 | 100 chars | 107 |
+| 24 | 104 chars | 111 |
 
 **Data retention matters most.** A seed backup has to last. Cheap Type 2 chips (NTAG21x, Ultralight C/EV1) are
 rated for 10 years (at 22 °C), others for 25–60. Check the datasheet of the exact chip you buy: older revisions
@@ -453,16 +457,16 @@ copy among several, and verify it every now and then.
 ST25TV16K/64K for 40 y with 64-bit passwords (ST25TV16K is *not recommended for new designs*).
 
 SeedTag doesn't use any of these write protections yet: the payload is encrypted either way, and **Make tag
-read-only** is the only protection against overwriting. It doesn't protect everything: Android's read-only lock
+read-only** is the only protection against overwriting. It doesn't protect everything: Android's read-only setting
 freezes the data but, on NTAG21x and on Ultralight C tags formatted without NXP's Lock Control TLV, leaves the
 chip's own password settings open. Someone holding the tag for a few seconds can then set a read password of their
 own, and no phone can read the backup again. Nothing leaks, but that copy is lost. So keep the tag where strangers
 can't reach it (a metal box or a shielding sleeve also stops it being read from a distance), don't carry it
 around, and keep other copies of the seed. Only Ultralight C has been tested with SeedTag: try
 any other tag with your phone (write, verify, restore) before relying on it. **Make tag read-only** uses Android's
-own lock, which phones usually only offer for Type 1 and 2 tags (NTAG, MIFARE Ultralight): on the Type 4 and 5 tags
+own read-only function, which phones usually only offer for Type 1 and 2 tags (NTAG, MIFARE Ultralight): on the Type 4 and 5 tags
 above (NTAG 424 DNA, DESFire, ICODE, ST25TV) expect it to be refused (untested). If a tag is already read-only, the
-app says so and doesn't call it locked, since it can't tell whether that's permanent. A tag mounted on metal needs
+app says so and doesn't claim to have made it read-only, since it can't tell whether that's permanent. A tag mounted on metal needs
 an on-metal version.
 
 **Avoid:**
@@ -568,7 +572,7 @@ SeedTag can only protect you from what happens inside its own window, and only f
   apps* (the path varies by phone) and turn it off for every app you don't fully trust, or use a phone with
   Android 12+.
 - **Tapjacking.** An overlay can let your taps through while hiding what's underneath, to make you confirm
-  *Overwrite*, *Write anyway* or *Lock forever* without seeing it. SeedTag ignores every tap that comes through
+  *Overwrite*, *Write anyway* or *Make read-only* without seeing it. SeedTag ignores every tap that comes through
   another app's window, on every Android version, and shows a red banner saying so. On **Android 10 and 11**, where
   overlays can't be hidden, it also ignores taps while another app's window covers any part of SeedTag's, so an
   overlay can't hide a warning while leaving its button clear. Screen dimmers, blue-light

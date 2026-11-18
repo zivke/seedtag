@@ -702,8 +702,8 @@ class SeedTagViewModel : ViewModel() {
                 closePrompt()
                 _haptics.tryEmit(Haptic.Success)
                 dialog = Dialog.Info(
-                    "Tag locked",
-                    "The tag's data is now permanently read-only. Keep the tag where strangers can't reach it: on many " +
+                    "Tag is now read-only",
+                    "Its data can never be rewritten or erased. Keep the tag where strangers can't reach it: on many " +
                         "chips, someone holding it could still lock it against reading.",
                 )
             }

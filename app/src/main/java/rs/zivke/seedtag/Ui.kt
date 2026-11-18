@@ -862,7 +862,7 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
                 Tone.Caution,
                 "Read every screen carefully",
                 "Each one says exactly what to do. Read all of it, including every Learn more, before you actually " +
-                    "do anything – the details matter. Some steps, such as overwriting or locking a tag, can't be " +
+                    "do anything – the details matter. Some steps, such as overwriting a tag or making it read-only, can't be " +
                     "undone.",
             ),
         )
@@ -922,7 +922,7 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
                         "seed – without ever showing the words.",
                     "Type the password from your written copy, not from memory – that checks the copy too. You'll get ✓ " +
                         "and a fingerprint, and right after a backup, it also tells you whether the tag holds the seed you " +
-                        "just wrote. Verify after every backup, before you lock the tag and again every now and then (say, " +
+                        "just wrote. Verify after every backup, before you make the tag read-only and again every now and then (say, " +
                         "once a year) to make sure the tag still reads.",
                 ),
             )
@@ -1485,7 +1485,7 @@ private fun DoneStep(vm: SeedTagViewModel) {
         Notice(
             Tone.Caution,
             "Not finished yet",
-            "Verify the tag with the password from your written copy before you rely on it or lock it. Keep another " +
+            "Verify the tag with the password from your written copy before you rely on it or make it read-only. Keep another " +
                 "copy of the seed somewhere else, too – NFC chips can fail.",
         )
         SectionLabel("Next steps")
@@ -1495,7 +1495,7 @@ private fun DoneStep(vm: SeedTagViewModel) {
                 "Optionally, recover it on an offline computer with seedtag.py.",
                 "Keep a copy of seedtag.py (printed, or on a USB stick) with your written password: with Python, " +
                     "it's all anyone needs to recover the tag, even if SeedTag and its website are gone.",
-                "Only then lock the tag (on the Verify tab – it's permanent) and keep another backup of the seed somewhere else.",
+                "Only then make the tag read-only (on the Verify tab – it's permanent) and keep another backup of the seed somewhere else.",
             ),
         )
     }
@@ -1552,7 +1552,7 @@ private fun EraseScreen(vm: SeedTagViewModel) {
                     "Erasing overwrites the tag's whole data area with zeros, then reads it again, confirming the tag " +
                         "to be empty. It can't be undone. It clears only this tag: if someone copied the backup from it " +
                         "earlier, their copy isn't touched. You don't have to erase an old backup to write a new one: " +
-                        "Back up overwrites it, after asking you. A read-only (locked) tag can't be erased.",
+                        "Back up overwrites it, after asking you. A read-only tag can't be erased.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1589,7 +1589,7 @@ private fun EraseCheckResult(c: EraseCheck, verified: VerifyResult?) {
         !c.ndef -> Triple(Tone.Info, "Nothing to erase", "This tag is blank: it has never been formatted, so it holds no NDEF data.")
         !c.writable -> Triple(
             Tone.Caution, "Can't be erased",
-            "This tag is read-only. If it was locked, that's permanent: nothing can rewrite or erase it. To get rid of " +
+            "This tag is read-only. If it was made read-only for good, nothing can rewrite or erase it. To get rid of " +
                 "what it holds, destroy the tag (cut through its antenna and chip).",
         )
         verified != null -> Triple(Tone.Success, "Password checked", "Your password decrypts this tag to a valid ${verified.wordCount}-word seed.")
@@ -1669,8 +1669,17 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
     StepScreen(bottom = { SecondaryButton(if (reveal) "Restore another tag" else "Verify another tag", vm::readAnother) }) {
         Hero(
             if (differs) Tone.Caution else Tone.Success,
-            if (reveal) "Restored" else "Verified",
-            "Decrypted a ${result.wordCount}-word seed with a valid checksum.",
+            when {
+                differs -> "Not the backup you just wrote"
+                reveal -> "Restored"
+                else -> "Verified"
+            },
+            if (differs) {
+                "Decrypted a ${result.wordCount}-word seed with a valid checksum, but it's a different seed from the " +
+                    "backup written in this session."
+            } else {
+                "Decrypted a ${result.wordCount}-word seed with a valid checksum."
+            },
         )
         Facts(
             buildList {
@@ -1716,7 +1725,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                     "a different number.",
             )
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                SectionLabel("Lock the tag")
+                SectionLabel("Make it read-only")
                 Text(
                     "Once you're sure, you can make the tag read-only. That's permanent: its data can never be rewritten or " +
                         "erased. It doesn't stop someone who gets hold of the tag from locking it against reading with a " +
@@ -2378,7 +2387,7 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
                         "Only do this after you've successfully verified the backup with your written password.",
                 )
             },
-            confirmButton = { TextButton(onClick = vm::confirmLock) { DangerText("Lock forever") } },
+            confirmButton = { TextButton(onClick = vm::confirmLock) { DangerText("Make read-only") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
         )
     }
