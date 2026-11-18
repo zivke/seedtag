@@ -85,13 +85,9 @@ class MainActivity : ComponentActivity() {
                     nfcState = nfcState.value,
                     airplaneMode = airplaneMode.value,
                     debugging = debugging.value,
-                    openDeveloperSettings = {
-                        runCatching { startActivity(Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)) }
-                    },
                     overlayDetected = overlayDetected.value,
-                    openNfcSettings = { startActivity(Intent(Settings.ACTION_NFC_SETTINGS)) },
+                    openSettings = ::openSettings,
                     accessibilityApps = if (apps == accessibilityHidden.value) emptyList() else apps,
-                    openAccessibilitySettings = { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) },
                     hideAccessibilityBanner = { accessibilityHidden.value = apps },
                     leave = { finish() },
                 )
@@ -104,6 +100,20 @@ class MainActivity : ComponentActivity() {
             window.decorView.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
         }
         window.decorView.excludeFromCaptureAndAutofill()
+    }
+
+    /**
+     * Opens a Settings screen. Some phones (trimmed or vendor builds) lack one of them: then the main
+     * Settings screen, and if even that is missing, nothing happens rather than a crash.
+     */
+    private fun openSettings(page: SettingsPage) {
+        val action = when (page) {
+            SettingsPage.Nfc -> Settings.ACTION_NFC_SETTINGS
+            SettingsPage.Accessibility -> Settings.ACTION_ACCESSIBILITY_SETTINGS
+            SettingsPage.Developer -> Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS
+        }
+        runCatching { startActivity(Intent(action)) }
+            .recoverCatching { startActivity(Intent(Settings.ACTION_SETTINGS)) }
     }
 
     override fun onResume() {

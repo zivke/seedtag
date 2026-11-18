@@ -64,6 +64,9 @@ data class VerifyResult(
     val restored: Boolean = false,
 )
 
+/** A system Settings screen the app links to. */
+enum class SettingsPage { Nfc, Accessibility, Developer }
+
 sealed interface Dialog {
     data class Error(val message: String) : Dialog
     data class Info(val title: String, val message: String) : Dialog
@@ -75,6 +78,8 @@ sealed interface Dialog {
     data class ConfirmNewPassphrase(val generated: Boolean) : Dialog
     /** Back would drop what was entered: [toWords] for the Password step's Back (clears the passwords), else leaving the app. */
     data class ConfirmBack(val toWords: Boolean) : Dialog
+    /** Opening Settings at [page] would leave the app, which drops what was entered or restored. */
+    data class ConfirmSettings(val page: SettingsPage) : Dialog
     /** The Words step's Clear would drop the [count] words entered so far. */
     data class ConfirmClearWords(val count: Int) : Dialog
     /** Switching to tab [to] would hide the restored [words] and/or clear a typed [password]. */
@@ -854,7 +859,8 @@ class SeedTagViewModel : ViewModel() {
         clearPasswords(PwField.Read, PwField.Erase); restoredWords = null
         val d = dialog
         if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
-            d is Dialog.ConfirmBack || d is Dialog.ConfirmTab || d is Dialog.ConfirmClearWords || d == Dialog.StillThere
+            d is Dialog.ConfirmBack || d is Dialog.ConfirmSettings || d is Dialog.ConfirmTab ||
+            d is Dialog.ConfirmClearWords || d == Dialog.StillThere
         ) dialog = null
     }
 

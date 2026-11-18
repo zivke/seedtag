@@ -207,7 +207,7 @@ report's tests N1–N12, A1–A3, H1).
   better checksum message for non-BIP39 phrases; "not your wallet's fingerprint".
 - [ ] **B28: not ready for screen readers** *(device: A3)*. Content descriptions and roles, announcements, idle
   timer on accessibility actions, README "Accessibility".
-- [ ] **B29: settings links wipe secrets without warning, and two of them can crash.** Leave dialog while
+- [x] **B29: settings links wipe secrets without warning, and two of them can crash.** Leave dialog while
   `holdsSecrets`; `runCatching` with `ACTION_SETTINGS` as fallback.
 - [ ] **B30: the typed-back passphrase check can be got around** (Show during Repeat; editing after "Show it
   again").

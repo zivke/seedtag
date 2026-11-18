@@ -405,8 +405,11 @@ touch it asks *Still there?* (with a buzz), with the screen behind it blurred (c
 clears everything a minute later unless you tap **Keep**. The power
 button still turns the screen off, and that clears everything. Back on the Words and Password steps does what their
 **Back** button does (going back from the password asks first, since it clears the password). Anywhere else, Back
-asks before leaving while something would be lost. Behind both questions, and behind *Ready to scan* and the
-progress dialog (while encrypting, for example), the screen is blurred as well (covered before Android 12).
+asks before leaving while something would be lost. So do the links to Settings (*Turn on NFC*, the accessibility
+banner, *Open Developer options*): Settings is a separate app, so going there clears everything too. To turn NFC on
+without leaving, use the NFC button in quick settings. A phone that lacks the Settings screen a link points to gets
+the main Settings screen instead. Behind these questions, and behind *Ready to scan* and the progress dialog (while
+encrypting, for example), the screen is blurred as well (covered before Android 12).
 
 **ⓘ** (About) in the top bar shows the version, what the app does with your data (nothing leaves the phone), the
 encryption used and the license, with links to the source code and to donate. Links open in the browser, and only

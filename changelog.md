@@ -29,6 +29,11 @@ All notable user-visible changes to SeedTag. The format follows
   still goes on (for practice, say).
 
 ### Changed
+- *Turn on NFC*, the accessibility banner's link and *Open Developer
+  options* ask first (**Clear and open Settings** or **Stay**) while
+  something you entered or restored would be lost: Settings is a separate
+  app, and leaving SeedTag clears everything. For NFC, the question points
+  to the quick-settings button, which doesn't leave the app.
 - Making a tag read-only has one name everywhere: the confirm button says
   *Make read-only* instead of *Lock forever*, the result *Tag is now
   read-only*, and the Verify section *Make it read-only*. A Verify or
@@ -112,6 +117,11 @@ All notable user-visible changes to SeedTag. The format follows
   that choose programs git or ssh run, saying what they mean; the message
   for a key in GNOME's SSH agent says to move it out of `~/.ssh`. It shows
   the pager and runs from any folder of the clone.
+
+### Fixed
+- On a phone that lacks the NFC or accessibility Settings screen, *Turn on
+  NFC* and the accessibility banner's link open the main Settings screen
+  instead of closing the app.
 
 ## [0.4.2] - 2026-11-13
 

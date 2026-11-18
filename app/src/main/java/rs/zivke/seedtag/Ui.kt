@@ -279,14 +279,15 @@ fun SeedTagApp(
     nfcState: NfcState,
     airplaneMode: Boolean,
     overlayDetected: Boolean,
-    openNfcSettings: () -> Unit,
+    openSettings: (SettingsPage) -> Unit,
     debugging: Boolean = false,
-    openDeveloperSettings: () -> Unit = {},
     accessibilityApps: List<String> = emptyList(),
-    openAccessibilitySettings: () -> Unit = {},
     hideAccessibilityBanner: () -> Unit = {},
     leave: () -> Unit = {},
 ) {
+    // Settings is another app: going there stops SeedTag, which wipes what was entered. Ask first.
+    val settings: (SettingsPage) -> Unit = { p -> if (vm.holdsSecrets) vm.dialog = Dialog.ConfirmSettings(p) else openSettings(p) }
+    val openNfcSettings = { settings(SettingsPage.Nfc) }
     val view = LocalView.current
     LaunchedEffect(vm) { vm.haptics.collect { view.play(it) } }
     val page = vm.page
@@ -302,17 +303,20 @@ fun SeedTagApp(
     var actionsDone by remember { mutableIntStateOf(0) }
     LaunchedEffect(prompting) { if (!prompting) actionsDone++ }
     // What's behind some prompts (words, a password) is blurred while they're up: "Still there?" (nobody
-    // is watching the screen, which is kept on), the two Back questions, the tab-switch and clear-words
-    // questions, the progress dialog and "Ready to scan" (the phone is held to a tag, often in view of
+    // is watching the screen, which is kept on), the two Back questions, the Settings, tab-switch and
+    // clear-words questions, the progress dialog and "Ready to scan" (the phone is held to a tag, often in view of
     // others). Blur needs Android 12; before that, it's covered.
     val veiled = vm.busy != null || vm.scanPrompt != null ||
-        vm.dialog.let { it == Dialog.StillThere || it is Dialog.ConfirmBack || it is Dialog.ConfirmTab || it is Dialog.ConfirmClearWords }
+        vm.dialog.let {
+            it == Dialog.StillThere || it is Dialog.ConfirmBack || it is Dialog.ConfirmSettings || it is Dialog.ConfirmTab ||
+                it is Dialog.ConfirmClearWords
+        }
     val blurs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
     Box(if (veiled && blurs) Modifier.blur(20.dp) else Modifier) {
         CompositionLocalProvider(
             LocalAirplaneMode provides airplaneMode,
             LocalDebugging provides debugging,
-            LocalOpenDeveloperSettings provides openDeveloperSettings,
+            LocalOpenDeveloperSettings provides { settings(SettingsPage.Developer) },
             LocalActionsDone provides actionsDone,
         ) {
             Scaffold(
@@ -329,7 +333,10 @@ fun SeedTagApp(
                 Column(Modifier.padding(pad).fillMaxSize()) {
                     if (page == null && !typing) ModeSwitch(vm)
                     // The NFC spot page says it itself, as its first step.
-                    Banners(if (page == Page.Antenna) NfcState.Ready else nfcState, openNfcSettings, overlayDetected, accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
+                    Banners(
+                        if (page == Page.Antenna) NfcState.Ready else nfcState, openNfcSettings, overlayDetected, accessibilityApps,
+                        { settings(SettingsPage.Accessibility) }, hideAccessibilityBanner,
+                    )
                     when (page) {
                         Page.Antenna -> AntennaPage(vm, nfcState, openNfcSettings)
                         Page.About -> AboutPage()
@@ -345,7 +352,7 @@ fun SeedTagApp(
         }
         if (veiled && !blurs) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
     }
-    Dialogs(vm, leave)
+    Dialogs(vm, leave, openSettings)
 }
 
 /**
@@ -2126,7 +2133,7 @@ private fun TagWorking(step: TagStep) {
 }
 
 @Composable
-private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
+private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (SettingsPage) -> Unit) {
     vm.busy?.let { msg ->
         AlertDialog(
             onDismissRequest = {},
@@ -2298,6 +2305,29 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
                 TextButton(onClick = { vm.dialog = null; if (d.toWords) vm.backToWords() else leave() }) {
                     DangerText(if (d.toWords) "Clear and go back" else "Leave")
                 }
+            },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Stay") } },
+        )
+        is Dialog.ConfirmSettings -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            icon = { WarningIcon() },
+            title = { Text("Leave SeedTag?") },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    "Settings is a separate app, so opening it leaves SeedTag, and leaving clears everything you " +
+                        "entered or restored: none of it is kept anywhere." +
+                        if (d.page == SettingsPage.Nfc) {
+                            " To turn NFC on without leaving, use the NFC button in quick settings instead, if your " +
+                                "phone has one: swipe down from the top of the screen (twice, if the first swipe only " +
+                                "shows the status bar)."
+                        } else {
+                            ""
+                        },
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { vm.dialog = null; openSettings(d.page) }) { DangerText("Clear and open Settings") }
             },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Stay") } },
         )
