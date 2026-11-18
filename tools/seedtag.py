@@ -36,6 +36,11 @@ Run it on an offline machine.
     python3 seedtag.py verify  [BLOB]   # like decrypt, but only prints OK / FAIL
                                         # plus a short fingerprint, not the words
 
+BLOB is the tag's text, or a file that holds it; without it, you're asked
+for it. Spaces and line breaks in it, missing = at the end, and the "en"
+some NFC apps show in front of it are fine. On Windows, type py instead of
+python3.
+
 Add --builtin to decrypt or verify to use only the built-in Argon2id and
 AES-GCM, even when a package is installed. If an installed package fails,
 the tool says so and goes on with the next one, down to the built-in code.
@@ -397,15 +402,47 @@ class WrongPassword(ValueError):
     pass
 
 
+_B64_ALPHABET = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+# Characters of a backup's text, = included, for 12, 15, 18, 21 and 24 words.
+TEXT_LENGTHS = tuple((1 + SALT_LEN + NONCE_LEN + n + TAG_LEN + 2) // 3 * 4 for n in (16, 20, 24, 28, 32))
+_LENGTHS_HINT = (f"A SeedTag backup's text is {', '.join(map(str, TEXT_LENGTHS[:-1]))} or {TEXT_LENGTHS[-1]} "
+                 "characters long (12, 15, 18, 21 or 24 words), counting any = at the end.")
+
+
+def blob_from_text(text: str) -> bytes:
+    """The blob in a tag's text, as someone may have copied or typed it: whitespace anywhere (the
+    PASSWORD_SPACES), the record's language code "en" in front, URL-safe - and _, and missing or
+    extra = at the end are all accepted. Same rules as SeedBox.fromBase64 in the app, checked
+    against blob-text.tsv. Raises ValueError with a plain explanation otherwise."""
+    s = "".join(c for c in text if c not in PASSWORD_SPACES)
+    if s.startswith("enA"):  # every SeedTag text starts with A; "en" is the record's language
+        s = s[2:]
+    body = s.replace("-", "+").replace("_", "/").rstrip("=")
+    for c in body:
+        if c == "=":
+            raise ValueError("the text has an = before its end: = can only come last. Check what you copied.")
+        if c not in _B64_ALPHABET:
+            raise ValueError(f"the text contains {c!r}, which can't be in it: only A-Z, a-z, 0-9, + and / "
+                             "(and = at the end). Check what you copied.")
+    if len(body) % 4 == 1:
+        raise ValueError(f"the text is {len(body)} characters long without the = at the end, which can't be "
+                         f"right: a character is missing or one too many. {_LENGTHS_HINT}")
+    return base64.b64decode(body + "=" * (-len(body) % 4))
+
+
 def open_blob(blob: bytes, password: str) -> bytes:
     if not blob or blob[0] != VERSION:
         if blob and VERSION < blob[0] <= MAX_FUTURE_VERSION:
             raise ValueError(f"this tag was written by a newer version of SeedTag (format {blob[0]}): "
-                             "use a current seedtag.py")
-        raise ValueError(f"not a SeedTag backup (unknown format {blob[:1].hex() or 'empty'})")
+                             "use a current seedtag.py. If you typed the text in, check its first "
+                             "characters too: a backup from this version starts with A, then one of Q-Z or a-f.")
+        raise ValueError(f"not a SeedTag backup (unknown format {blob[:1].hex() or 'empty'}). If you typed "
+                         "the text in, check its first characters: a backup starts with A, then one of "
+                         "Q-Z or a-f.")
     ent_len = len(blob) - 1 - SALT_LEN - NONCE_LEN - TAG_LEN
     if ent_len not in (16, 20, 24, 28, 32):
-        raise ValueError(f"bad blob length {len(blob)}")
+        raise ValueError(f"the text is {(len(blob) + 2) // 3 * 4} characters long, counting = at the end, "
+                         f"which isn't a backup's length: a character is missing or one too many. {_LENGTHS_HINT}")
     salt = blob[1:1 + SALT_LEN]
     nonce = blob[1 + SALT_LEN:1 + SALT_LEN + NONCE_LEN]
     ct = blob[1 + SALT_LEN + NONCE_LEN:]
@@ -695,8 +732,12 @@ class AesGcmBuiltin:
 # -------------------------------------------------------------------- CLI ---
 
 def _read_blob(argv) -> bytes:
-    s = argv[0] if argv else input("Blob (Base64): ")
-    return base64.b64decode("".join(s.split()), validate=True)
+    """The tag's text from the command line or typed in, or from a file named either way."""
+    s = argv[0] if argv else input("Tag text (Base64), or a file that holds it: ")
+    if s.strip() and os.path.isfile(s.strip()):
+        with open(s.strip(), encoding="utf-8", errors="replace") as fh:
+            s = fh.read()
+    return blob_from_text(s)
 
 
 def main(argv):
@@ -748,6 +789,9 @@ def main(argv):
                 print("(SeedTag's own fingerprint, not the one a wallet shows)", file=sys.stderr)
     except ValueError as e:
         print(f"FAIL: {e}", file=sys.stderr)
+        if isinstance(e, WrongPassword):
+            print("If you typed the tag's text in, check it as well: one wrong character gives the same "
+                  "error as a wrong password.", file=sys.stderr)
         return 1
     except Exception as e:
         # Only the type: the message could echo input. Most likely a broken or changed package.

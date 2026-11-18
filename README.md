@@ -564,11 +564,19 @@ python3 seedtag.py decrypt --builtin <BASE64>   # the same with the built-in cod
 python3 seedtag.py encrypt            # create a tag string on the computer instead
 ```
 
+On Windows, type `py` instead of `python3`. `<BASE64>` is the tag's text, or a file that holds it (a text file
+saved from an NFC app, say); leave it out to be asked for it.
+
 Like the app, `decrypt` and `verify` retry a wrong password without extra spaces, then in lower case, and say so if
 that's what matched. `encrypt`, like Back up, refuses a password with leading, trailing or doubled spaces.
 
 To get the Base64 string off the tag without this app, read it with any NFC reader app (e.g. NFC Tools).
-It's ciphertext, so that's safe.
+It's ciphertext, so that's safe. Spaces and line breaks in it, missing `=` at the end, `-` and `_` for `+` and `/`,
+and an `en` in front (the record's language, which some apps show) are all accepted, by `seedtag.py` and the app
+alike. A backup's text is 84, 88, 92, 100 or 104 characters long (12, 15, 18, 21 or 24 words), counting the `=` at
+the end, and starts with `A`. If you type it in by hand, a missing or extra character, or a wrong first one, gets
+its own message. A wrong character elsewhere can't be told from a wrong password: both end in "wrong password or
+corrupted blob", so check the text as well as the password.
 
 ## Warnings: other apps on the phone
 

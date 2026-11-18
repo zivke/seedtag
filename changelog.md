@@ -31,6 +31,13 @@ All notable user-visible changes to SeedTag. The format follows
   built-in Argon2id and AES-GCM, even when a package is installed.
 
 ### Changed
+- `seedtag.py` and the app accept a backup's text the way it may have
+  been copied or typed: spaces and line breaks anywhere, missing or extra
+  `=` at the end, `-` and `_` for `+` and `/`, and the `en` some NFC apps
+  show in front. `seedtag.py` also reads it from a file, and says plainly
+  what's wrong with the text: a character that can't be in it, the wrong
+  length (with the lengths a backup has), or a wrong first character. A
+  wrong password adds that one mistyped character gives the same error.
 - *Turn on NFC*, the accessibility banner's link and *Open Developer
   options* ask first (**Clear and open Settings** or **Stay**) while
   something you entered or restored would be lost: Settings is a separate

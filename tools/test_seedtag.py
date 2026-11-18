@@ -15,6 +15,7 @@ import io
 import os
 import pathlib
 import sys
+import tempfile
 import unittest
 from unittest import mock
 
@@ -368,6 +369,49 @@ class Robustness(unittest.TestCase):
     def test_builtin_flag_is_for_decrypt_and_verify(self):
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(2, seedtag.main(["encrypt", "--builtin"]))
+
+
+class BlobText(unittest.TestCase):
+    """Same file BlobTextTest.kt reads: the tool and the app accept the same tag text."""
+
+    def test_matches_vectors(self):
+        vecs = rows("blob-text.tsv")
+        self.assertGreaterEqual(len(vecs), 20)
+        for what, inp, expected in vecs:
+            text = bytes.fromhex(inp).decode("utf-8")
+            with self.subTest(what):
+                if expected == "error":
+                    with self.assertRaises(ValueError):
+                        seedtag.blob_from_text(text)
+                else:
+                    self.assertEqual(expected, seedtag.blob_from_text(text).hex())
+
+    def test_messages_say_what_to_check(self):
+        v12 = rows("seedtag-v1-vectors.tsv")[1][4]
+        with self.assertRaisesRegex(ValueError, "missing or one too many.*84, 88, 92, 100 or 104"):
+            seedtag.blob_from_text(v12[:30] + v12[31:])
+        with self.assertRaisesRegex(ValueError, "contains '\\*'"):
+            seedtag.blob_from_text("*" + v12)
+        with self.assertRaisesRegex(ValueError, "missing or one too many"):
+            seedtag.open_blob(seedtag.blob_from_text(v12[:-6]), "x")  # a whole group short
+        with self.assertRaisesRegex(ValueError, "starts with A"):
+            seedtag.open_blob(seedtag.blob_from_text("B" + v12[1:]), "x")
+
+    def test_read_from_a_file(self):
+        v24 = rows("seedtag-v1-vectors.tsv")[0][4]
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "tag.txt"
+            path.write_text("en" + v24[:50] + "\n" + v24[50:] + "\n", encoding="utf-8")
+            self.assertEqual(base64.b64decode(v24), seedtag._read_blob([str(path)]))
+
+    def test_wrong_password_mentions_the_text(self):
+        pw, _, _, _, b64, _ = rows("seedtag-v1-vectors.tsv")[0]
+        stderr = io.StringIO()
+        with mock.patch.object(seedtag, "open_forgiving", side_effect=seedtag.WrongPassword("wrong password")), \
+                mock.patch.object(seedtag.getpass, "getpass", return_value="pw"), \
+                contextlib.redirect_stderr(stderr):
+            self.assertEqual(1, seedtag.main(["verify", b64]))
+        self.assertIn("one wrong character gives the same error", stderr.getvalue())
 
 
 if __name__ == "__main__":

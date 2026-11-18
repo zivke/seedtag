@@ -255,11 +255,24 @@ object SeedBox {
         }
     }
 
-    /** Accepts Base64 with arbitrary whitespace. */
-    fun fromBase64(text: String): ByteArray = try {
-        Base64.getDecoder().decode(text.filterNot { it.isWhitespace() })
-    } catch (e: IllegalArgumentException) {
-        throw SeedTagException.Malformed("not Base64")
+    private const val BASE64_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+
+    /**
+     * The blob in a tag's text, as another tool may have written it: whitespace anywhere
+     * ([isPasswordSpace]), the record's language code "en" in front, URL-safe `-` and `_`, and
+     * missing or extra `=` at the end are all accepted. Same rules as blob_from_text() in
+     * seedtag.py, checked against blob-text.tsv.
+     */
+    fun fromBase64(text: String): ByteArray {
+        var s = text.filterNot { isPasswordSpace(it) }
+        if (s.startsWith("enA")) s = s.substring(2) // every SeedTag text starts with A
+        s = s.replace('-', '+').replace('_', '/').trimEnd('=')
+        if (s.length % 4 == 1 || s.any { it !in BASE64_CHARS }) throw SeedTagException.Malformed("not Base64")
+        return try {
+            Base64.getDecoder().decode(s + "=".repeat((4 - s.length % 4) % 4))
+        } catch (e: IllegalArgumentException) {
+            throw SeedTagException.Malformed("not Base64")
+        }
     }
 
     /** Short non-secret check value for comparing backups (same as seedtag.py `verify`). */

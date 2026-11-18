@@ -162,8 +162,11 @@ report's tests N1–N12, A1–A3, H1).
   "Restore once and compare every word" in the Done steps and the Verify checklist.
 - [ ] **B7: no path to a second tag; retyping the generated passphrase scores "Weak".** "Write the same backup to
   another tag" after Done and Verify (ciphertext only); README: identical copies are fine.
-- [ ] **B8: one Base64 typo in `seedtag.py` looks like a wrong password.** A non-secret check value of the text in
-  the app and the tool; plain error messages; re-pad and accept `-_`; accept a file; shared `blob-text.tsv`.
+- [ ] **B8: one Base64 typo in `seedtag.py` looks like a wrong password.**
+  - [x] Plain error messages; re-pad and accept `-_` (and an `en` prefix); accept a file; `py` on Windows; shared
+    `blob-text.tsv`.
+  - [ ] A non-secret check value of the text in the app (Done, Verify, Erase scan) and the tool, printed before
+    the password is asked for.
 - [ ] **B9: custody model and heir instructions not written down.** README "What the tag is for" with a loss
   table; two password copies, never with a tag; a printable heir sheet.
 - [ ] **B10: `seedtag.py` long-term.**
