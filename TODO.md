@@ -166,9 +166,10 @@ report's tests N1–N12, A1–A3, H1).
   the app and the tool; plain error messages; re-pad and accept `-_`; accept a file; shared `blob-text.tsv`.
 - [ ] **B9: custody model and heir instructions not written down.** README "What the tag is for" with a loss
   table; two password copies, never with a tag; a printable heir sheet.
-- [ ] **B10: `seedtag.py` long-term.** Drop `from __future__ import annotations`; catch any backend exception and
-  fall back to the built-in code; `--builtin`; the `-I -S` hint in the failure message; CI on the newest Python
-  with `-W error`.
+- [ ] **B10: `seedtag.py` long-term.**
+  - [x] Drop `from __future__ import annotations`; catch any backend exception and fall back to the built-in code;
+    `--builtin`; the `-I -S` hint in the failure message; tests run with `-W error` (`make test`, CI).
+  - [ ] CI on the newest Python (needs `actions/setup-python`, pinned by SHA; with B37).
 - [ ] **B11: the APK-to-tag binding is one person reading a run header.** Build-provenance attestation checked by
   `sign-release.sh`, or a host rebuild from a throwaway clone for `--expect`.
 - [ ] **B12: raw empty check and format guard skip non-NXP Type 2 tags** *(device: N4)*. Raw reads through `NfcA`.

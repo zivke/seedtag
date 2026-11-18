@@ -545,7 +545,12 @@ Without either package, `decrypt` and `verify` still work with a built-in Argon2
 tested against the same vectors: about a minute per password tried (a password that needs the spaces or capitals
 retry takes two or three), and around 90 MB of memory. `encrypt` needs `cryptography`. To make sure only
 `seedtag.py`'s own code runs, even where packages are installed, start it with `python3 -I -S seedtag.py …`: a
-poisoned package then can't see the password or the words.
+poisoned package then can't see the password or the words. `--builtin` (for `decrypt` and `verify`) also uses only
+the built-in code, but in the same Python, where installed packages are still loaded.
+
+If an installed package fails (a broken install, or a future version that changed how it's called), `seedtag.py`
+says so and goes on with the next one, down to the built-in code, so a recovery doesn't depend on any package
+working. If something else still goes wrong, it suggests `python3 -I -S seedtag.py decrypt --builtin`.
 
 **Keep a copy of `seedtag.py` with your written password**, printed or on a USB stick. With it and any Python 3.8
 or later, recovering a tag needs neither this app, nor this website, nor any package. The packages' installers
@@ -555,6 +560,7 @@ or later, recovering a tag needs neither this app, nor this website, nor any pac
 pip install cryptography          # optional, much faster; before going offline
 python3 seedtag.py verify  <BASE64>   # OK + fingerprint, no words
 python3 seedtag.py decrypt <BASE64>   # prints the words
+python3 seedtag.py decrypt --builtin <BASE64>   # the same with the built-in code only (slow)
 python3 seedtag.py encrypt            # create a tag string on the computer instead
 ```
 

@@ -8,7 +8,10 @@
 Standard library only, plus whatever seedtag.py itself needs. SEEDTAG_SLOW_TESTS=1 also decrypts a
 vector with the built-in Argon2id at the real parameters (about a minute).
 """
+import ast
 import base64
+import contextlib
+import io
 import os
 import pathlib
 import sys
@@ -290,6 +293,81 @@ class PasswordVariants(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             seedtag.open_forgiving(b"\x02" + bytes(76), " Pw ")
         self.assertNotIsInstance(cm.exception, seedtag.WrongPassword)
+
+
+class Robustness(unittest.TestCase):
+    """A broken or changed package must not stop a recovery the built-in code can do."""
+
+    def setUp(self):
+        for patcher in (mock.patch.object(seedtag, "_broken", set()), mock.patch.object(seedtag, "builtin_only", False)):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_python_38_syntax_without_future_import(self):
+        tree = ast.parse((HERE / "seedtag.py").read_text(encoding="utf-8"), feature_version=(3, 8))
+        future = [n for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module == "__future__"]
+        self.assertEqual([], future)
+
+    def test_failing_backend_falls_through(self):
+        def broken(pw, salt):
+            raise TypeError("unexpected keyword argument 'lanes'")
+        stderr = io.StringIO()
+        with mock.patch.object(seedtag, "KDF_BACKENDS", (("cryptography", broken), ("built-in", lambda pw, s: b"k"))), \
+                contextlib.redirect_stderr(stderr):
+            self.assertEqual(b"k", seedtag.derive_key("x", bytes(16)))
+            self.assertEqual("built-in", seedtag.kdf_used)
+            self.assertIn("cryptography's Argon2id failed (TypeError)", stderr.getvalue())
+            self.assertNotIn("lanes", stderr.getvalue())  # the type only, never the message
+            seedtag.derive_key("x", bytes(16))
+        self.assertEqual(1, stderr.getvalue().count("failed"))  # not tried again
+
+    def test_builtin_only_skips_packages(self):
+        def package(pw, salt):
+            raise AssertionError("a package was used")
+        with mock.patch.object(seedtag, "KDF_BACKENDS", (("cryptography", package), ("built-in", lambda pw, s: b"k"))), \
+                mock.patch.object(seedtag, "builtin_only", True):
+            self.assertEqual(b"k", seedtag.derive_key("x", bytes(16)))
+            self.assertIs(seedtag.AesGcmBuiltin, seedtag._aesgcm(decrypt_only=True)[0])
+
+    def test_failing_aes_gcm_falls_back_to_builtin(self):
+        class Broken:
+            def __init__(self, key):
+                pass
+
+            def decrypt(self, nonce, data, aad):
+                raise AttributeError("renamed")
+        pw, ent, salt, _, b64, _ = rows("seedtag-v1-vectors.tsv")[0]
+        pw = bytes.fromhex(pw).decode("utf-8")
+        try:
+            key = seedtag.derive_key(pw, bytes.fromhex(salt))
+        except seedtag.NoArgon2:
+            self.skipTest("no Argon2id package installed")
+        if seedtag.kdf_used == "built-in":
+            self.skipTest("no Argon2id package installed")
+
+        class NeverRaised(Exception):
+            pass
+        with mock.patch.object(seedtag, "_aesgcm", lambda decrypt_only=False: (Broken, NeverRaised)), \
+                mock.patch.object(seedtag, "derive_key", lambda p, s: key), \
+                contextlib.redirect_stderr(io.StringIO()) as stderr:
+            self.assertEqual(bytes.fromhex(ent), seedtag.open_blob(base64.b64decode(b64), pw))
+            with self.assertRaises(seedtag.WrongPassword):
+                seedtag.open_blob(base64.b64decode(b64)[:-1] + b"\0", pw)
+        self.assertIn("cryptography's AES-GCM failed (AttributeError)", stderr.getvalue())
+
+    def test_unexpected_error_suggests_standard_library_only(self):
+        stderr = io.StringIO()
+        with mock.patch.object(seedtag, "open_forgiving", side_effect=TypeError("secret")), \
+                mock.patch.object(seedtag.getpass, "getpass", return_value="pw"), \
+                contextlib.redirect_stderr(stderr):
+            self.assertEqual(1, seedtag.main(["decrypt", "AAAA"]))
+        self.assertIn("FAIL: unexpected error (TypeError)", stderr.getvalue())
+        self.assertIn("python3 -I -S seedtag.py decrypt --builtin", stderr.getvalue())
+        self.assertNotIn("secret", stderr.getvalue())
+
+    def test_builtin_flag_is_for_decrypt_and_verify(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(2, seedtag.main(["encrypt", "--builtin"]))
 
 
 if __name__ == "__main__":

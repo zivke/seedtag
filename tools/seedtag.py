@@ -36,6 +36,10 @@ Run it on an offline machine.
     python3 seedtag.py verify  [BLOB]   # like decrypt, but only prints OK / FAIL
                                         # plus a short fingerprint, not the words
 
+Add --builtin to decrypt or verify to use only the built-in Argon2id and
+AES-GCM, even when a package is installed. If an installed package fails,
+the tool says so and goes on with the next one, down to the built-in code.
+
 decrypt and verify forgive extra spaces and wrong capitals: a wrong password
 is tried again trimmed and with single spaces, then also lower-cased.
 
@@ -46,7 +50,8 @@ Format v1 (all multi-byte fields raw bytes):
     entropy= raw BIP39 entropy: 16/20/24/28/32 bytes for 12/15/18/21/24 words
     on tag = NDEF Text record, lang "en", UTF-8, standard Base64 with padding
 """
-from __future__ import annotations  # list[str], bytes | None: not evaluated, so Python 3.8 works
+# Annotations such as list[str] are in quotes: never evaluated, so Python 3.8 works, with no
+# `from __future__` import that a future Python might drop.
 
 import base64
 import getpass
@@ -240,7 +245,7 @@ _INDEX = {w: i for i, w in enumerate(WORDLIST)}
 
 # ---------------------------------------------------------------- BIP39 ----
 
-def entropy_to_words(entropy: bytes) -> list[str]:
+def entropy_to_words(entropy: bytes) -> "list[str]":
     if len(entropy) not in (16, 20, 24, 28, 32):
         raise ValueError("entropy must be 16/20/24/28/32 bytes")
     cs_bits = len(entropy) * 8 // 32
@@ -250,7 +255,7 @@ def entropy_to_words(entropy: bytes) -> list[str]:
     return [WORDLIST[(bits >> (11 * (n - 1 - i))) & 0x7FF] for i in range(n)]
 
 
-def words_to_entropy(words: list[str]) -> bytes:
+def words_to_entropy(words: "list[str]") -> bytes:
     if len(words) not in (12, 15, 18, 21, 24):
         raise ValueError(f"expected 12/15/18/21/24 words, got {len(words)}")
     bits = 0
@@ -270,7 +275,7 @@ def words_to_entropy(words: list[str]) -> bytes:
     return entropy
 
 
-def normalize_words(s: str) -> list[str]:
+def normalize_words(s: str) -> "list[str]":
     return unicodedata.normalize("NFKD", s).lower().split()
 
 
@@ -290,6 +295,8 @@ def _argon2_cryptography(pw: bytes, salt: bytes) -> bytes:
         from cryptography.hazmat.primitives.kdf.argon2 import Argon2id
     except ImportError:
         raise _Unavailable("cryptography >= 44 isn't installed") from None
+    except Exception as e:  # installed, but broken
+        raise _Unavailable(f"cryptography doesn't load ({type(e).__name__})") from None
     try:
         return Argon2id(salt=salt, length=KEY_LEN, iterations=ARGON_T,
                         lanes=ARGON_P, memory_cost=ARGON_M_KIB).derive(pw)
@@ -303,20 +310,27 @@ def _argon2_cffi(pw: bytes, salt: bytes) -> bytes:
         from argon2.low_level import Type, hash_secret_raw
     except ImportError:
         raise _Unavailable("argon2-cffi isn't installed") from None
+    except Exception as e:  # installed, but broken
+        raise _Unavailable(f"argon2-cffi doesn't load ({type(e).__name__})") from None
     return hash_secret_raw(pw, salt, time_cost=ARGON_T, memory_cost=ARGON_M_KIB,
                            parallelism=ARGON_P, hash_len=KEY_LEN, type=Type.ID)
 
 
 def _argon2_builtin(pw: bytes, salt: bytes) -> bytes:
-    print("(no Argon2id package installed: using the slow built-in one, about a minute per try)",
-          file=sys.stderr, flush=True)
+    _note("using the slow built-in Argon2id: about a minute per try")
     return argon2id_builtin(pw, salt, ARGON_T, ARGON_M_KIB, KEY_LEN)
+
+
+def _note(msg: str) -> None:
+    print(f"({msg})", file=sys.stderr, flush=True)
 
 
 # Tried in this order; all give the same bytes.
 KDF_BACKENDS = (("cryptography", _argon2_cryptography), ("argon2-cffi", _argon2_cffi),
                 ("built-in", _argon2_builtin))
 kdf_used = None  # name of the backend the last derive_key() used, for the CLI to report
+builtin_only = False  # --builtin: only the built-in Argon2id and AES-GCM, no package
+_broken = set()  # packages that failed unexpectedly in this run: not tried again
 
 
 def derive_key(password: str, salt: bytes) -> bytes:
@@ -324,10 +338,21 @@ def derive_key(password: str, salt: bytes) -> bytes:
     pw = unicodedata.normalize("NFKD", password).encode("utf-8")
     why = []
     for name, kdf in KDF_BACKENDS:
+        if name != "built-in" and (builtin_only or name in _broken):
+            continue
         try:
             key = kdf(pw, salt)
         except _Unavailable as e:
             why.append(f"{name}: {e}")
+            continue
+        except Exception as e:
+            # A package that changed or broke (a renamed argument, a bad install) must not stop a
+            # recovery the built-in code can do. Only the type: the message could echo input.
+            if name == "built-in":
+                raise
+            _broken.add(name)
+            _note(f"{name}'s Argon2id failed ({type(e).__name__}): trying the next one")
+            why.append(f"{name}: failed ({type(e).__name__})")
             continue
         kdf_used = name
         return key
@@ -342,19 +367,22 @@ class NoAesGcm(ValueError):
 def _aesgcm(decrypt_only: bool = False):
     """(AESGCM, InvalidTag) from `cryptography`, checked before the slow key derivation. For
     decrypting, the built-in AES-GCM stands in if it isn't installed; encrypting needs it."""
+    if decrypt_only and (builtin_only or "cryptography" in _broken):
+        return AesGcmBuiltin, InvalidTagBuiltin
     try:
         from cryptography.exceptions import InvalidTag
         from cryptography.hazmat.primitives.ciphers.aead import AESGCM
-    except ImportError:
+    except Exception as e:  # not installed, or installed but broken
         if decrypt_only:
             return AesGcmBuiltin, InvalidTagBuiltin
-        raise NoAesGcm("encrypting needs the cryptography package (AES-GCM), which isn't installed. "
+        what = "isn't installed" if isinstance(e, ImportError) else f"doesn't load ({type(e).__name__})"
+        raise NoAesGcm(f"encrypting needs the cryptography package (AES-GCM), which {what}. "
                        "Install it: pip install cryptography") from None
     return AESGCM, InvalidTag
 
 
-def seal(entropy: bytes, password: str, salt: bytes | None = None,
-         nonce: bytes | None = None) -> bytes:
+def seal(entropy: bytes, password: str, salt: "bytes | None" = None,
+         nonce: "bytes | None" = None) -> bytes:
     if len(entropy) not in (16, 20, 24, 28, 32):
         raise ValueError("bad entropy length")
     salt = salt if salt is not None else os.urandom(SALT_LEN)
@@ -382,9 +410,20 @@ def open_blob(blob: bytes, password: str) -> bytes:
     nonce = blob[1 + SALT_LEN:1 + SALT_LEN + NONCE_LEN]
     ct = blob[1 + SALT_LEN + NONCE_LEN:]
     aesgcm, InvalidTag = _aesgcm(decrypt_only=True)
+    key = derive_key(password, salt)
     try:
-        return aesgcm(derive_key(password, salt)).decrypt(nonce, ct, blob[:1])
+        return aesgcm(key).decrypt(nonce, ct, blob[:1])
     except InvalidTag:
+        raise WrongPassword("wrong password or corrupted blob") from None
+    except Exception as e:
+        if aesgcm is AesGcmBuiltin:
+            raise
+        # cryptography's AES-GCM failed in some other way: the built-in one can still decrypt.
+        _broken.add("cryptography")
+        _note(f"cryptography's AES-GCM failed ({type(e).__name__}): using the built-in one")
+    try:
+        return AesGcmBuiltin(key).decrypt(nonce, ct, blob[:1])
+    except InvalidTagBuiltin:
         raise WrongPassword("wrong password or corrupted blob") from None
 
 
@@ -405,7 +444,7 @@ def _collapse_spaces(password: str) -> str:
     return " ".join(w for w in spaced.split(" ") if w)
 
 
-def password_variants(password: str) -> list[tuple[str, str]]:
+def password_variants(password: str) -> "list[tuple[str, str]]":
     """Retry candidates for a password that didn't match: whitespace trimmed and collapsed to
     single spaces, then that lower-cased (char by char, except U+0130, whose lower case is two
     chars). Only variants that differ. Same rules as SeedBox.passwordVariants in the app."""
@@ -427,7 +466,7 @@ def has_stray_spaces(password: str) -> bool:
     return _collapse_spaces(password) != password
 
 
-def open_forgiving(blob: bytes, password: str) -> tuple[bytes, str | None]:
+def open_forgiving(blob: bytes, password: str) -> "tuple[bytes, str | None]":
     """Like open_blob, but a wrong password is also tried without extra spaces, then lower-cased.
     Returns (entropy, fix), fix being None or a key of FIXES."""
     try:
@@ -661,12 +700,19 @@ def _read_blob(argv) -> bytes:
 
 
 def main(argv):
-    global kdf_used
+    global kdf_used, builtin_only
     kdf_used = None
+    _broken.clear()
     if not argv or argv[0] not in ("encrypt", "decrypt", "verify"):
         print(__doc__)
         return 2
-    cmd, rest = argv[0], argv[1:]
+    cmd, rest = argv[0], [a for a in argv[1:] if a != "--builtin"]
+    builtin = len(rest) != len(argv) - 1
+    if builtin and cmd == "encrypt":
+        print("--builtin works with decrypt and verify only: encrypt needs the cryptography package.",
+              file=sys.stderr)
+        return 2
+    builtin_only = builtin
     try:
         if cmd == "encrypt":
             words = normalize_words(getpass.getpass("Mnemonic (hidden): "))
@@ -702,6 +748,16 @@ def main(argv):
                 print("(SeedTag's own fingerprint, not the one a wallet shows)", file=sys.stderr)
     except ValueError as e:
         print(f"FAIL: {e}", file=sys.stderr)
+        return 1
+    except Exception as e:
+        # Only the type: the message could echo input. Most likely a broken or changed package.
+        print(f"FAIL: unexpected error ({type(e).__name__}).", file=sys.stderr)
+        if cmd == "encrypt":
+            print("Reinstall the cryptography package (pip install --force-reinstall cryptography) "
+                  "and try again.", file=sys.stderr)
+        else:
+            print(f"To rule out an installed package, run it with Python's standard library only:\n"
+                  f"    python3 -I -S seedtag.py {cmd} --builtin", file=sys.stderr)
         return 1
     finally:
         if kdf_used:

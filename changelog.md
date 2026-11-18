@@ -27,6 +27,8 @@ All notable user-visible changes to SeedTag. The format follows
   read it at all, so a backup on it might not be readable on the phone you
   have when you need it. It suggests another tag; **Use this tag anyway**
   still goes on (for practice, say).
+- `seedtag.py decrypt --builtin` and `verify --builtin` use only the
+  built-in Argon2id and AES-GCM, even when a package is installed.
 
 ### Changed
 - *Turn on NFC*, the accessibility banner's link and *Open Developer
@@ -119,6 +121,13 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- `seedtag.py`: an installed package that fails (a broken install, or a
+  future version that changed how it's called) no longer stops a recovery:
+  the tool says so and goes on with the next one, down to its built-in
+  code. Any other unexpected error ends with a one-line message suggesting
+  `python3 -I -S seedtag.py decrypt --builtin`, not a traceback. It no
+  longer relies on `from __future__ import annotations`, which a future
+  Python may drop.
 - An unexpected error while encrypting or decrypting (a fault in the
   phone's own encryption, say) shows an error message instead of closing
   the app. An error that comes after the app has cleared everything, or

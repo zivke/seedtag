@@ -66,7 +66,7 @@ test-core: wrapper-check
 
 ## test-py: seedtag.py against the Trezor and SeedTag v1 vectors
 test-py:
-	python3 tools/test_seedtag.py
+	python3 -W error tools/test_seedtag.py
 
 ## check: tests, the workflow check, plus lint on the app
 check: test check-workflows
