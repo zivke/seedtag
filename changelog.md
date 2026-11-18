@@ -12,8 +12,12 @@ All notable user-visible changes to SeedTag. The format follows
   sure it's the backup you mean, or erase it without checking. It asks
   first, and only erases the same tag, with the same content, that was
   scanned. The tag's whole NDEF area is overwritten with zeros and read
-  back before it's left empty, so no part of the old backup stays in the
-  chip.
+  back before it's left empty, not just its first few bytes. Erasing clears
+  only the tag: if someone copied the backup earlier, they can still open
+  their copy with your password, so if that may have happened and the
+  password may be known or isn't strong, move your funds to a new seed. You
+  don't have to erase an old backup to write a new one: Back up overwrites
+  it, after asking you.
 - As soon as the phone finds the tag, it buzzes once and the scan window
   says *Tag found*, with what's being done and, for writing, erasing or
   locking a tag, which step it's on, until it's done or fails. So you know

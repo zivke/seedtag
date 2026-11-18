@@ -172,7 +172,7 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B11: the APK-to-tag binding is one person reading a run header.** Build-provenance attestation checked by
   `sign-release.sh`, or a host rebuild from a throwaway clone for `--expect`.
 - [ ] **B12: raw empty check and format guard skip non-NXP Type 2 tags** *(device: N4)*. Raw reads through `NfcA`.
-- [ ] **B13: Erase over-promises.** "The tag's whole NDEF area was overwritten and read back"; erasing doesn't undo
+- [x] **B13: Erase over-promises.** "The tag's whole NDEF area was overwritten and read back"; erasing doesn't undo
   copies already read (move the funds if the password may be known); replace a backup by writing over it.
 - [ ] **B14: reproducibility not shown since the toolchain bump.** Run CI on `develop`, compare with `make build`,
   record both hashes; repeat after every toolchain change.
@@ -193,7 +193,8 @@ report's tests N1–N12, A1–A3, H1).
 
 - [ ] **B20: Erase edge cases** *(device: N5, N6)*. Shared probe for `check()` and `inspect()`; continue an
   interrupted erase (no message, raw length 0, same UID); wrap the final empty write; confirmed re-format for CC
-  E1h without an NDEF TLV; clear the erase password on "Don't check the password".
+  E1h without an NDEF TLV; clear the erase password on "Don't check the password"; on Type 2, a raw page check
+  after the zero fill (from B13).
 - [ ] **B21: no known-answer self-test** for Argon2id and AES-GCM before the first seal.
 - [ ] **B22: write down the format envelope** a v2 must keep; `FORMAT.md` and the vectors under 0BSD or CC0.
 - [ ] **B23: system screen readers and accessibility overlays are outside every warning.** Neutral notice when any

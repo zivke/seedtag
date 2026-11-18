@@ -729,8 +729,12 @@ class SeedTagViewModel : ViewModel() {
                 if (!stale) resetErase()
                 dialog = Dialog.Info(
                     "Tag erased",
-                    "Everything the tag held was overwritten with zeros and read back, and the tag is now empty. Nothing " +
-                        "of what it held can be read from it any more. It can take a new backup.",
+                    "The tag's whole data area was overwritten with zeros and read again, confirming the tag to be " +
+                        "empty. It can take a new backup.\n\nErasing clears only this tag. If someone copied the backup from it " +
+                        "earlier (any phone can do that in a second), they still have their copy, and they can open it " +
+                        "if they know or guess your password. So if you think the tag may have been copied and your " +
+                        "password may be known or isn't strong, erasing doesn't protect you: move your funds to a new " +
+                        "seed.",
                 )
             }
             is TagResult.Read -> {

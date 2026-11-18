@@ -374,7 +374,15 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    or this one with different content, is refused. Erasing first overwrites the tag's whole NDEF area with zeros
    and reads that back, then leaves the tag empty. Writing an empty message alone wouldn't do: on NTAG and MIFARE
    Ultralight tags it only rewrites the first few bytes, and the rest of the old ciphertext stays in the chip,
-   readable by any app that reads its memory directly.
+   readable by any app that reads its memory directly. What the app checks is the NDEF area as Android reports it:
+   on Type 4 and Type 5 tags, and on chips that move data around internally, it can't see whether old copies
+   remain elsewhere in the memory, and on a few sizes just above 255 bytes up to 3 bytes at the end stay as they
+   were.
+   **Erasing clears only the tag.** If someone copied the backup from it earlier (any phone can do that in a
+   second), they still have their copy, and they can open it if they know or guess your password. So if you think
+   the tag may have been copied and your password may be known or isn't strong, erasing doesn't protect you: move
+   your funds to a new seed. You don't have to erase an old backup to write a new one (with a new password, say):
+   Back up overwrites it, after asking you. Erasing first would only leave the tag with no backup at all for a while.
 
 Verify and Restore are two steps, like Back up: type the password and scan, then the result. Once the tag has
 been decrypted, the password field and keyboard are gone; **Verify another tag** or **Restore another tag** starts

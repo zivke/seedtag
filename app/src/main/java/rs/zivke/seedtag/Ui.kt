@@ -1548,9 +1548,10 @@ private fun EraseScreen(vm: SeedTagViewModel) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Erase a tag", style = MaterialTheme.typography.headlineSmall)
                 Text(
-                    "Erasing overwrites everything the tag holds with zeros, then leaves it empty, so nothing of an old " +
-                        "backup can be read from it, not even with apps that read the chip's memory directly. It can't be " +
-                        "undone. A read-only (locked) tag can't be erased.",
+                    "Erasing overwrites the tag's whole data area with zeros, then reads it again, confirming the tag " +
+                        "to be empty. It can't be undone. It clears only this tag: if someone copied the backup from it " +
+                        "earlier, their copy isn't touched. You don't have to erase an old backup to write a new one: " +
+                        "Back up overwrites it, after asking you. A read-only (locked) tag can't be erased.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -2340,10 +2341,12 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit) {
                 Text(
                     when {
                         d.checked -> "This destroys the backup you just checked (fingerprint ${d.fingerprint}) for good. " +
-                            "Make sure you have the seed somewhere else."
+                            "Make sure you have the seed somewhere else. If someone copied the backup from the tag earlier, " +
+                            "their copy isn't touched."
                         d.content == TagContent.Backup || d.content == TagContent.NewerBackup ->
                             "This tag holds a SeedTag backup, and its password wasn't checked, so it may not be the one you " +
-                                "think. Erasing destroys it for good. Make sure it isn't your only copy of the seed."
+                                "think. Erasing destroys it for good. Make sure it isn't your only copy of the seed. If someone " +
+                                "copied the backup from the tag earlier, their copy isn't touched."
                         d.content == TagContent.Other -> "Everything the tag holds is overwritten and can't be recovered."
                         else -> "Any leftovers of earlier data in the tag's memory are overwritten."
                     } + " Then hold the same tag to the phone.",
