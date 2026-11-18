@@ -1536,12 +1536,12 @@ private fun EraseScreen(vm: SeedTagViewModel) {
                     SecretField("Password", vm, PwField.Erase, revealDefault = false, active = true) {}
                     PasswordKeyboard(vm, PwField.Erase)
                     PrimaryButton("Check password", vm::checkErasePassword, enabled = vm.passwordLength(PwField.Erase) > 0)
-                    TextButton(onClick = { vm.eraseWithPassword = false }, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = vm::skipErasePassword, modifier = Modifier.fillMaxWidth()) {
                         Text("Don't check the password")
                     }
                 }
                 backup && verified == null -> {
-                    PrimaryButton("Check the password first", { vm.eraseWithPassword = true })
+                    PrimaryButton("Check the password first", vm::checkErasePasswordFirst)
                     DangerButton("Erase without checking", vm::requestErase)
                     SecondaryButton("Scan another tag", vm::scanToErase)
                 }

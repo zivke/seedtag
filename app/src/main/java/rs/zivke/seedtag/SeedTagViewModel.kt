@@ -280,6 +280,15 @@ class SeedTagViewModel : ViewModel() {
         private set
     /** The user chose to check the backup's password before erasing it. */
     var eraseWithPassword by mutableStateOf(false)
+        private set
+
+    fun checkErasePasswordFirst() { eraseWithPassword = true }
+
+    /** "Don't check the password": the field goes away, and so does what was typed in it. */
+    fun skipErasePassword() {
+        eraseWithPassword = false
+        clearPasswords(PwField.Erase)
+    }
     /** Bumped by [resetErase]: a password check that finishes after it is thrown away. */
     private var eraseSession = 0L
 

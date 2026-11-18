@@ -191,10 +191,14 @@ report's tests N1–N12, A1–A3, H1).
 
 ### Medium-Low and Low
 
-- [ ] **B20: Erase edge cases** *(device: N5, N6)*. Shared probe for `check()` and `inspect()`; continue an
-  interrupted erase (no message, raw length 0, same UID); wrap the final empty write; confirmed re-format for CC
-  E1h without an NDEF TLV; clear the erase password on "Don't check the password"; on Type 2, a raw page check
-  after the zero fill (from B13).
+- [ ] **B20: Erase edge cases** *(device: N5, N6)*.
+  - [x] (a) Shared probe for `check()` and `inspect()`.
+  - [ ] (b) Continue an interrupted erase (no message, raw length 0, same UID).
+  - [x] (c) Wrap the final empty write.
+  - [ ] (d) Erasing an Empty-scanned tag takes two rounds on current AOSP.
+  - [ ] (e) Confirmed re-format for CC E1h without an NDEF TLV.
+  - [x] (f) Clear the erase password on "Don't check the password".
+  - [ ] On Type 2, a raw page check after the zero fill (from B13).
 - [ ] **B21: no known-answer self-test** for Argon2id and AES-GCM before the first seal.
 - [ ] **B22: write down the format envelope** a v2 must keep; `FORMAT.md` and the vectors under 0BSD or CC0.
 - [ ] **B23: system screen readers and accessibility overlays are outside every warning.** Neutral notice when any

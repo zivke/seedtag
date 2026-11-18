@@ -230,25 +230,47 @@ object TagIo {
         }
     }
 
+    /** What [check] and [inspect] read first, the same way for both. */
+    private sealed interface Probe {
+        /** The read failed, though the tag may hold data: don't call it empty or blank. */
+        data object NotRead : Probe
+        /** Neither NDEF data nor formattable: SeedTag can't use it. */
+        data object Unsupported : Probe
+        /** Never formatted. */
+        data object Blank : Probe
+        class Formatted(val msg: NdefMessage?, val writable: Boolean, val maxSize: Int) : Probe
+    }
+
+    private fun probe(tag: Tag): Probe {
+        val ndef = Ndef.get(tag) ?: return when {
+            NdefFormatable.get(tag) == null -> Probe.Unsupported
+            // Android offers no Ndef for a formatted tag read too quickly: not blank, just not read.
+            looksNdefFormatted(tag) -> Probe.NotRead
+            else -> Probe.Blank
+        }
+        ndef.use {
+            it.connect()
+            val msg = readMessage(it)
+            // A read that failed looks like an empty tag: don't call a tag empty that may hold a backup.
+            if (msg == null && type2HoldsData(tag, it)) return Probe.NotRead
+            return Probe.Formatted(msg, it.isWritable, it.maxSize)
+        }
+    }
+
     private fun check(tag: Tag): TagResult {
         // Android lists MifareClassic only on phones that support it; no I/O needed.
         val classic = MifareClassic::class.java.name in tag.techList
-        val ndef = Ndef.get(tag)
-        if (ndef != null) {
-            ndef.use {
-                it.connect()
-                val msg = readMessage(it)
-                if (msg == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
-                val content = contentOf(msg)
-                return TagResult.Checked(
-                    TagCheck(true, ndef = true, capacity = it.maxSize, writable = it.isWritable, content = content, classic = classic),
-                )
+        return when (val p = probe(tag)) {
+            Probe.NotRead -> TagResult.Failed(NOT_READ)
+            Probe.Unsupported -> TagResult.Checked(TagCheck(supported = false, ndef = false, capacity = null))
+            Probe.Blank -> {
+                val capacity = blankCapacity(tag)
+                TagResult.Checked(TagCheck(true, ndef = false, capacity = capacity, estimated = capacity != null, classic = classic))
             }
+            is Probe.Formatted -> TagResult.Checked(
+                TagCheck(true, ndef = true, capacity = p.maxSize, writable = p.writable, content = contentOf(p.msg), classic = classic),
+            )
         }
-        if (NdefFormatable.get(tag) == null) return TagResult.Checked(TagCheck(supported = false, ndef = false, capacity = null))
-        if (looksNdefFormatted(tag)) return TagResult.Failed(NOT_READ)
-        val capacity = blankCapacity(tag)
-        return TagResult.Checked(TagCheck(true, ndef = false, capacity = capacity, estimated = capacity != null, classic = classic))
     }
 
     private fun contentOf(msg: NdefMessage?): TagContent =
@@ -264,24 +286,18 @@ object TagIo {
 
     private fun isEmpty(msg: NdefMessage) = msg.records.all { r -> r.tnf == NdefRecord.TNF_EMPTY }
 
-    private fun inspect(tag: Tag): TagResult {
-        val ndef = Ndef.get(tag)
-            ?: return TagResult.Inspected(
-                EraseCheck(NdefFormatable.get(tag) != null, ndef = false, writable = false, TagContent.Empty, null, null, null),
-            )
-        ndef.use {
-            it.connect()
-            val msg = readMessage(it)
-            // A read that failed looks like an empty tag: don't call a tag empty that may hold a backup.
-            if (msg == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
-            val target = if (it.isWritable) OverwriteTarget(tag.id ?: ByteArray(0), msg?.toByteArray() ?: ByteArray(0)) else null
-            return TagResult.Inspected(
-                EraseCheck(
-                    true, ndef = true, writable = it.isWritable, content = contentOf(msg), capacity = it.maxSize,
-                    text = runCatching { firstText(msg) }.getOrNull(), target = target,
-                ),
-            )
-        }
+    private fun inspect(tag: Tag): TagResult = when (val p = probe(tag)) {
+        Probe.NotRead -> TagResult.Failed(NOT_READ)
+        Probe.Unsupported, Probe.Blank -> TagResult.Inspected(
+            EraseCheck(p == Probe.Blank, ndef = false, writable = false, TagContent.Empty, null, null, null),
+        )
+        is Probe.Formatted -> TagResult.Inspected(
+            EraseCheck(
+                true, ndef = true, writable = p.writable, content = contentOf(p.msg), capacity = p.maxSize,
+                text = runCatching { firstText(p.msg) }.getOrNull(),
+                target = if (p.writable) OverwriteTarget(tag.id ?: ByteArray(0), p.msg?.toByteArray() ?: ByteArray(0)) else null,
+            ),
+        )
     }
 
     /**
@@ -322,7 +338,15 @@ object TagIo {
                 )
             }
             report(TagStep("Emptying the tag", 4, ERASE_STEPS, writes = true))
-            it.writeNdefMessage(EMPTY)
+            try {
+                it.writeNdefMessage(EMPTY)
+            } catch (e: IOException) {
+                return TagResult.Failed(
+                    "The old backup was already overwritten: the zeros were written and read back. But the tag moved away before it " +
+                        "was left empty. Hold the same tag still and tap again to finish. If the app then says it isn't " +
+                        "the tag you scanned, Cancel, scan the tag again and erase it again.",
+                )
+            }
             report(TagStep("Checking that it's empty", 5, ERASE_STEPS, writes = true))
             val after = it.ndefMessage
             if (after != null && !isEmpty(after)) {
