@@ -334,7 +334,7 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    accept each word), then set a password.
    Words already entered are hidden by default; tap **Show words** to check them. **Clear** asks before removing them
    all. Only English BIP39 phrases are
-   supported, and only the words are stored: if your wallet also uses a **BIP39 passphrase** (a "25th word", set in
+   supported (not Electrum, SLIP-39 (Shamir) or Monero phrases), and only the words are stored: if your wallet also uses a **BIP39 passphrase** (a "25th word", set in
    the wallet), SeedTag doesn't store it, so back it up separately. It has nothing to do with SeedTag's own password.
    **Generate a 7-word passphrase** is recommended (≈77 bits). Write it down and label it *SeedTag password*: it's made of
    the same BIP39 words as a seed phrase, so an unlabeled copy is easy to mistake for one, by you or by your heirs. Then
@@ -365,7 +365,10 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
 4. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
    It stops the backup from being overwritten or erased, but not, on most chips, from being locked against reading
    by someone who gets hold of the tag (see [Choosing a tag](#choosing-a-tag)).
-5. **Restore**: same as Verify, but the words are shown.
+5. **Restore**: same as Verify, but the words are shown. They're only the seed's words: if your wallet also used a
+   passphrase of its own (a "25th word"), it isn't on the tag, and without it the wallet opens empty. A wallet can
+   also look empty when the funds are under another account or address type: check its settings before you assume
+   anything is lost. The app and `seedtag.py decrypt` say this next to the words.
 6. **Erase**, the fourth tab, to retire a tag or reuse it. Scan it first (nothing is written): the app
    shows what it holds, a SeedTag backup, other data or nothing, and whether it can be erased at all (a read-only
    tag can't). For a backup you can **Check the password first**: the app decrypts what it just read (no second
@@ -515,7 +518,8 @@ tag   = one NDEF Text record, lang "en", standard Base64 of blob (104 chars for 
 
 The *fingerprint* is the first 4 bytes of `SHA-256("seedtag-fp" ‖ entropy)`. It isn't secret, and it lets you confirm two
 backups or a recovery match without showing the words. The same seed always gives the same fingerprint, whatever the tag
-or password.
+or password. It's SeedTag's own: wallets often show a fingerprint too (of the wallet's master key), but that's a different
+number and never matches this one.
 
 It can't be turned back into the seed, and it doesn't help anyone guess the tag's password. It only helps someone who
 already knows *most* of the seed: with two words of a 24-word phrase missing, the BIP39 checksum leaves about 16,000

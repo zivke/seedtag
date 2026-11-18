@@ -29,6 +29,13 @@ All notable user-visible changes to SeedTag. The format follows
   still goes on (for practice, say).
 
 ### Changed
+- Restore and `seedtag.py decrypt` now say, next to the words, that only
+  the seed's words are stored: a wallet passphrase (a "25th word") isn't,
+  and a wallet can also look empty when the funds are under another account
+  or address type. The fingerprint texts say it's SeedTag's own, not the
+  one a wallet shows. A checksum mismatch now adds that a phrase whose words
+  are all right isn't a BIP39 phrase (an Electrum one, for example); Back up
+  names Electrum, SLIP-39 and Monero phrases as not supported.
 - The *Before you start* checklist on Back up, Verify and Restore now
   starts, right after *Read every screen carefully*, with *Safest on a
   spare phone*: its *Learn more* explains why a phone that's never online

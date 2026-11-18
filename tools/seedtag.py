@@ -265,7 +265,8 @@ def words_to_entropy(words: list[str]) -> bytes:
     entropy = (bits >> cs_bits).to_bytes(ent_bits // 8, "big")
     checksum = bits & ((1 << cs_bits) - 1)
     if hashlib.sha256(entropy).digest()[0] >> (8 - cs_bits) != checksum:
-        raise ValueError("checksum mismatch - check the words")
+        raise ValueError("checksum mismatch - check the words. If every word is right, this isn't "
+                         "a BIP39 phrase (an Electrum phrase, for example).")
     return entropy
 
 
@@ -692,8 +693,13 @@ def main(argv):
                       "check your written copy.", file=sys.stderr)
             if cmd == "decrypt":
                 print(" ".join(entropy_to_words(entropy)))
+                print("note: these are only the seed's words. If your wallet also used a passphrase of its own "
+                      "(a \"25th word\"), it isn't stored here, and without it the wallet opens empty. A wallet "
+                      "can also look empty when the funds are under another account or address type: check "
+                      "its settings before you assume anything is lost.", file=sys.stderr)
             else:
                 print(f"OK  {len(entropy) * 3 // 4} words  fingerprint: {fingerprint(entropy)}")
+                print("(SeedTag's own fingerprint, not the one a wallet shows)", file=sys.stderr)
     except ValueError as e:
         print(f"FAIL: {e}", file=sys.stderr)
         return 1

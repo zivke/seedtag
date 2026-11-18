@@ -12,7 +12,10 @@ sealed class SeedTagException(message: String) : Exception(message) {
         SeedTagException("Word #$position isn't in the BIP39 English wordlist.")
 
     class BadChecksum :
-        SeedTagException("Checksum mismatch – one or more words are wrong or in the wrong order.")
+        SeedTagException(
+            "Checksum mismatch – one or more words are wrong or in the wrong order. If every word is right, this " +
+                "isn't a BIP39 phrase (an Electrum phrase, for example), and SeedTag can't store it.",
+        )
 
     class UnsupportedVersion(version: Int) : SeedTagException(
         if (version in SeedBox.VERSION + 1..SeedBox.MAX_FUTURE_VERSION) {

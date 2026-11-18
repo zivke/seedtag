@@ -1132,7 +1132,7 @@ private fun LengthStep(vm: SeedTagViewModel) {
             "Only the words are stored",
             "If your wallet also uses a BIP39 passphrase (a \"25th word\", set in the wallet), SeedTag doesn't store it: " +
                 "back it up separately, or the words alone won't restore your funds. SeedTag's own password, set later, is " +
-                "something else. Only English BIP39 phrases are supported.",
+                "something else. Only English BIP39 phrases are supported, not Electrum, SLIP-39 (Shamir) or Monero phrases.",
         )
     }
 }
@@ -1475,7 +1475,8 @@ private fun DoneStep(vm: SeedTagViewModel) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Facts(listOf(Fact("Fingerprint", it, mono = true)))
                 Text(
-                    "This isn't secret. If the backup is intact, Verify (here or in seedtag.py) shows the same value.",
+                    "This isn't secret. If the backup is intact, Verify (here or in seedtag.py) shows the same value. " +
+                        "It's SeedTag's own: a wallet may show a fingerprint too, but that's a different number.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1689,6 +1690,14 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
             if (words != null) {
                 WordGrid(words)
                 DangerButton("Hide words", vm::hideRestored)
+                Notice(
+                    Tone.Caution,
+                    "If your wallet shows no funds",
+                    "These are only the seed's words. If your wallet also used a passphrase of its own (a \"25th word\", " +
+                        "set in the wallet, not SeedTag's password), it isn't on the tag, and without it the wallet opens " +
+                        "empty. A wallet can also look empty when the funds are under another account or address type: " +
+                        "check its settings before you assume anything is lost.",
+                )
             } else {
                 Text(
                     "The words are hidden. To see them again, restore the tag once more.",
@@ -1703,7 +1712,8 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                 "The tag reads correctly, and your password decrypts it to a valid ${result.wordCount}-word seed.",
                 "The fingerprint is the same for the same seed on any tag, with any password and in seedtag.py. It " +
                     "isn't secret and doesn't reveal the words. Compare it with the one shown after the backup – if they " +
-                    "match, this tag holds that seed.",
+                    "match, this tag holds that seed. It's SeedTag's own: a wallet may show a fingerprint too, but that's " +
+                    "a different number.",
             )
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionLabel("Lock the tag")

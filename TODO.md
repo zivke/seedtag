@@ -203,7 +203,7 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B25: Android 16 ignores the portrait lock on large screens** *(device: A2)*. `field` into the view model;
   veil on `onPause` without focus.
 - [ ] **B26: seed words may be clipped at large font sizes** *(device: H1)*. Two columns when needed.
-- [ ] **B27: Restore and `decrypt` end at the words.** "BIP39 words only, no wallet passphrase or account"; a
+- [x] **B27: Restore and `decrypt` end at the words.** "BIP39 words only, no wallet passphrase or account"; a
   better checksum message for non-BIP39 phrases; "not your wallet's fingerprint".
 - [ ] **B28: not ready for screen readers** *(device: A3)*. Content descriptions and roles, announcements, idle
   timer on accessibility actions, README "Accessibility".
