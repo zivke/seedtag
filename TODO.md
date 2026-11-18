@@ -222,7 +222,7 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B31: warning fatigue; idle timeout short for Restore.**
 - [ ] **B32: a refused write reads as "moved away"; one bad read-back calls the tag faulty** *(device: N10)*.
 - [ ] **B33: SDK, JDK and apt not pinned; AGP may download SDK packages.**
-- [ ] **B34: RELEASING.md:129-133 stale** ("0.4.3"; add the Dockerfile and the metadata `<configuration>` block).
+- [x] **B34: RELEASING.md:129-133 stale** ("0.4.3"; add the Dockerfile and the metadata `<configuration>` block).
 - [ ] **B35: one Gradle cache volume shared by every project's container** (`gradle-cache-${devcontainerId}`).
 - [ ] **B36: gaps in `check-apk.sh`, `check-workflows.py` and the metadata `<configuration>` check.**
 - [ ] **B37: no CI on branch pushes** (tests-only workflow).

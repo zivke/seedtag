@@ -128,9 +128,30 @@ its message says why and what to do.
 
 **A changed `release-tag.sh` runs one release late.** The clone runs the copy from the last release tag, so changes
 to the script are reviewed in the next release and first run in the one after. Until then, check by hand what the
-new checks would have: for 0.4.3, which 0.4.2's copy reviews, look at
-`git diff --stat v0.4.2 <release commit> -- gradle/ .gitattributes .gitmodules` and compare any changed wrapper jar or
-`gradle-wrapper.properties` with gradle.org.
+new checks would have. **The first release after 0.4.2** is reviewed by 0.4.2's copy, which checks neither the
+Gradle wrapper jar nor `gradle-wrapper.properties`, and that release changes the properties (Gradle 9.9). So look at
+`git diff v0.4.2 <release commit> -- gradle/wrapper/ .gitattributes .gitmodules`:
+- `distributionUrl` must point to `https://services.gradle.org/distributions/`, and `distributionSha256Sum` must be
+  the checksum [gradle.org/release-checksums](https://gradle.org/release-checksums/) lists for that version and
+  distribution (`-bin` or `-all`). Look it up in your browser.
+- A changed `gradle-wrapper.jar` must match the "Wrapper JAR Checksum" there:
+  `git show <release commit>:gradle/wrapper/gradle-wrapper.jar | sha256sum` (`shasum -a 256` on macOS).
+- `.gitattributes`: 0.4.2's copy already refuses a filter; read anything else that changed.
+- `.gitmodules`: there must be none. 0.4.2's copy doesn't yet refuse a submodule.
+
+**What no copy of the script stops at**, in every release. The review's diff shows these, but nothing asks about
+them, so check them yourself:
+- **`gradle/verification-metadata.xml`, its `<configuration>` block** (the first dozen lines). A line there can turn
+  checking off for whole groups of dependencies, and it's easy to miss among thousands of changed checksum lines.
+  Compare the block on its own:
+  `git show <rev>:gradle/verification-metadata.xml | sed -n '/<configuration>/,/<\/configuration>/p'` for the last
+  release tag and for the release commit. Today it holds `verify-metadata` true, `verify-signatures` false, and
+  trusts only `-javadoc` and `-sources` jars, which are never built into the APK.
+- **`.devcontainer/Dockerfile`**: a changed base image digest (`FROM …@sha256:`), or a changed
+  `CMDLINE_TOOLS_SHA256`, `ANDROID_JAR_SHA256` or `LAMBDA_STUBS_SHA256`. The commit that changed one should say
+  where the new value came from; check that it does. A new tools checksum should come with a new
+  `CMDLINE_TOOLS_BUILD`, `ANDROID_PLATFORM` or `ANDROID_BUILD_TOOLS`: a checksum that changed on its own is a red
+  flag.
 
 ## 4. The tag's CI run
 
