@@ -72,6 +72,8 @@ All notable user-visible changes to SeedTag. The format follows
   process usually stays in memory for a while, with the copies that can't be
   wiped (now including Argon2id's 64 MiB) until they're overwritten: restart
   the phone when you're done, or at least force-stop SeedTag.
+- README, *Using it safely*, point 5: says what checking a tag on another
+  computer can't rule out: a secret hidden in the random salt and nonce.
 - Releasing, `tools/release-tag.sh`: tags only the release commit itself
   (it refuses a later commit, whose parent already has the version), and
   RELEASING.md passes it with `--commit`. A changed Gradle wrapper jar, and

@@ -266,6 +266,10 @@ seed. From safest down:
    packages out; about a minute). It must print the fingerprint the app shows. Read the tag with another NFC app
    too: it should hold one Text record and nothing else. [The dependency report](reports/2026-11-14-dependency-risk.md)
    lists what else a poisoned library could do.
+   This rules out a weak key and extra data on the tag, but not everything. The salt and nonce (28 bytes of the
+   blob) are random by design, so nothing can tell them apart from a secret a poisoned app hid in them, such as the
+   seed encrypted for an attacker who later reads the tag. Against that, only the build itself helps: an APK whose
+   source and build you can check ([Signing a release](#signing-a-release)), and a tag kept out of strangers' reach.
 
 The Back up, Verify and Restore screens remind you of this (*Safest on a spare phone*, second in their checklist,
 explains it under *Learn more*, and so does the About page), say whether airplane mode is on, and warn when USB or
