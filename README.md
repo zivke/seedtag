@@ -594,10 +594,14 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
     letters are hidden too);
   - copies of the AES key inside Android's crypto code. SeedTag keeps Android's AES on purpose: it's
     hardware-accelerated and resistant to timing attacks, unlike a pure-Java AES whose key could be wiped;
-  - text Compose has already drawn on screen.
+  - text Compose has already drawn on screen;
+  - the 64 MiB Argon2id works in, which the Bouncy Castle version SeedTag uses doesn't clear afterwards.
 
-  Everything is dropped when the app is backgrounded. What's left in memory until it's overwritten can only be read
-  with root access or a debugger.
+  When the app is backgrounded, it drops every reference to what was typed or decrypted, but Android usually keeps
+  the app's process in memory for a while (minutes to days), and the copies above stay in it until they're
+  overwritten. They can only be read with root access, a debugger or a forensic memory dump. To clear them, restart
+  the phone when you're done (the offline advice in [Using it safely](#using-it-safely) asks for that anyway), or at
+  least force-stop SeedTag (*Settings › Apps › SeedTag › Force stop*).
 - The Ultralight C's own 3DES access protection isn't used, and isn't needed: the payload is encrypted.
 
 ## Tests

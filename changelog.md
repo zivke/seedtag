@@ -67,6 +67,11 @@ All notable user-visible changes to SeedTag. The format follows
   app to see that it holds nothing else. *Recovering on a computer* says how
   to run `seedtag.py` without any installed package. A new report lists every
   dependency and what it could do if poisoned.
+- README, *What's wiped from memory*: no longer says everything is dropped
+  when the app is backgrounded. The app drops its references, but its
+  process usually stays in memory for a while, with the copies that can't be
+  wiped (now including Argon2id's 64 MiB) until they're overwritten: restart
+  the phone when you're done, or at least force-stop SeedTag.
 - Releasing, `tools/release-tag.sh`: tags only the release commit itself
   (it refuses a later commit, whose parent already has the version), and
   RELEASING.md passes it with `--commit`. A changed Gradle wrapper jar, and
