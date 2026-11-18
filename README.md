@@ -303,11 +303,13 @@ The safest way to use SeedTag, from start to finish:
    password for the tag is planned; once it's in the app, its instructions here will say where it fits, before
    making the tag read-only.
 7. **Make at least two tags** this way and keep them in different places, out of strangers' reach (a metal box or
-   shielding sleeve). Keep your paper or metal copy of the seed too, somewhere else again. Keep the written
+   shielding sleeve), cool and dry, and away from wireless chargers and induction hobs ([Storing a
+   tag](#choosing-a-tag)). Keep your paper or metal copy of the seed too, somewhere else again. Keep the written
    password apart from the tags, together with a copy of `seedtag.py` (printed or on a USB stick).
 8. **Keep the phone** offline in a drawer, with SeedTag on it, for the yearly Verify: that means typing the password
    again, and this phone is the safest place to do it. SeedTag stores nothing, and powering the phone off clears
-   its memory. If the phone is ever going to go online or be given away, factory-reset it first.
+   its memory. If the phone is ever going to go online or be given away, factory-reset it first. Every five years or
+   so, use it to write a fresh set of tags.
 
 ## Using it
 
@@ -437,6 +439,23 @@ check compares; in the chip's raw memory, the TLV wrapper around it takes 3 byte
 rated for 10 years (at 22 °C), others for 25–60. Check the datasheet of the exact chip you buy: older revisions
 can differ (MIFARE Ultralight C was rated for 5 years before the current datasheet). Treat a 10-year tag as one
 copy among several, and verify it every now and then.
+
+**Storing a tag.** What kills a tag is mostly physical:
+- **Heat.** The retention figures are rated at 22 °C; a hot place (an attic, a car, a windowsill, next to a
+  radiator) shortens them. Keep tags cool and dry.
+- **Wireless chargers and induction hobs.** Both make a strong alternating magnetic field (a charger at about
+  100–200 kHz, a hob at about 20–100 kHz), which induces a voltage in the tag's antenna coil. On a charger that can
+  be enough to destroy the chip: the Qi standard has a whole part on detecting tags and cards to protect them, which
+  not every charger has. A hob works the same way, with kilowatts where a charger has tens of watts at most. Keep
+  tags away from both, and from other strong magnetic fields.
+- **Bending.** In a paper sticker or a thin card, the antenna or its connection to the chip can break when bent. PVC
+  cards, epoxy and coin tags last better (see *Buying one* below); don't keep a sticker in a wallet.
+- **Time.** Write a fresh set of tags every five years or so, from your seed words, and verify them; then retire
+  the old ones (erase them, or destroy one that's read-only). A read-only tag can never be rewritten, so making a
+  tag read-only also means it can't be refreshed: its data only gets older.
+
+Writing itself barely wears a tag: NXP rates NTAG21x and Ultralight C for 100,000 writes (older Ultralight C
+datasheets said 10,000), and a backup or an erase takes a handful.
 
 **Tag families** (manufacturer figures, checked November 2026; check the datasheet of your chip):
 

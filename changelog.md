@@ -31,6 +31,10 @@ All notable user-visible changes to SeedTag. The format follows
   built-in Argon2id and AES-GCM, even when a package is installed.
 
 ### Changed
+- README: *Storing a tag*, on what physically kills a tag (heat, wireless
+  chargers and induction hobs, bending), and on writing a fresh set of tags
+  every five years or so (a read-only tag can't be rewritten, so it can't
+  be refreshed). The recommended procedure points to it.
 - `seedtag.py` and the app accept a backup's text the way it may have
   been copied or typed: spaces and line breaks anywhere, missing or extra
   `=` at the end, `-` and `_` for `+` and `/`, and the `en` some NFC apps
