@@ -34,4 +34,10 @@ sealed class SeedTagException(message: String) : Exception(message) {
 
     class WrongPassword :
         SeedTagException("Wrong password, or the tag data is corrupted.")
+
+    /** The platform's AES failed, not the password. [type] is the exception's class, never its message. */
+    class CryptoFailure(type: String) : SeedTagException(
+        "This phone's encryption failed ($type), so SeedTag couldn't encrypt or decrypt here. Nothing was written to " +
+            "a tag. If it keeps failing, use another phone, or seedtag.py on a computer.",
+    )
 }

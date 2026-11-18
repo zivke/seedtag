@@ -228,7 +228,7 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B40: storage advice** (heat, wireless chargers, bending, refresh every ~5 years).
 - [x] **B41: wording and numbers** (111/91 vs ~114/~94, step order in "Using it", one name for Lock, "Verified"
   for a different seed).
-- [ ] **B42: unexpected exceptions in the Argon2 paths crash the app** (one `runKdf` helper; map
+- [x] **B42: unexpected exceptions in the Argon2 paths crash the app** (one `runKdf` helper; map
   `GeneralSecurityException`).
 - [ ] **B43: dialog guards applied late and to the root view only.**
 - [ ] **B44: branch hygiene.** Delete `toolchain-update` and `dependency-trim`; merge `main` into `develop`.

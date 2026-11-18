@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -472,37 +473,61 @@ class SeedTagViewModel : ViewModel() {
     }
 
     private fun encrypt() {
-        if (busy != null) return // never two Argon2 runs of 64 MiB at once
         val snapshot = words.toList()
         val pw = password.copy()
-        val wipesAtStart = wipes
-        busy = "Encrypting and checking… (Argon2id runs twice; this takes a few seconds)"
-        viewModelScope.launch {
-            try {
-                val sealed = withContext(Dispatchers.Default) {
-                    val entropy = Bip39.wordsToEntropy(snapshot)
-                    try {
-                        val text = SeedBox.toBase64(SeedBox.seal(entropy, pw))
-                        // Decrypt exactly what will be written, with a second, independent key derivation,
-                        // so a fault on this device can't produce a backup nobody can open.
-                        if (decryptsTo(text, pw, entropy)) text to SeedBox.fingerprint(entropy) else null
-                    } finally { entropy.fill(0) }
-                }
-                if (wipes != wipesAtStart) return@launch
-                if (sealed == null) {
-                    return@launch showError(
-                        "Self-check failed – the encrypted backup didn't decrypt again. Nothing was written to the tag. " +
-                            "Try again, and if it keeps failing, don't make backups on this phone.",
-                    )
-                }
+        runKdf(
+            "Encrypting and checking… (Argon2id runs twice; this takes a few seconds)", pw,
+            work = {
+                val entropy = Bip39.wordsToEntropy(snapshot)
+                try {
+                    val text = SeedBox.toBase64(SeedBox.seal(entropy, pw))
+                    // Decrypt exactly what will be written, with a second, independent key derivation,
+                    // so a fault on this device can't produce a backup nobody can open.
+                    if (decryptsTo(text, pw, entropy)) text to SeedBox.fingerprint(entropy) else null
+                } finally { entropy.fill(0) }
+            },
+        ) { sealed ->
+            if (sealed == null) {
+                showError(
+                    "Self-check failed – the encrypted backup didn't decrypt again. Nothing was written to the tag. " +
+                        "Try again, and if it keeps failing, don't make backups on this phone.",
+                )
+            } else {
                 val (text, fp) = sealed
                 pendingFingerprint = fp
                 pendingText = text
                 arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write the backup")
+            }
+        }
+    }
+
+    /**
+     * Runs [work] (Argon2id, 64 MiB) off the main thread, never two at once, with [label] in the
+     * progress dialog, then [done] with its result on the main thread. If the app wiped meanwhile, or
+     * [current] has turned false, nothing is shown: neither the result nor an error. Every exception
+     * becomes an error dialog, never a crash. [pw] is zeroed at the end, also when nothing runs.
+     */
+    private fun <T> runKdf(label: String, pw: CharArray, current: () -> Boolean = { true }, work: () -> T, done: (T) -> Unit) {
+        if (busy != null) {
+            pw.fill(' ')
+            return showError("SeedTag is still busy with the previous step. Wait until it's done, then try again.")
+        }
+        val wipesAtStart = wipes
+        fun stale() = wipes != wipesAtStart || !current()
+        busy = label
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.Default) { work() }
+                if (!stale()) done(result)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: SeedTagException) {
-                showError(e.message ?: "Encryption failed.")
+                if (!stale()) showError(e.message ?: "Something went wrong. Nothing was written to a tag. Try again.")
             } catch (e: OutOfMemoryError) {
-                showError(OUT_OF_MEMORY)
+                if (!stale()) showError(OUT_OF_MEMORY)
+            } catch (e: Exception) {
+                // Only the type: another library's message isn't known to be free of secrets.
+                if (!stale()) showError("Something went wrong (${e.javaClass.simpleName}). Nothing was written to a tag. Try again.")
             } finally {
                 pw.fill(' ')
                 busy = null
@@ -558,31 +583,21 @@ class SeedTagViewModel : ViewModel() {
     fun checkErasePassword() {
         val text = eraseCheck?.text ?: return
         if (erasePassword.isEmpty()) return showError("Enter the password first.")
-        if (busy != null) return
         val pw = erasePassword.copy()
-        val wipesAtStart = wipes
         val session = eraseSession
-        busy = "Checking the password… (Argon2id takes a few seconds, longer if the password needs a second try)"
-        viewModelScope.launch {
-            try {
-                val (count, fp, fix) = withContext(Dispatchers.Default) {
-                    val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)
-                    try {
-                        Triple(Bip39.entropyToWords(opened.entropy).size, SeedBox.fingerprint(opened.entropy), opened.fix)
-                    } finally { opened.entropy.fill(0) }
-                }
-                if (wipes != wipesAtStart || session != eraseSession) return@launch
-                eraseVerified = VerifyResult(count, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix)
-                clearPasswords(PwField.Erase)
-                _haptics.tryEmit(Haptic.Success)
-            } catch (e: SeedTagException) {
-                showError(e.message ?: "Decryption failed.")
-            } catch (e: OutOfMemoryError) {
-                showError(OUT_OF_MEMORY)
-            } finally {
-                pw.fill(' ')
-                busy = null
-            }
+        runKdf(
+            "Checking the password… (Argon2id takes a few seconds, longer if the password needs a second try)", pw,
+            current = { session == eraseSession },
+            work = {
+                val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)
+                try {
+                    Triple(Bip39.entropyToWords(opened.entropy).size, SeedBox.fingerprint(opened.entropy), opened.fix)
+                } finally { opened.entropy.fill(0) }
+            },
+        ) { (count, fp, fix) ->
+            eraseVerified = VerifyResult(count, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix)
+            clearPasswords(PwField.Erase)
+            _haptics.tryEmit(Haptic.Success)
         }
     }
 
@@ -761,31 +776,21 @@ class SeedTagViewModel : ViewModel() {
 
     private fun decrypt(text: String, reveal: Boolean) {
         val pw = readPassword.copy()
-        val wipesAtStart = wipes
-        viewModelScope.launch {
-            busy = "Decrypting… (Argon2id takes a few seconds, longer if the password needs a second try)"
-            try {
-                val (words, fp, fix) = withContext(Dispatchers.Default) {
-                    // A wrong password is retried without extra spaces, then lower-cased.
-                    val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)
-                    try {
-                        Triple(Bip39.entropyToWords(opened.entropy), SeedBox.fingerprint(opened.entropy), opened.fix)
-                    } finally { opened.entropy.fill(0) }
-                }
-                if (wipes != wipesAtStart) return@launch
-                verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix, restored = reveal)
-                lockTarget = text
-                if (reveal) restoredWords = words
-                clearPasswords(PwField.Read)
-                _haptics.tryEmit(Haptic.Success)
-            } catch (e: SeedTagException) {
-                showError(e.message ?: "Decryption failed.")
-            } catch (e: OutOfMemoryError) {
-                showError(OUT_OF_MEMORY)
-            } finally {
-                pw.fill(' ')
-                busy = null
-            }
+        runKdf(
+            "Decrypting… (Argon2id takes a few seconds, longer if the password needs a second try)", pw,
+            work = {
+                // A wrong password is retried without extra spaces, then lower-cased.
+                val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)
+                try {
+                    Triple(Bip39.entropyToWords(opened.entropy), SeedBox.fingerprint(opened.entropy), opened.fix)
+                } finally { opened.entropy.fill(0) }
+            },
+        ) { (words, fp, fix) ->
+            verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix, restored = reveal)
+            lockTarget = text
+            if (reveal) restoredWords = words
+            clearPasswords(PwField.Read)
+            _haptics.tryEmit(Haptic.Success)
         }
     }
 

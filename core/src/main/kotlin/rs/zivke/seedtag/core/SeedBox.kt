@@ -8,6 +8,7 @@ import org.bouncycastle.crypto.params.Argon2Parameters
 import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.CharacterCodingException
+import java.security.GeneralSecurityException
 import java.security.SecureRandom
 import java.text.Normalizer
 import java.util.Base64
@@ -60,6 +61,8 @@ object SeedBox {
             cipher.updateAAD(header)
             val ct = cipher.doFinal(entropy)
             return header + salt + nonce + ct
+        } catch (e: GeneralSecurityException) {
+            throw SeedTagException.CryptoFailure(e.javaClass.simpleName)
         } finally {
             key.fill(0)
         }
@@ -67,7 +70,7 @@ object SeedBox {
 
     /**
      * Decrypts a blob back to raw entropy. Caller must zero the result when done.
-     * @throws SeedTagException.WrongPassword / UnsupportedVersion / Malformed
+     * @throws SeedTagException.WrongPassword / UnsupportedVersion / Malformed / CryptoFailure
      */
     fun open(blob: ByteArray, password: CharArray): ByteArray {
         if (blob.isEmpty()) throw SeedTagException.Malformed("empty")
@@ -86,6 +89,9 @@ object SeedBox {
             return cipher.doFinal(blob, offset, blob.size - offset)
         } catch (e: AEADBadTagException) {
             throw SeedTagException.WrongPassword()
+        } catch (e: GeneralSecurityException) {
+            // Not the password: the platform's AES itself failed (a missing provider, a rejected key).
+            throw SeedTagException.CryptoFailure(e.javaClass.simpleName)
         } finally {
             key.fill(0)
         }

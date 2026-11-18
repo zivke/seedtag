@@ -119,6 +119,10 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- An unexpected error while encrypting or decrypting (a fault in the
+  phone's own encryption, say) shows an error message instead of closing
+  the app. An error that comes after the app has cleared everything, or
+  after Erase was started over, is no longer shown over the empty screen.
 - On a phone that lacks the NFC or accessibility Settings screen, *Turn on
   NFC* and the accessibility banner's link open the main Settings screen
   instead of closing the app.
