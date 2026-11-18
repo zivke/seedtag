@@ -152,9 +152,12 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B4: the process outlives the wipe.** Correct README:592 ("Everything is dropped") now and advise a
   force-stop or restart. Decide whether to end the process in `onStop`, only when no tag I/O is pending, and what
   Done and Verify show afterwards.
-- [ ] **B5: salt and nonce are a 28-byte covert channel `verify` can't detect.** Reword README step 5 now (it
-  rules out a weak key, not a hidden channel). Deriving them from the secrets is a format decision: it makes
-  password guesses cheap for anyone who knows the seed. Design review first.
+- [ ] **B5: salt and nonce are a 28-byte covert channel `verify` can't detect.**
+  - [x] Reword README step 5 (it rules out a weak key, not a hidden channel).
+  - [ ] Derive salt and nonce from the secrets so `seedtag.py verify` can check them: options, trade-offs and what
+    the fix needs in [the salt and nonce report](reports/2026-11-18-salt-nonce-channel.md). A format decision for
+    the owner (the report recommends option C, after a review); own branch. The generated passphrase stays a way
+    out for a malicious app even then (the report, "What it doesn't close").
 - [ ] **B6: the app never has the user compare the words it encrypts.** A review step before Password, or at least
   "Restore once and compare every word" in the Done steps and the Verify checklist.
 - [ ] **B7: no path to a second tag; retyping the generated passphrase scores "Weak".** "Write the same backup to
