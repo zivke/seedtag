@@ -11,6 +11,7 @@ vector with the built-in Argon2id at the real parameters (about a minute).
 import ast
 import base64
 import contextlib
+import hashlib
 import io
 import os
 import pathlib
@@ -55,6 +56,11 @@ class Bip39(unittest.TestCase):
         app = (HERE.parent / "core/src/main/resources/rs/zivke/seedtag/core/bip39-english.txt")
         self.assertEqual(app.read_text(encoding="utf-8").split(), seedtag.WORDLIST)
 
+    def test_wordlist_is_the_official_file(self):
+        # bitcoin/bips, bip-0039/english.txt: 2048 lines, each ending in a newline.
+        official = "2f5eed53a4727b4bf8880d8f3f199efc90e58503646d9ff8eff3a2ed3b24dbda"
+        self.assertEqual(official, hashlib.sha256(("\n".join(seedtag.WORDLIST) + "\n").encode()).hexdigest())
+
 
 class SeedBoxV1(unittest.TestCase):
     """Same file SeedBoxTest.kt reads: the two implementations must agree byte for byte."""
@@ -66,6 +72,11 @@ class SeedBoxV1(unittest.TestCase):
             for pw, ent, salt, nonce, b64, fp in rows("seedtag-v1-vectors.tsv")
         ]
         self.assertGreaterEqual(len(self.vecs), 5)
+
+    def test_vectors_cover_long_and_non_bmp_passwords(self):
+        self.assertTrue(any(len(pw) == 128 for pw, *_ in self.vecs))
+        # Outside the BMP, and one that NFKD changes (fraktur U to U).
+        self.assertTrue(any("\U0001D518" in pw and any(ord(c) > 0xFFFF for c in pw) for pw, *_ in self.vecs))
 
     def test_seal_matches_vectors(self):
         for pw, ent, salt, nonce, b64, _ in self.vecs:

@@ -4,9 +4,10 @@
 package rs.zivke.seedtag.core
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
-/** NdefText.differences: what Verify and Restore say about a Text record SeedTag didn't write exactly. */
+/** NdefText: decoding a Text record's payload, and what Verify and Restore say about one SeedTag didn't write exactly. */
 class NdefTextTest {
 
     /** The 24-word vector's text, exactly as SeedTag writes it. */
@@ -40,5 +41,18 @@ class NdefTextTest {
             listOf("a language code other than en", "text that isn't exactly what SeedTag writes (spaces or line breaks in it, or a different ending)"),
             NdefText.differences(payload(2, "fr", (text.substring(0, 50) + "\n" + text.substring(50)).toByteArray())),
         )
+    }
+
+    @Test
+    fun decodesUtf16AndRefusesBrokenPayloads() {
+        // UTF-16 as Java writes it (byte-order mark, big-endian), and little-endian with its mark.
+        assertEquals(text, NdefText.decodePayload(payload(0x82, "en", text.toByteArray(Charsets.UTF_16))))
+        val le = byteArrayOf(0xFF.toByte(), 0xFE.toByte()) + text.toByteArray(Charsets.UTF_16LE)
+        assertEquals(text, NdefText.decodePayload(payload(0x82, "en", le)))
+        // Empty, and a language code longer than the payload.
+        assertThrows(SeedTagException.Malformed::class.java) { NdefText.decodePayload(ByteArray(0)) }
+        assertThrows(SeedTagException.Malformed::class.java) { NdefText.decodePayload(byteArrayOf(0x05, 0x65, 0x6E)) }
+        // Status byte only, no language and no text: an empty text.
+        assertEquals("", NdefText.decodePayload(byteArrayOf(0x00)))
     }
 }

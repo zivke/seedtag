@@ -8,11 +8,21 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
+import java.security.MessageDigest
 import java.security.SecureRandom
 
 class Bip39Test {
 
     private fun hex(s: String) = ByteArray(s.length / 2) { s.substring(2 * it, 2 * it + 2).toInt(16).toByte() }
+
+    /** The wordlist is the official file, byte for byte (bitcoin/bips, bip-0039/english.txt). */
+    @Test
+    fun wordlistIsTheOfficialFile() {
+        val bytes = javaClass.getResourceAsStream("/rs/zivke/seedtag/core/bip39-english.txt")!!.use { it.readBytes() }
+        val sha = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+        assertEquals("2f5eed53a4727b4bf8880d8f3f199efc90e58503646d9ff8eff3a2ed3b24dbda", sha)
+        assertEquals(2048, Bip39.wordlist.size)
+    }
 
     /** Official Trezor reference vectors (python-mnemonic/vectors.json, English). */
     @Test

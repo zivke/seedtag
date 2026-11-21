@@ -33,6 +33,13 @@ class SeedBoxTest {
     }
 
     @Test
+    fun vectorsCoverLongAndNonBmpPasswords() {
+        assertTrue(vectors.any { it.password.length == 128 })
+        // Outside the BMP (surrogate pairs in a CharArray), and one that NFKD changes (fraktur U to U).
+        assertTrue(vectors.any { v -> v.password.any { it.isSurrogate() } && v.password.contains("\uD835\uDD18") })
+    }
+
+    @Test
     fun openPythonBlobs() {
         for (v in vectors) {
             val e = SeedBox.open(SeedBox.fromBase64(v.b64), v.password.toCharArray())
