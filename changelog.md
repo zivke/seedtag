@@ -49,6 +49,13 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- A password that doesn't open a tag (on Verify, Restore or Erase's
+  password check) no longer ends at "Wrong password, or the tag data is
+  corrupted". The message says what to check, in order: compare the
+  password with your written copy, check that it's the right tag, then try
+  `seedtag.py`. For a password made of words, it says which ones, by
+  position, aren't BIP39 words. The password keyboard is wider: it runs
+  almost to the screen's edges.
 - README: *Storing a tag*, on what physically kills a tag (heat, wireless
   chargers and induction hobs, bending), and on writing a fresh set of tags
   every five years or so (a read-only tag can't be rewritten, so it can't

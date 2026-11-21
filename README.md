@@ -378,7 +378,10 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    compare the fingerprint with the one shown after the backup. Verify again every now and then (say once a year)
    to make sure the tag still reads.
    If the password is wrong, the app tries it again without extra spaces, then in lower case, and tells you if that
-   worked, so you can correct your written copy.
+   worked, so you can correct your written copy. If it still doesn't open the tag, the app says what to check, in
+   order: compare the password with your copy (**Show**); whether it's the right tag; then `seedtag.py`, which tells
+   a damaged tag from a wrong password. For a password made of words, it also says which words, by position, aren't
+   BIP39 words, the likeliest typos in a generated passphrase.
    Verify and Restore also say whether the tag's message is exactly what SeedTag writes: one Text record, language
    `en`, the Base64 text and nothing else. If it isn't (another record, another language code, spaces in the text…),
    they say what's different. That's expected for a tag you wrote with another app, from `seedtag.py encrypt` say.

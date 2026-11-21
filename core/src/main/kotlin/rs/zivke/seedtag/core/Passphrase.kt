@@ -120,6 +120,27 @@ object Passphrase {
     private const val DIGITS = 1
     private const val OTHER = 2
 
+    /**
+     * For a password that looks like a word passphrase (at least 3 words between spaces, at least half
+     * of them BIP39 words, in any case): the positions, from 1, of the words that aren't BIP39 words,
+     * empty if all are. Null for any other password. Shown when a password doesn't open a tag, since a
+     * mistyped word is the likeliest cause; only positions, never the words. Works on the chars
+     * directly, without a String copy.
+     */
+    fun nonWordPositions(password: CharArray, length: Int = password.size): List<Int>? {
+        val words = ArrayList<IntRange>()
+        var i = 0
+        while (i < length) {
+            if (password[i].isWhitespace()) { i++; continue }
+            val start = i
+            while (i < length && !password[i].isWhitespace()) i++
+            words += start until i
+        }
+        if (words.size < 3) return null
+        val bad = words.indices.filter { Bip39.indexOf(password, words[it].first, words[it].last + 1, true) < 0 }
+        return if (bad.size * 2 <= words.size) bad.map { it + 1 } else null
+    }
+
     /** Tokens of `chars[0 until length]` as (start, end, kind); whitespace only separates them. */
     private fun tokens(chars: CharArray, length: Int): List<Triple<Int, Int, Int>> {
         fun kind(c: Char) = when {

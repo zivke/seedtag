@@ -266,6 +266,9 @@ on hidden data (H…, `TODO.md`). Each change adds its rows here in the same com
 | 7.18 ⚠ | H3: Back up a 12-word seed over a 24-word backup, then dump | As 7.17: nothing of the older backup's last 18 characters left after the new one. | ⬜ |
 | 7.19 | H3: pull the tag away right after *Reading it back to check it* (hard to time; try a few times) | *Backup written* with the caution *Old data may still be on the tag* and *Clear old data*. Tapping it and holding the same tag: the notice goes away; a dump shows zeros after the backup. A different tag: *This isn't the tag you just wrote*. | ⬜ |
 | 7.20 | H3: Back up to a tag that isn't NTAG or MIFARE Ultralight (Type 4 or 5), if you have one | *Backup written* with the notice that old data may still be there and to use a new tag if it ever held anything secret. | ⬜ |
+| 7.21 | Verify with a wrong password: once with a 7-word passphrase where one word is misspelt (e.g. `abandn` for `abandon`), once with every word a real BIP39 word but one of them wrong, once with a password that isn't words (`Tr0ub4dor&3`) (B45) | Title *This password doesn't open the tag*, three numbered steps (Show and compare; the right tag; seedtag.py). The misspelt case adds *Word 2 isn't a BIP39 word…* (its position), the all-words case *Every word is a BIP39 word…*, the other case neither. The password stays in the field, so Show works. | ⬜ |
+| 7.22 | Erase, *Check the password first*, with a wrong password (B45) | The same title; step 2 says you can erase without checking if you're sure it's the right backup, step 3 suggests seedtag.py before erasing. | ⬜ |
+| 7.23 | The password keyboard on Back up's Password step, Verify and Erase (B45), on a narrow phone if you have one | Its keys reach almost to the screen's edges (about 4dp left), wider than before; nothing cut off, no key overlaps another. The word keypad is unchanged. | ⬜ |
 
 ## Short regression check for every release
 

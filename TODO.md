@@ -239,7 +239,9 @@ report's tests N1–N12, A1–A3, H1).
   `GeneralSecurityException`).
 - [ ] **B43: dialog guards applied late and to the root view only.**
 - [ ] **B44: branch hygiene.** Delete `toolchain-update` and `dependency-trim`; merge `main` into `develop`.
-- [ ] **B45: "Wrong password, or the tag data is corrupted" is a dead end** (hints).
+- [x] **B45: "Wrong password, or the tag data is corrupted" is a dead end** (hints). `Dialog.WrongPassword` with
+  the steps to check, non-BIP39 word positions (`Passphrase.nonWordPositions`, tested), Erase's own variant; the
+  password keyboard runs into the gutters (`intoGutter`).
 - [ ] **B46: small screens, contrast, English-only strings.**
 - [ ] **B47: test gaps** (wordlist hash, `NdefText` paths, long and non-BMP password vectors, a differential test).
   - [x] The wordlist's SHA-256 pinned in both suites; `NdefText.decodePayload`'s UTF-16 (both byte orders) and

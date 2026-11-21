@@ -131,4 +131,18 @@ class PassphraseTest {
             assertEquals(pw, spaces, Passphrase.hasStraySpaces(pw.toCharArray()))
         }
     }
+
+    @Test
+    fun nonWordPositionsPointAtTypos() {
+        fun pos(pw: String) = Passphrase.nonWordPositions(pw.toCharArray())
+        assertEquals(listOf(2), pos("abandon abandn ability able"))
+        assertEquals(listOf(2, 4), pos("abandon abandn  ability  abel zoo"))
+        assertEquals(emptyList<Int>(), pos("ABANDON Ability able"))
+        // Not a word passphrase: fewer than 3 words, or mostly not BIP39 words.
+        assertEquals(null, pos("abandon ability"))
+        assertEquals(null, pos("my dog Rex 1999"))
+        assertEquals(null, pos("Tr0ub4dor&3"))
+        // Only the first [length] chars count, as in a SecretChars buffer.
+        assertEquals(listOf(3), Passphrase.nonWordPositions("abandon ability ablx zzzz".toCharArray(), 20))
+    }
 }

@@ -72,6 +72,12 @@ enum class SettingsPage { Nfc, Accessibility, Developer }
 
 sealed interface Dialog {
     data class Error(val message: String) : Dialog
+    /**
+     * The password didn't open the tag, even with spaces collapsed and lower-cased. [nonWords]: the
+     * positions of words that aren't BIP39 words, if it looks like a word passphrase
+     * ([Passphrase.nonWordPositions]); [erase]: on the Erase tab.
+     */
+    data class WrongPassword(val nonWords: List<Int>?, val erase: Boolean) : Dialog
     data class Info(val title: String, val message: String) : Dialog
     data class ConfirmOverwrite(val looksLikeSeedTag: Boolean) : Dialog
     data object ConfirmLock : Dialog
@@ -513,7 +519,14 @@ class SeedTagViewModel : ViewModel() {
      * [current] has turned false, nothing is shown: neither the result nor an error. Every exception
      * becomes an error dialog, never a crash. [pw] is zeroed at the end, also when nothing runs.
      */
-    private fun <T> runKdf(label: String, pw: CharArray, current: () -> Boolean = { true }, work: () -> T, done: (T) -> Unit) {
+    private fun <T> runKdf(
+        label: String,
+        pw: CharArray,
+        current: () -> Boolean = { true },
+        wrongPassword: Dialog.WrongPassword? = null,
+        work: () -> T,
+        done: (T) -> Unit,
+    ) {
         if (busy != null) {
             pw.fill(' ')
             return showError("SeedTag is still busy with the previous step. Wait until it's done, then try again.")
@@ -527,6 +540,8 @@ class SeedTagViewModel : ViewModel() {
                 if (!stale()) done(result)
             } catch (e: CancellationException) {
                 throw e
+            } catch (e: SeedTagException.WrongPassword) {
+                if (!stale()) dialog = wrongPassword ?: Dialog.Error(e.message ?: "Wrong password.")
             } catch (e: SeedTagException) {
                 if (!stale()) showError(e.message ?: "Something went wrong. Nothing was written to a tag. Try again.")
             } catch (e: OutOfMemoryError) {
@@ -600,6 +615,7 @@ class SeedTagViewModel : ViewModel() {
         runKdf(
             "Checking the password… (Argon2id takes a few seconds, longer if the password needs a second try)", pw,
             current = { session == eraseSession },
+            wrongPassword = Dialog.WrongPassword(Passphrase.nonWordPositions(pw), erase = true),
             work = {
                 val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)
                 try {
@@ -806,6 +822,7 @@ class SeedTagViewModel : ViewModel() {
         val pw = readPassword.copy()
         runKdf(
             "Decrypting… (Argon2id takes a few seconds, longer if the password needs a second try)", pw,
+            wrongPassword = Dialog.WrongPassword(Passphrase.nonWordPositions(pw), erase = false),
             work = {
                 // A wrong password is retried without extra spaces, then lower-cased.
                 val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)

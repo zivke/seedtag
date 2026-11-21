@@ -93,6 +93,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
@@ -589,6 +590,38 @@ private fun TagDiffersNotice(differences: List<String>) {
             "wasn't a genuine SeedTag, and it may have hidden your seed on the tag for someone who reads it later. " +
             "Then treat the seed as exposed: move your funds to a new seed, and back that up with a SeedTag you trust.",
     )
+}
+
+/** What to check when a password doesn't open a tag, most likely cause first. */
+private fun wrongPasswordText(d: Dialog.WrongPassword): String {
+    val words = d.nonWords
+    val hint = when {
+        words == null -> ""
+        words.isEmpty() -> " Every word is a BIP39 word, so a mistyped word would be another real word: compare each one."
+        else -> {
+            val list = if (words.size == 1) "${words[0]}" else words.dropLast(1).joinToString(", ") + " and ${words.last()}"
+            if (words.size == 1) {
+                " Word $list isn't a BIP39 word. A generated passphrase uses only BIP39 words, so if yours is one, " +
+                    "check that word first."
+            } else {
+                " Words $list aren't BIP39 words. A generated passphrase uses only BIP39 words, so if yours is one, " +
+                    "check those first."
+            }
+        }
+    }
+    val intro = "Either it isn't the password this backup was written with, or the tag's data is damaged. SeedTag " +
+        "already tried it without extra spaces and in lower case.\n\n" +
+        "1. Tap Show and compare the password with your written copy, word by word and letter by letter.$hint\n\n"
+    return intro + if (d.erase) {
+        "2. Maybe this backup was written with another password. If you're sure it's the backup you mean to " +
+            "erase, you can erase it without checking the password.\n\n" +
+            "3. Not sure? Try the password with seedtag.py on a computer before you erase anything (README, " +
+            "\"Recovering on a computer\")."
+    } else {
+        "2. Check that this is the right tag: another tag may have another password.\n\n" +
+            "3. Still no luck? Try seedtag.py on a computer (README, \"Recovering on a computer\"). If the right " +
+            "password fails there too, this tag's data is damaged: restore from another backup of your seed."
+    }
 }
 
 /** "Learn more" that reveals [text] in place. */
@@ -1860,6 +1893,19 @@ private val MORE_ROWS = listOf("1234567890", "[]{}<>^_=~", "`|\\€£¥§°")
 private val ACCENT_ROWS = listOf("áàâäãåąæçč", "ćđéèêëěęíî", "ïłñńňóôöõø", "œřśšßťúùûü", "ìòůýÿźżž")
 
 /**
+ * Widens a full-width element into the screen's side gutters, leaving [KeyboardEdge] on each side: ten
+ * keys to a row are narrow, and every dp of key width helps someone typing a long passphrase.
+ */
+private fun Modifier.intoGutter() = layout { measurable, constraints ->
+    val extra = ((Gutter - KeyboardEdge) * 2).roundToPx()
+    val width = constraints.maxWidth + extra
+    val placeable = measurable.measure(constraints.copy(minWidth = width, maxWidth = width))
+    layout(constraints.maxWidth, placeable.height) { placeable.place(-extra / 2, 0) }
+}
+
+private val KeyboardEdge = 4.dp
+
+/**
  * Full keyboard: letters with shift, digits and all printable ASCII symbols, and common Latin
  * accented letters. Characters outside these sets can't be typed in the app.
  */
@@ -1892,7 +1938,7 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit, onBack
         Key(label, modifier, kind = KeyKind.Function) { layer = target }
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(Modifier.intoGutter(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         val rows = when (layer) {
             KeyLayer.Letters -> LETTER_ROWS
             KeyLayer.Symbols -> SYMBOL_ROWS
@@ -2250,6 +2296,16 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Sett
             text = {
                 GuardDialogWindow()
                 Text(d.message)
+            },
+            confirmButton = { TextButton(onClick = { vm.dialog = null }) { Text("OK") } },
+        )
+        is Dialog.WrongPassword -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            icon = { WarningIcon() },
+            title = { Text("This password doesn't open the tag") },
+            text = {
+                GuardDialogWindow()
+                Text(wrongPasswordText(d), modifier = Modifier.verticalScroll(rememberScrollState()))
             },
             confirmButton = { TextButton(onClick = { vm.dialog = null }) { Text("OK") } },
         )
