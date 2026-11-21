@@ -91,8 +91,10 @@ the blob. Two ways out remain for a malicious app:
    computer (a `passphrase` command would be new). The app would then need a way to accept a typed passphrase
    without calling it weak (board finding B7 has the same problem for a second tag).
 2. **Tag memory outside the NDEF message**, such as pages after the terminator or lock and configuration bytes. An
-   NDEF reader doesn't show those. A raw memory dump (NXP TagInfo) does, and `seedtag.py` could check one. That's
-   the NFC seat's open question in the board report.
+   NDEF reader doesn't show those. A raw memory dump (NFC Tools' *Read memory*, or NXP TagInfo) does. *Update,
+   2026-11-21:* Back up now zeroes the data area after the backup (`TODO.md`, H3), and `seedtag.py check` checks
+   a dump of an NTAG213/215/216 page by page (H4; README, *Recovering on a computer*). What no dump shows: the
+   chip's password and its reply (6 bytes), and the Ultralight C, which `check` doesn't support yet.
 
 Neither is made worse by the fix, but the README shouldn't call the blob check complete while they're open.
 

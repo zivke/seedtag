@@ -45,7 +45,8 @@ All notable user-visible changes to SeedTag. The format follows
   NTAG213, 215 or 216 for anything besides the backup: data after it,
   other records, a password-protected area, changed settings, counters.
   No password needed. `decrypt` and `verify` take the dump in place of the
-  text.
+  text. The README says how to take the dump with NFC Tools and shows what
+  a clean NTAG213 looks like, page by page.
 
 ### Changed
 - README: *Storing a tag*, on what physically kills a tag (heat, wireless

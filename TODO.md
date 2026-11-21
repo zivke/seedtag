@@ -304,12 +304,12 @@ left is around the blob, where nothing checks it:
     whatever it holds. Check what NFC Tools writes for an enabled one.
   - [ ] Optional: verify NXP's originality signature from the dump, so a fake chip shows (NFC Tools already says
     "Valid (NXP Public Key)").
-- [ ] **H5: README: what a clean tag's dump looks like**, how to take one, and what stays unchecked (the key or
+- [x] **H5: README: what a clean tag's dump looks like**, how to take one, and what stays unchecked (the key or
   PWD pages, other chips). Update the salt and nonce report's "What it doesn't close" point 2 to link here.
   - [x] How to take one (NFC Tools: OTHER, Read memory, Export .nfc) and what `check` can't see: README,
     *Recovering on a computer*.
-  - [ ] What a clean dump looks like, page by page, for someone checking without `seedtag.py`.
-  - [ ] The salt and nonce report's point 2.
+  - [x] What a clean dump looks like, page by page, for someone checking without `seedtag.py` (NTAG213).
+  - [x] The salt and nonce report's point 2.
 
 ## App and docs
 

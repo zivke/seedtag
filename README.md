@@ -645,6 +645,28 @@ only a warning. What no dump can show: the chip's own password and its reply alw
 genuine chip's signature isn't checked (NFC Tools shows it). Other chips aren't supported yet. `decrypt` and
 `verify` take the same dump file in place of the text.
 
+**What a clean NTAG213 looks like**, for checking a dump by eye (NFC Tools' *Read memory* shows the same pages).
+Bytes are hex; `..` is a byte that differs from tag to tag.
+
+| Page | What it is | Clean |
+|---|---|---|
+| 0–1 | Serial number, with a check byte | `04 .. .. ..` `.. .. .. ..` (any; `check` verifies the check bytes) |
+| 2 | Check byte, NXP's internal byte, lock bits | `.. 48 00 00` (lock bits set once made read-only) |
+| 3 | Capability container: NDEF, 144 bytes | `E1 10 12 00` (`E1 10 12 0F` once read-only) |
+| 4–5 | NXP's lock-control block, then the message's start | `01 03 A0 0C` `34 03 LL D1` |
+| 6 | Record header: one short Text record | `01 PP 54 02` |
+| 7 on | `en`, then the Base64 text | `65 6E 41 ..`, then the text's characters |
+| after the text | End marker, then zeros | `FE`, then `00` up to the end of page 39 |
+| 40 | More lock bits, then a fixed byte | `00 00 00 BD` (lock bits set once read-only) |
+| 41–42 | Settings | `04 00 00 FF` and `00 05 00 00` (the last `FF`: no page needs a password) |
+| 43–44 | The chip's password and its reply | always read as `00`: a dump can't show them |
+
+`LL` is the message length and `PP` the text record's: `5B`/`57` for 12 words, `5F`/`5B` for 15, `63`/`5F` for
+18, `6B`/`67` for 21, `6F`/`6B` for 24. The text starts with `A` (`41`). An empty tag reads `34 03 04 D8`
+`00 00 00 FE` in pages 5–6 after Erase (an empty record), or `34 03 00 FE` new, then zeros. NTAG215 and 216 have the same
+layout with a bigger data area (capability container `E1 10 3E 00` and `E1 10 6D 00`; the last five pages are
+130–134 and 226–230), and may come without NXP's lock-control block, the message starting right at page 4.
+
 ## Warnings: other apps on the phone
 
 SeedTag can only protect you from what happens inside its own window, and only from some attacks (see the
