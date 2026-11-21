@@ -16,6 +16,24 @@ object NdefText {
         return String(payload, 1 + langLen, payload.size - 1 - langLen, charset)
     }
 
+    /**
+     * How a Text record [payload] differs from the one SeedTag writes (UTF-8, language "en", the exact
+     * Base64 of the blob), each as the end of "This tag has …". Empty if it doesn't. The language code
+     * isn't quoted: it could be anything, up to 63 bytes.
+     */
+    fun differences(payload: ByteArray): List<String> {
+        val out = mutableListOf<String>()
+        val status = payload[0].toInt() and 0xFF
+        if (status and 0x80 != 0) out += "the text stored as UTF-16"
+        if (status and 0x40 != 0) out += "a reserved bit set in the record"
+        val lang = payload.copyOfRange(1, minOf(payload.size, 1 + (status and 0x3F)))
+        if (!lang.contentEquals("en".toByteArray(Charsets.US_ASCII))) out += "a language code other than en"
+        if (!SeedBox.isExactText(decodePayload(payload))) {
+            out += "text that isn't exactly what SeedTag writes (spaces or line breaks in it, or a different ending)"
+        }
+        return out
+    }
+
     /** Same layout as NdefRecord.createTextRecord("en", text) – used for size estimates and tests. */
     fun encodePayload(text: String, lang: String = "en"): ByteArray {
         val l = lang.toByteArray(Charsets.US_ASCII)

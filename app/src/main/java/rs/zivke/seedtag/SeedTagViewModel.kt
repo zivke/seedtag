@@ -55,6 +55,7 @@ data class ScanPrompt(val title: String, val error: String? = null, val working:
  * there was none.
  * [passwordFix]: what had to be ignored in the typed password before it matched.
  * [restored]: from Restore rather than Verify, so each tab shows only its own result.
+ * [tagDifferences]: how the tag's message differs from what SeedTag writes, empty if it doesn't.
  */
 data class VerifyResult(
     val wordCount: Int,
@@ -63,6 +64,7 @@ data class VerifyResult(
     val backupFingerprint: String? = null,
     val passwordFix: PasswordFix = PasswordFix.None,
     val restored: Boolean = false,
+    val tagDifferences: List<String> = emptyList(),
 )
 
 /** A system Settings screen the app links to. */
@@ -769,12 +771,12 @@ class SeedTagViewModel : ViewModel() {
             is TagResult.Read -> {
                 if (stale) return
                 scanPrompt = null
-                decrypt(r.text, reveal = p.purpose == Purpose.Restore)
+                decrypt(r.text, reveal = p.purpose == Purpose.Restore, differences = r.differences)
             }
         }
     }
 
-    private fun decrypt(text: String, reveal: Boolean) {
+    private fun decrypt(text: String, reveal: Boolean, differences: List<String>) {
         val pw = readPassword.copy()
         runKdf(
             "Decrypting… (Argon2id takes a few seconds, longer if the password needs a second try)", pw,
@@ -786,7 +788,10 @@ class SeedTagViewModel : ViewModel() {
                 } finally { opened.entropy.fill(0) }
             },
         ) { (words, fp, fix) ->
-            verifyResult = VerifyResult(words.size, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix, restored = reveal)
+            verifyResult = VerifyResult(
+                words.size, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix, restored = reveal,
+                tagDifferences = differences,
+            )
             lockTarget = text
             if (reveal) restoredWords = words
             clearPasswords(PwField.Read)

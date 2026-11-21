@@ -34,6 +34,11 @@ All notable user-visible changes to SeedTag. The format follows
   the tag unchanged that isn't exact means something else wrote or changed
   the tag, and may have hidden data in it. The recommended procedure has
   you check a tag this way.
+- Verify and Restore say whether the tag's message is exactly what SeedTag
+  writes (one Text record, language `en`, the exact Base64 text), and if
+  not, what's different, when that's fine (a tag written with another
+  app), and what to do otherwise. After writing, the read-back compares
+  the whole message, not only the text.
 
 ### Changed
 - README: *Storing a tag*, on what physically kills a tag (heat, wireless

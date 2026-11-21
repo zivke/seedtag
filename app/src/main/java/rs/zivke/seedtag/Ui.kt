@@ -576,6 +576,21 @@ private fun Notice(
     }
 }
 
+/** The tag's message isn't exactly what SeedTag writes: what's different, when that's fine, and when it isn't. */
+@Composable
+private fun TagDiffersNotice(differences: List<String>) {
+    val list = if (differences.size == 1) differences[0] else differences.dropLast(1).joinToString(", ") + " and " + differences.last()
+    Notice(
+        Tone.Caution,
+        "This tag isn't exactly as SeedTag writes it",
+        "SeedTag writes one Text record with the backup's text and nothing else. This tag has $list. The backup " +
+            "still opened.\n\nThat's expected if the tag was written or changed with another app: for example, " +
+            "text from seedtag.py encrypt written with an NFC app. If nobody did that, whatever wrote this tag " +
+            "wasn't a genuine SeedTag, and it may have hidden your seed on the tag for someone who reads it later. " +
+            "Then treat the seed as exposed: move your funds to a new seed, and back that up with a SeedTag you trust.",
+    )
+}
+
 /** "Learn more" that reveals [text] in place. */
 @Composable
 private fun ColumnScope.Expandable(text: String, textColor: Color, linkColor: Color) {
@@ -1691,6 +1706,10 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
         Facts(
             buildList {
                 add(Fact("Fingerprint", result.fingerprint, mono = true))
+                add(
+                    if (result.tagDifferences.isEmpty()) Fact("The tag's message", "Exactly as SeedTag writes it", Tone.Success)
+                    else Fact("The tag's message", "Not as SeedTag writes it: see below", Tone.Caution),
+                )
                 when (result.matchesBackup) {
                     true -> add(Fact("Backup from this session", "Same seed", Tone.Success))
                     false -> add(
@@ -1701,6 +1720,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
             },
         )
         passwordFixNote(result.passwordFix)?.let { Notice(Tone.Caution, "Check your written password", it) }
+        if (result.tagDifferences.isNotEmpty()) TagDiffersNotice(result.tagDifferences)
         if (reveal) {
             val words = vm.restoredWords
             if (words != null) {

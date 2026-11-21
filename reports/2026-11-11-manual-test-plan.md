@@ -256,6 +256,9 @@ on hidden data (H…, `TODO.md`). Each change adds its rows here in the same com
 | 7.10 | Each Settings link (NFC off banner, accessibility banner, debugging warning) with words or a password entered, then again with nothing entered (B29) | With secrets: *Leave SeedTag?*, background blurred; *Stay* keeps everything; *Clear and open Settings* wipes and opens the page. For NFC it also suggests the quick-settings button. With nothing entered: Settings opens straight away. | ⬜ |
 | 7.11 | A Settings link whose page the phone can't open (B29; it may not happen on your phone) | The main Settings page opens; no crash. | ⬜ |
 | 7.12 | Argon2 steps after the `runKdf` change (B42): Back up's encryption, Verify, Restore and Erase's password check, each once with the right password and once with a wrong one | Same results and messages as before. Tapping again while one runs: nothing starts twice (or *SeedTag is still busy…*). Home during the run, then back: wiped, no result shown late. | ⬜ |
+| 7.13 | Back up a throwaway seed, then Verify and Restore it (H2) | *The tag's message: Exactly as SeedTag writes it*, no caution notice. *Backup written* as before (the read-back now compares the whole message). | ⬜ |
+| 7.14 | With NFC Tools: write the same Base64 text to a tag as a Text record with another language code (or add a second record, a URL say), then Verify it in SeedTag (H2) | *Not as SeedTag writes it: see below*, and the notice *This tag isn't exactly as SeedTag writes it* naming the difference (*a language code other than en*, or *other records besides the backup*). The seed still opens. | ⬜ |
+| 7.15 | With NFC Tools: write the Base64 text with a space or line break in it, then Restore (H2) | The same notice, naming *text that isn't exactly what SeedTag writes…*; the words are shown. | ⬜ |
 
 ## Short regression check for every release
 

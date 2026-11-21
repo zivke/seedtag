@@ -372,6 +372,12 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    to make sure the tag still reads.
    If the password is wrong, the app tries it again without extra spaces, then in lower case, and tells you if that
    worked, so you can correct your written copy.
+   Verify and Restore also say whether the tag's message is exactly what SeedTag writes: one Text record, language
+   `en`, the Base64 text and nothing else. If it isn't (another record, another language code, spaces in the text…),
+   they say what's different. That's expected for a tag you wrote with another app, from `seedtag.py encrypt` say.
+   Otherwise, whatever wrote the tag wasn't a genuine SeedTag and may have hidden your seed on it: treat the seed as
+   exposed and move your funds to a new one. This covers the message only, not the rest of the tag's memory, and
+   it's SeedTag checking itself: the independent check is `seedtag.py` ([Using it safely](#using-it-safely), point 5).
 3. **Restore**: same as Verify, but the words are shown. After a backup, restore once and compare every word with
    your paper copy of the seed: that catches a mistyped word that still passes the checksum. They're only the seed's
    words: if your wallet also used a passphrase of its own (a "25th word"), it isn't on the tag, and without it the

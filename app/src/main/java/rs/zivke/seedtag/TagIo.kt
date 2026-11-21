@@ -103,7 +103,8 @@ sealed interface TagResult {
     data class Written(val text: String) : TagResult
     /** A blank tag was formatted with [text], but couldn't be read back on the same tap. */
     data class WrittenUnchecked(val text: String) : TagResult
-    data class Read(val text: String) : TagResult
+    /** [differences]: how the tag's message differs from what SeedTag writes ([TagIo.differences]); empty if it doesn't. */
+    data class Read(val text: String, val differences: List<String> = emptyList()) : TagResult
     data object Locked : TagResult
     /** Lock found the tag already not writable: nothing was changed, and it may not be permanent. */
     data object AlreadyReadOnly : TagResult
@@ -166,8 +167,11 @@ object TagIo {
     private const val LOCK_STEPS = 2
     private const val ERASE_STEPS = 5
 
+    /** Exactly the message SeedTag writes for [text]: one Text record, language "en", nothing else. */
+    private fun messageFor(text: String) = NdefMessage(NdefRecord.createTextRecord("en", text))
+
     private fun write(tag: Tag, req: TagRequest.Write, report: (TagStep) -> Unit): TagResult {
-        val message = NdefMessage(NdefRecord.createTextRecord("en", req.text))
+        val message = messageFor(req.text)
         val ndef = Ndef.get(tag)
         if (ndef == null) {
             val formatable = NdefFormatable.get(tag)
@@ -225,7 +229,8 @@ object TagIo {
             report(TagStep("Reading it back to check it", 3, WRITE_STEPS, writes = true))
             val back = it.ndefMessage ?: it.ndefMessage
                 ?: return TagResult.WrittenUnchecked(req.text) // couldn't read: check on the next tap
-            if (firstText(back) != req.text) return TagResult.Failed("What was read back doesn't match what was written. The tag may be faulty – don't use it.")
+            // The whole message, not only the text: nothing else may have ended up on the tag.
+            if (!back.toByteArray().contentEquals(message.toByteArray())) return TagResult.Failed("What was read back doesn't match what was written. The tag may be faulty – don't use it.")
             return TagResult.Written(req.text)
         }
     }
@@ -390,7 +395,7 @@ object TagIo {
         ndef.use {
             it.connect()
             val msg = readMessage(it) ?: return TagResult.Failed(NOT_READ)
-            if (firstText(msg) != expected) {
+            if (!msg.toByteArray().contentEquals(messageFor(expected).toByteArray())) {
                 return TagResult.Failed("This tag doesn't hold what was just written. Hold the same tag to the phone again. If this keeps happening, the tag may be faulty.")
             }
             return TagResult.Written(expected)
@@ -405,8 +410,25 @@ object TagIo {
                 "The tag is empty, or it couldn't be read properly. Hold it still against the phone and try again.",
             )
             val text = firstText(msg) ?: return TagResult.Failed("The tag holds no text record.")
-            return TagResult.Read(text)
+            return TagResult.Read(text, differences(msg, text))
         }
+    }
+
+    /**
+     * How [msg], whose first Text record holds [text], differs from what SeedTag writes ([messageFor] with
+     * the exact Base64), each as the end of "This tag has …". Empty for a tag SeedTag wrote. Only the
+     * message: what's on the tag outside it needs a raw read (TODO.md, H3 and H4).
+     */
+    private fun differences(msg: NdefMessage, text: String): List<String> {
+        val out = mutableListOf<String>()
+        if (msg.records.size > 1) out += "other records besides the backup"
+        val record = msg.records.first { it.tnf == NdefRecord.TNF_WELL_KNOWN && it.type.contentEquals(NdefRecord.RTD_TEXT) }
+        if (record.id.isNotEmpty()) out += "an ID on the backup's record"
+        out += NdefText.differences(record.payload)
+        if (out.isEmpty() && !msg.toByteArray().contentEquals(messageFor(text).toByteArray())) {
+            out += "a record laid out differently"
+        }
+        return out
     }
 
     private fun lock(tag: Tag, expected: String, report: (TagStep) -> Unit): TagResult {

@@ -86,7 +86,8 @@ Two Gradle modules plus the Python tool:
     the format.
   - `Passphrase.kt`: 7-word generator from the BIP39 list, rough strength estimate.
   - `SecretChars.kt`: zeroable, in-place password buffer.
-  - `NdefText.kt`: Text-record payload decode (encode is `NdefRecord.createTextRecord`).
+  - `NdefText.kt`: Text-record payload decode (encode is `NdefRecord.createTextRecord`), and how a
+    payload differs from SeedTag's own (`differences`, shown by Verify and Restore).
   - `Type2Tlv.kt`: NDEF TLV length in a Type 2 tag's raw data area, to double-check
     a tag every NDEF read called empty before writing to it without asking.
   - `Errors.kt`: `SeedTagException` subclasses; messages are shown to the user

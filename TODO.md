@@ -261,9 +261,13 @@ left is around the blob, where nothing checks it:
   `en` prefix and `=` in the text (accepted since B8); the 2 or 4 unused bits in the last Base64 character
   (12, 15, 21 and 24 words); the language code (up to 63 bytes), the UTF-16 flag, a record ID, and extra
   records (`firstText` takes the first Text record and ignores the rest).
-  - [ ] The app: the read-back after writing (`write`, `checkWritten`) compares the whole NDEF message with
+  - [x] The app: the read-back after writing (`write`, `checkWritten`) compares the whole NDEF message with
     `NdefMessage(createTextRecord("en", toBase64(blob)))`, not only the text.
-  - [ ] The app: Verify and Restore say so when a tag's message isn't exactly what SeedTag writes.
+  - [x] The app: Verify and Restore say so when a tag's message isn't exactly what SeedTag writes
+    (`NdefText.differences`, tested in `core`).
+  - [ ] Both compare the message as Android parsed it and wrote it out again. A record header encoded
+    differently (no short-record flag, a zero-length ID field, chunks) parses to the same message and only shows
+    in the raw bytes: that's for H3 and H4.
   - [x] `seedtag.py verify` and `decrypt`: keep accepting lenient text, but say whether it's exactly what
     SeedTag writes (re-encode and compare), so a text copied straight off the tag can be checked.
   - [x] Tests in both suites (an `exact` column and two rows in `blob-text.tsv`; `SeedBox.isExactText`).
