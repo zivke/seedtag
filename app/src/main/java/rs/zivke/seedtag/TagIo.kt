@@ -34,6 +34,21 @@ sealed interface TagRequest {
     data object Inspect : TagRequest
     /** Erase [target]: overwrite all of its NDEF data with zeros, then leave it empty. */
     data class Erase(val target: OverwriteTarget) : TagRequest
+    /** Finish [Rest.Interrupted]: clear the old data after the backup, if the tag holds exactly [expected]. */
+    data class ClearRest(val expected: String) : TagRequest
+}
+
+/**
+ * The tag's data area after the backup, where Android's write leaves whatever was there before (the
+ * end of a longer backup, or anything another app wrote).
+ */
+enum class Rest {
+    /** Overwritten with zeros and read back, or zero already. */
+    Cleared,
+    /** Not a tag whose layout SeedTag knows (only NTAG and MIFARE Ultralight): older data may remain. */
+    NotPossible,
+    /** The tag moved away while it was being cleared: the backup is fine, older data may remain. */
+    Interrupted,
 }
 
 /**
@@ -99,8 +114,10 @@ data class TagStep(val label: String, val step: Int = 0, val of: Int = 0, val wr
 
 sealed interface TagResult {
     data class Checked(val check: TagCheck) : TagResult
-    /** [text] was written and read back. */
-    data class Written(val text: String) : TagResult
+    /** [text] was written and read back; [rest]: what happened to the old data after it. */
+    data class Written(val text: String, val rest: Rest) : TagResult
+    /** The result of [TagRequest.ClearRest]. */
+    data class RestCleared(val rest: Rest) : TagResult
     /** A blank tag was formatted with [text], but couldn't be read back on the same tap. */
     data class WrittenUnchecked(val text: String) : TagResult
     /** [differences]: how the tag's message differs from what SeedTag writes ([TagIo.differences]); empty if it doesn't. */
@@ -135,6 +152,7 @@ object TagIo {
             is TagRequest.Lock -> lock(tag, request.expected, report)
             TagRequest.Inspect -> inspect(tag)
             is TagRequest.Erase -> erase(tag, request.target, report)
+            is TagRequest.ClearRest -> clearRestOf(tag, request.expected)
         }
     } catch (e: TagLostException) {
         TagResult.Failed("The tag moved away too early. Hold it still against the phone and try again.")
@@ -159,11 +177,13 @@ object TagIo {
         is TagRequest.Write -> TagStep(CHECKING, 1, if (Ndef.get(tag) == null) WRITE_BLANK_STEPS else WRITE_STEPS, writes = true)
         is TagRequest.Lock -> TagStep(CHECKING, 1, LOCK_STEPS, writes = true)
         is TagRequest.Erase -> TagStep(CHECKING, 1, ERASE_STEPS, writes = true)
+        is TagRequest.ClearRest -> TagStep(CLEARING, writes = true)
     }
 
     private const val CHECKING = "Checking the tag"
     private const val WRITE_BLANK_STEPS = 2
-    private const val WRITE_STEPS = 3
+    private const val WRITE_STEPS = 4
+    private const val CLEARING = "Clearing old data after the backup"
     private const val LOCK_STEPS = 2
     private const val ERASE_STEPS = 5
 
@@ -231,7 +251,8 @@ object TagIo {
                 ?: return TagResult.WrittenUnchecked(req.text) // couldn't read: check on the next tap
             // The whole message, not only the text: nothing else may have ended up on the tag.
             if (!back.toByteArray().contentEquals(message.toByteArray())) return TagResult.Failed("What was read back doesn't match what was written. The tag may be faulty – don't use it.")
-            return TagResult.Written(req.text)
+            report(TagStep(CLEARING, 4, WRITE_STEPS, writes = true))
+            return TagResult.Written(req.text, clearRest(tag, it))
         }
     }
 
@@ -398,8 +419,74 @@ object TagIo {
             if (!msg.toByteArray().contentEquals(messageFor(expected).toByteArray())) {
                 return TagResult.Failed("This tag doesn't hold what was just written. Hold the same tag to the phone again. If this keeps happening, the tag may be faulty.")
             }
-            return TagResult.Written(expected)
+            return TagResult.Written(expected, clearRest(tag, it))
         }
+    }
+
+    private fun clearRestOf(tag: Tag, expected: String): TagResult {
+        val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
+        ndef.use {
+            it.connect()
+            val msg = readMessage(it) ?: return TagResult.Failed(NOT_READ)
+            if (!msg.toByteArray().contentEquals(messageFor(expected).toByteArray())) {
+                return TagResult.Failed("This isn't the tag you just wrote. Nothing was changed.")
+            }
+            return TagResult.RestCleared(clearRest(tag, it))
+        }
+    }
+
+    /**
+     * After a backup was written and checked: overwrite with zeros the data area after its TLVs'
+     * terminator, where Android's write leaves the old bytes, and read it back. Only on a Type 2 tag
+     * (NTAG, MIFARE Ultralight) whose layout [Type2Tlv.freeAfterTerminator] is sure of. Only whole pages
+     * after the terminator's page are written: a write torn on that page could damage the backup, and
+     * Android fills the rest of it with zeros anyway. [ndef] is closed for the raw I/O (one technology
+     * at a time). Never throws: the backup is already fine.
+     */
+    private fun clearRest(tag: Tag, ndef: Ndef): Rest {
+        val ul = MifareUltralight.get(tag) ?: return Rest.NotPossible
+        ndef.close()
+        return try {
+            ul.use {
+                it.connect()
+                val data: ByteArray
+                val first: Int
+                try {
+                    val cc = it.readPages(3)
+                    if ((cc[0].toInt() and 0xFF) != 0xE1) return Rest.NotPossible
+                    data = readDataArea(it, (cc[2].toInt() and 0xFF) * 8)
+                    first = Type2Tlv.freeAfterTerminator(data) ?: return Rest.NotPossible
+                } catch (e: TagLostException) {
+                    throw e
+                } catch (e: IOException) {
+                    return Rest.NotPossible // a page it won't read: not a layout to write to blindly
+                }
+                val firstPage = (first + 3) / 4
+                val zeros = ByteArray(4)
+                for (page in firstPage until data.size / 4) {
+                    if (!data.copyOfRange(4 * page, 4 * page + 4).contentEquals(zeros)) it.writePage(4 + page, zeros)
+                }
+                val back = readDataArea(it, data.size)
+                if ((4 * firstPage until back.size).all { i -> back[i] == 0.toByte() }) Rest.Cleared else Rest.Interrupted
+            }
+        } catch (e: IOException) {
+            Rest.Interrupted
+        } catch (e: SecurityException) {
+            Rest.Interrupted // "tag out of date": it left the field
+        }
+    }
+
+    /** The data area from page 4, [size] bytes; READ returns four pages at a time. */
+    private fun readDataArea(ul: MifareUltralight, size: Int): ByteArray {
+        val out = ByteArray(size)
+        var offset = 0
+        while (offset < size) {
+            val pages = ul.readPages(4 + offset / 4)
+            if (pages.isEmpty()) throw IOException("empty read")
+            pages.copyInto(out, offset, 0, minOf(pages.size, size - offset))
+            offset += pages.size
+        }
+        return out
     }
 
     private fun read(tag: Tag): TagResult {

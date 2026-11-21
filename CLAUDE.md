@@ -90,7 +90,8 @@ Two Gradle modules plus the Python tool:
   - `NdefText.kt`: Text-record payload decode (encode is `NdefRecord.createTextRecord`), and how a
     payload differs from SeedTag's own (`differences`, shown by Verify and Restore).
   - `Type2Tlv.kt`: NDEF TLV length in a Type 2 tag's raw data area, to double-check
-    a tag every NDEF read called empty before writing to it without asking.
+    a tag every NDEF read called empty before writing to it without asking; and where
+    the free bytes after the terminator start (`freeAfterTerminator`), which Back up zeroes.
   - `Errors.kt`: `SeedTagException` subclasses; messages are shown to the user
     and must never contain secrets.
 - **`app/`**: Compose, single activity.
@@ -115,7 +116,8 @@ Two Gradle modules plus the Python tool:
     `backStaysInApp` decide what system Back does (`Dialog.ConfirmBack` before
     anything is lost). A successful write resets Verify and Restore
     (`readAnother()`).
-  - `TagIo.kt`: blocking NFC I/O (check, write + read-back, read, lock), returns a
+  - `TagIo.kt`: blocking NFC I/O (check, write + read-back, then zeroing the old data
+    Android leaves after the backup on Type 2 tags, read, lock, erase), returns a
     `TagResult`, never throws.
   - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
     `IdleWatch` keeps the screen on while `holdsSecrets` and shows *Still

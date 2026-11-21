@@ -143,6 +143,14 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- Back up no longer leaves old data on the tag after the backup. Android
+  writes only the backup itself, so the rest of the tag's memory kept
+  whatever was there: the end of a longer, older backup, or anything
+  another app wrote before, such as a seed in plain text, readable with an
+  app that shows a tag's whole memory. On NTAG and MIFARE Ultralight tags,
+  Back up now overwrites it with zeros and reads it back (*Clear old data*
+  finishes it if the tag moved away); on other tags, *Backup written* says
+  that old data may still be there.
 - The beta notice (README, About page, the disclaimer before you start), the
   MIFARE Classic warning and the README's tag table named MIFARE Ultralight C
   as the tested tag. It was an NXP NTAG213, as a memory dump showed; no

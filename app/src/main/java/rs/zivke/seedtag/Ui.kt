@@ -1493,6 +1493,27 @@ private fun DoneStep(vm: SeedTagViewModel) {
         },
     ) {
         Hero(Tone.Success, "Backup written", "Written to the tag and checked by reading it back.")
+        when (vm.backupRest) {
+            Rest.Interrupted -> {
+                Notice(
+                    Tone.Caution,
+                    "Old data may still be on the tag",
+                    "The backup is written and checked. After it, in the rest of the tag's memory, whatever the tag held " +
+                        "before was being cleared when the tag moved away, so some of it may still be there: an app that " +
+                        "shows the tag's whole memory would show it. Tap Clear old data and hold the same tag still.",
+                )
+                SecondaryButton("Clear old data", vm::clearRest)
+            }
+            Rest.NotPossible -> Notice(
+                Tone.Info,
+                "Old data may still be on the tag",
+                "Writing a backup leaves whatever the tag held before in the memory after the backup. SeedTag clears it " +
+                    "only on NTAG and MIFARE Ultralight tags, so on this one it may still be there: an app that shows " +
+                    "the tag's whole memory would show it. If this tag ever held something nobody should read (a seed in " +
+                    "plain text, say), use a new tag instead.",
+            )
+            Rest.Cleared, null -> Unit
+        }
         vm.backupFingerprint?.let {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Facts(listOf(Fact("Fingerprint", it, mono = true)))

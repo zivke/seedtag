@@ -279,11 +279,14 @@ left is around the blob, where nothing checks it:
   app first keeps that data: one dump had the end of a plain-text BIP39 phrase from an earlier NFC Tools write
   after the backup. So even an honest tag fails an "everything else is zero" check, and Back up doesn't clear old
   plain text.
-  - [ ] Zero the pages after the terminator with raw page writes on every Back up and read them back, so a clean
-    tag's dump is predictable (NTAG21x and Ultralight C, through `MifareUltralight`).
-  - [ ] Until then, and for chips it can't do, the Erase intro and README shouldn't imply that Back up clears
-    old data ("You don't have to erase an old backup to write a new one").
-  - [ ] Test plan rows: dumps before and after a Back up over a longer text, on the tested NTAG213.
+  - [x] Zero the pages after the terminator with raw page writes on every Back up and read them back, so a clean
+    tag's dump is predictable (NTAG21x and Ultralight C, through `MifareUltralight`; `Type2Tlv.freeAfterTerminator`).
+    *Clear old data* on Done finishes an interrupted clear; other tags get a notice there.
+  - [x] For chips it can't do, say so: *Backup written* and the README. The Erase intro ("You don't have to erase
+    an old backup to write a new one") stays true.
+  - [x] Test plan rows (7.17-7.20).
+  - [ ] Interrupted clearing, retried, on a tag whose capability container claims more memory than the chip has:
+    the writes past the end fail every time. Rare (a corrupt CC); Cancel ends it, and the backup is fine.
 - [ ] **H4: no check of the whole tag memory outside SeedTag.** A malicious build passes its own check, so this
   has to be `seedtag.py`, reading a full memory dump (no new dependency; a PC/SC reader would need `pyscard`).
   Own branch, with B5. The format: the Flipper Zero `.nfc` file that NFC Tools exports (plain text, a header with

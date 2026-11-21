@@ -106,7 +106,7 @@ sealed interface Dialog {
  */
 enum class Haptic { Tick, Success, Failure, Found, Detected }
 
-private enum class Purpose { Check, BackupWrite, Verify, Restore, Lock, Inspect, Erase }
+private enum class Purpose { Check, BackupWrite, ClearRest, Verify, Restore, Lock, Inspect, Erase }
 
 const val STRAY_SPACES =
     "The password starts or ends with a space, or has two spaces in a row. A written copy rarely shows that, " +
@@ -201,6 +201,10 @@ class SeedTagViewModel : ViewModel() {
     private var overwriteTarget: OverwriteTarget? = null
     /** Tag text (Base64 blob, no secret) last written or decrypted: the only tag Lock will touch. */
     private var lockTarget: String? = null
+    /** The old data after the backup just written (shown on Done), and that backup's text. */
+    var backupRest by mutableStateOf<Rest?>(null)
+        private set
+    private var writtenText: String? = null
 
     // ---- passwords ------------------------------------------------------------
     // Zeroable char buffers, edited in place by the app's keyboard: never Strings, which would
@@ -571,6 +575,12 @@ class SeedTagViewModel : ViewModel() {
         arm(TagRequest.Lock(target), Purpose.Lock, "Hold the same tag to make it permanently read-only")
     }
 
+    /** Done's "Clear old data", after [Rest.Interrupted]: only the tag that holds the backup just written. */
+    fun clearRest() {
+        val text = writtenText ?: return
+        arm(TagRequest.ClearRest(text), Purpose.ClearRest, "Hold the same tag to clear the old data after the backup")
+    }
+
     fun cancelScan() { scanId++; pending.set(null); scanPrompt = null }
 
     // ---- erase ----------------------------------------------------------------
@@ -634,6 +644,7 @@ class SeedTagViewModel : ViewModel() {
 
     fun startOver() {
         wipeBackup(); step = BackupStep.Tag; tagCheck = null; backupFingerprint = null; lockTarget = null
+        backupRest = null; writtenText = null
     }
 
     // ================================================================= NFC ===
@@ -727,7 +738,22 @@ class SeedTagViewModel : ViewModel() {
                 readAnother()
                 wipeBackup()
                 lockTarget = r.text
+                writtenText = r.text
+                backupRest = r.rest
                 step = BackupStep.Done
+            }
+            is TagResult.RestCleared -> {
+                if (r.rest == Rest.Interrupted) {
+                    if (stale) return
+                    _haptics.tryEmit(Haptic.Failure)
+                    pending.set(p) // stay armed: tap again
+                    scanPrompt = scanPrompt?.copy(error = "The tag moved away too early. Hold it still and try again.", working = null)
+                        ?: ScanPrompt("Hold the tag to the phone", "The tag moved away too early. Hold it still and try again.")
+                    return
+                }
+                closePrompt()
+                _haptics.tryEmit(Haptic.Success)
+                backupRest = r.rest
             }
             is TagResult.Locked -> {
                 closePrompt()

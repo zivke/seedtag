@@ -42,4 +42,36 @@ class Type2TlvTest {
         assertNull(Type2Tlv.ndefLength(bytes("03 ff 01")))
         assertNull(Type2Tlv.ndefLength(bytes("01 20 00 00 00 00"))) // a length that runs past the data
     }
+    /** A 144-byte data area (NTAG213, Ultralight C): [head], then [tail] repeated to the end. */
+    private fun area(head: String, tail: Int = 0x41) =
+        bytes(head).let { h -> h + ByteArray(144 - h.size) { tail.toByte() } }
+
+    @Test
+    fun freeBytesStartAfterTheTerminator() {
+        // NTAG213's Lock Control TLV (its lock bytes at page 28h, outside the data area), a 4-byte
+        // message, the terminator, then old text.
+        assertEquals(12, Type2Tlv.freeAfterTerminator(area("01 03 a0 0c 34 03 04 d1 01 00 54 fe 00")))
+        // Ultralight C's Lock Control TLV, no Lock Control TLV at all, NULL padding, a three-byte length.
+        assertEquals(8, Type2Tlv.freeAfterTerminator(area("01 03 a0 10 44 03 00 fe")))
+        assertEquals(3, Type2Tlv.freeAfterTerminator(area("03 00 fe")))
+        assertEquals(5, Type2Tlv.freeAfterTerminator(area("00 00 03 00 fe")))
+        assertEquals(7, Type2Tlv.freeAfterTerminator(area("03 ff 00 02 d0 00 fe")))
+    }
+
+    @Test
+    fun aMessageToTheEndLeavesNothingFree() {
+        assertEquals(144, Type2Tlv.freeAfterTerminator(bytes("03 8e") + ByteArray(142) { 0x41 }))
+    }
+
+    @Test
+    fun refusesWhatItCantBeSureOf() {
+        assertNull(Type2Tlv.freeAfterTerminator(area("fe")))                     // no NDEF TLV
+        assertNull(Type2Tlv.freeAfterTerminator(area("01 03 a0 0c 34 fe")))      // still none
+        assertNull(Type2Tlv.freeAfterTerminator(area("02 03 10 04 22 03 00 fe"))) // Memory Control
+        assertNull(Type2Tlv.freeAfterTerminator(area("fd 01 00 03 00 fe")))       // proprietary
+        assertNull(Type2Tlv.freeAfterTerminator(area("01 03 30 10 44 03 00 fe"))) // lock bytes at 48: inside
+        assertNull(Type2Tlv.freeAfterTerminator(area("01 02 a0 0c 03 00 fe")))    // odd Lock Control length
+        assertNull(Type2Tlv.freeAfterTerminator(bytes("03 20 d1 01")))            // runs past the end
+        assertNull(Type2Tlv.freeAfterTerminator(area("03 ff 01")))                // cut-off length
+    }
 }
