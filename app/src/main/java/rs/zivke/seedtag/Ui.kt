@@ -1023,7 +1023,7 @@ private const val SPARE_PHONE_DETAILS =
 private const val DISCLAIMER =
     "SeedTag comes without any warranty, and its developer isn't responsible for any loss or damage resulting from " +
         "its use, including a lost seed or lost funds. You use it at your own risk.\n\n" +
-        "SeedTag is beta software, still in development. It has only been tested with MIFARE Ultralight C tags: other " +
+        "SeedTag is beta software, still in development. It has only been tested with NXP NTAG213 tags: other " +
         "tag brands and types may not work as described. Before relying on a tag, back up to it, then Verify and " +
         "Restore it (and ideally decrypt it with seedtag.py), and keep another copy of your seed.\n\n" +
         "Before you enter a seed, it's up to you to make sure this phone is free of malware. SeedTag defends against " +
@@ -1071,8 +1071,8 @@ private fun TagCheckResult(c: TagCheck) {
         c.tooSmall -> "This tag is too small" to "Use a bigger tag (an NTAG215 or NTAG216, for example)."
         c.classic -> "Better use another tag" to
             "This is a MIFARE Classic tag. Many phones can't read MIFARE Classic at all, so a backup on it may not be " +
-            "readable on the phone you have when you need it. Use another tag (a MIFARE Ultralight C or an NTAG216, for " +
-            "example), or use this one only to practise."
+            "readable on the phone you have when you need it. Use another tag (an NTAG213, the chip SeedTag " +
+            "has been tested with, for example), or use this one only to practise."
         else -> "This tag works" to null
     }
     val good = c.usable && !c.classic

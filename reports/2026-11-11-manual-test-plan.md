@@ -11,7 +11,7 @@
 
 | Mark | Meaning |
 |---|---|
-| ✅ | **Presumed tested.** It shipped in a released version (0.1.0 to 0.3.0), which was installed and used on the phone with a MIFARE Ultralight C. Nobody recorded which steps were actually exercised, so confirm the ones you aren't sure of. |
+| ✅ | **Presumed tested.** It shipped in a released version (0.1.0 to 0.3.0), which was installed and used on the phone with an NXP NTAG213 (long taken for a MIFARE Ultralight C: a memory dump on 2026-11-21 showed otherwise). Nobody recorded which steps were actually exercised, so confirm the ones you aren't sure of. |
 | ❓ | **Shipped, but probably not tested.** It's in a release, but it depends on hardware or an Android version that may not have been at hand (another chip, Android 13 or 14+, a low-RAM phone). |
 | ⬜ | **Not tested.** Under `[Unreleased]` in `changelog.md`, on `main` only. |
 | 🔀 | **Not tested, on a branch.** `tag-write-password`, not merged. |
@@ -32,7 +32,7 @@ Record a result next to each row (pass, fail, or not possible, with the phone an
   - 12 words: `abandon` ×11, then `about`
   - 24 words: `abandon` ×23, then `art`
   - 12 words, different seed: `legal winner thank year wave sausage worth useful legal winner thank yellow`
-- **Tags:** at least two spare Ultralight C tags (A and B), one of them blank. Ideally also an NTAG213/215/216, a
+- **Tags:** at least two spare NTAG213 tags (A and B), one of them blank. Ideally also an Ultralight C, an NTAG215/216, a
   Type 5 tag (ICODE SLIX or ST25TV), a tag that's too small (plain Ultralight, 48 bytes) and any contactless card.
 - **Phones:** the main test phone, plus wherever possible an Android 14+ phone and an old low-RAM phone, and an older
   phone for [section 6](#6-android-8-to-11). Write down each phone's model and Android version with the results.
@@ -68,7 +68,7 @@ Everything under `[Unreleased]` in `changelog.md`.
 | 1.28 | Back | Words step: back gesture (also from the left and right edges, over the keypad's edge keys). Password step: Back with both fields empty, then with a password (gesture and on-screen **Back**: **Stay**, then **Clear and go back**). Length step with words entered, Verify / Restore with a password typed, and a Restore result: Back, **Stay**, then **Leave**. With nothing entered: Back. | Words → the length step, the words kept. Password with nothing typed goes straight back; with a password it asks *Clear the password?*. Elsewhere with input it asks *Leave SeedTag?*; **Leave** closes the app (and clears everything). With nothing entered, Back leaves as before. A top-bar page still closes with Back. | ✔️ Pass, 2026-11-11 |
 | 1.29 | Verify result after a new backup | Verify tag A (result shown), then type a password on Restore without scanning. Back up a different seed to tag B. Open Verify and Restore. Then verify B, start another backup and cancel it at the scan, and look at Verify again. | After the backup, Verify and Restore are empty (no old result, no typed password). Verifying B says *Same seed*. A backup canceled before writing doesn't change *Backup from this session*. | ⬜ |
 | 1.30 | Scroll hint | On the Password step (keyboard open) and on the Length step, on a small phone or with a large font size; also a screen that fits. Tap the ↓ button, scroll by hand to the end and back. | Where the content goes on below the visible part: a fade at the bottom with a round ↓; tapping it scrolls most of a screen down. At the end both go away; scrolled down, the top edge fades. A screen that fits shows neither. Nothing is hidden under the ↓ that can't be reached by scrolling. | ⬜ |
-| 1.31 | MIFARE Classic warning | Back up, Check your tag, with a MIFARE Classic 1K (blank, then formatted by a practice backup); then with an Ultralight C. | Classic: amber icon, *Better use another tag* with the reason, a failure buzz; **Check another tag** is the main button, **Use this tag anyway** goes on to the Length step. Room is "Unknown" while blank. Ultralight C: *This tag works*, as before. | ⬜ |
+| 1.31 | MIFARE Classic warning | Back up, Check your tag, with a MIFARE Classic 1K (blank, then formatted by a practice backup); then with an NTAG213. | Classic: amber icon, *Better use another tag* with the reason, a failure buzz; **Check another tag** is the main button, **Use this tag anyway** goes on to the Length step. Room is "Unknown" while blank. Ultralight C: *This tag works*, as before. | ⬜ |
 | 1.32 | No self-starting libraries | Install the `dependency-trim` build on the oldest phone at hand (Android 8 if possible) and a current one. Open every screen: Back up through the Done step with a throwaway seed, Verify, Restore, the dialogs, the NFC-spot page. Close and reopen the app a few times. | It starts and every screen draws as before: text, ✓, ↗, icons, dialogs. No crash at start (no missing class). Cold start isn't noticeably slower. | ⬜ |
 | 1.33 | Content capture and autofill | Android 11+: open Restore with a result shown, and a dialog, then `adb shell dumpsys content_capture` and `adb shell dumpsys autofill`. Compare with the 0.4.2 build if possible. | No content-capture session and no autofill session for `rs.zivke.seedtag`. | ⬜ |
 | 1.34 | New toolchain: full pass | Install the `toolchain-update` build (`make uninstall`, `make run-test`) on the oldest phone at hand and a current one. Back up a throwaway seed (all four steps), Verify, Restore, Lock on a spare tag; the dialogs, the idle warning, both keyboards (held ⌫ too), the NFC-spot page, Back everywhere. Open a tag written by 0.4.2. | Everything works and looks as before, except the icons (Material Symbols now: back arrow, ↓ scroll button, ✓, info, warning), which are slightly rounder and lighter but drawn in the same colors and sizes. A 0.4.2 tag verifies and restores; a tag written by this build verifies with `python3 -I -S tools/seedtag.py verify`. Argon2 takes about as long as before. | ⬜ |
@@ -96,7 +96,7 @@ during the other tests.
 
 | # | Test | Expected | Status |
 |---|---|---|---|
-| 2.1.1 | Check your tag, blank Ultralight C | Says blank, the room it has, nothing written. | ✅ |
+| 2.1.1 | Check your tag, blank NTAG213 | Says blank, the room it has, nothing written. | ✅ |
 | 2.1.2 | Check your tag with data: a SeedTag backup, and other data | Identifies a SeedTag backup vs. other data. | ✅ |
 | 2.1.3 | Check your tag, read-only tag | Says read-only; Back up isn't possible. | ⬜ |
 | 2.1.4 | Check your tag, tag too small (plain Ultralight) | Word counts it can't hold are grayed out; "too small" gives the bytes needed and available. | ❓ |
@@ -109,7 +109,7 @@ during the other tests.
 | 2.1.11 | Weak password, or one using seed words | Asks for confirmation before writing. | ✅ |
 | 2.1.12 | Repeat password mismatch | Refused. | ✅ |
 | 2.1.13 | "Label it SeedTag password" reminder and the lost-password warning | Shown with the generated passphrase and the password step. | ✅ |
-| 2.1.14 | Write to a blank, unformatted Ultralight C | Formats, asks for a second tap, reads back, *Backup written*. | ✅ |
+| 2.1.14 | Write to a blank, unformatted NTAG213 | Formats, asks for a second tap, reads back, *Backup written*. | ✅ |
 | 2.1.15 | Write to a blank NTAG21x, Ultralight EV1 or AES, NTAG203 | The size probe is right, formats, writes. | ❓ |
 | 2.1.16 | Write to a tag with data | Asks before overwriting; the risky choice is in red. | ✅ |
 | 2.1.17 | Tag moved away during write, or failed read-back | Asks for another tap to check, doesn't call the tag faulty. | ✅ |
@@ -259,6 +259,7 @@ on hidden data (H…, `TODO.md`). Each change adds its rows here in the same com
 | 7.13 | Back up a throwaway seed, then Verify and Restore it (H2) | *The tag's message: Exactly as SeedTag writes it*, no caution notice. *Backup written* as before (the read-back now compares the whole message). | ⬜ |
 | 7.14 | With NFC Tools: write the same Base64 text to a tag as a Text record with another language code (or add a second record, a URL say), then Verify it in SeedTag (H2) | *Not as SeedTag writes it: see below*, and the notice *This tag isn't exactly as SeedTag writes it* naming the difference (*a language code other than en*, or *other records besides the backup*). The seed still opens. | ⬜ |
 | 7.15 | With NFC Tools: write the Base64 text with a space or line break in it, then Restore (H2) | The same notice, naming *text that isn't exactly what SeedTag writes…*; the words are shown. | ⬜ |
+| 7.16 | The disclaimer before you start, the About page, and Back up's check of a MIFARE Classic tag (tested tag corrected) | The beta notice says *only been tested with NXP NTAG213 tags*. The Classic warning suggests *an NTAG213, the chip SeedTag has been tested with*. | ⬜ |
 
 ## Short regression check for every release
 

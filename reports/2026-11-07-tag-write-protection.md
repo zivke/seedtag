@@ -4,6 +4,8 @@
 - **Follows:** finding #11 of [the security review](2026-11-07-security-review.md) (skimming and destruction)
 - **Status:** analysis only. Nothing is implemented, and nothing was tested on a device.
 
+> **Correction (2026-11-21):** the tag this report calls the tested Ultralight C is an NXP NTAG213 (memory dump, `TODO.md` H3). No Ultralight C has been tested. The analysis of each chip stands.
+
 ## Background
 
 **Make tag read-only** calls Android's `Ndef.makeReadOnly()`. That locks the data pages but not the
@@ -27,7 +29,7 @@ without one. Phones, `seedtag.py` and NFC apps keep working, so the backup still
 the tag can be reused. Against the lockout attack it does the same job as a proper lock. How good it is
 depends on the chip.
 
-## MIFARE Ultralight C (tested hardware): good fit
+## MIFARE Ultralight C: good fit
 
 The datasheet supports exactly this mode:
 

@@ -236,8 +236,8 @@ From NF, plus a few from AN and HF. All use throwaway seeds; ⚠ uses up a tag.
 | N3 ⚠ | Ultralight C or NTAG213 | Lock, pulling the tag away as fast as possible, until a first tap fails; tap again; dump | B3: the second tap says "Already read-only", and the dump shows CC3 0F with the lock bytes 00 |
 | N4 | A non-NXP "NTAG213-compatible" tag | Check the tech list; back up over existing data with very quick taps, 20 times | No MifareUltralight in the list; count writes made without the overwrite prompt (B12) |
 | N5 | Ultralight C, NTAG213, NTAG216 | Erase a backup; full dump | Data area all 00 apart from the TLVs |
-| N6 | Ultralight C | Erase, pulling away during the zero fill; tap again; Cancel, rescan, Erase; also erase an Empty-scanned tag and count the taps | The messages from B20b and B20d; the phone and Android version |
-| N7 | Ultralight C | Back up to an empty formatted tag and to one holding data; count taps to "Backup written" | Whether this phone reads back on the same tap (I8) |
+| N6 | NTAG213 (the tested tag) | Erase, pulling away during the zero fill; tap again; Cancel, rescan, Erase; also erase an Empty-scanned tag and count the taps | The messages from B20b and B20d; the phone and Android version |
+| N7 | NTAG213 (the tested tag) | Back up to an empty formatted tag and to one holding data; count taps to "Backup written" | Whether this phone reads back on the same tap (I8) |
 | N8 | Blank EV1 MF0UL21, blank Ultralight C | Check (note the estimate), Back up, Check; dump pages 3-5 | The estimate equals `maxSize`; CC2 and Lock Control TLV as expected (I7) |
 | N9 | NTAG 424 DNA or DESFire EV3; ICODE SLIX2 | Back up, Verify, Lock, Erase; dump after Erase | Lock refused; no old bytes left; closes expert #9's open box |
 | N10 | NTAG213 with a password set by another tool | Back up over it; Erase it | Today "moved away … may already be gone", with the tag unchanged (B32) |

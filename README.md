@@ -3,7 +3,7 @@
 Free, open-source, offline Android app that stores a **password-encrypted BIP39 seed phrase on an NFC tag**,
 plus a single-file Python tool to recover it on any computer. Source: <https://github.com/zivke/seedtag>.
 
-- Encrypts the raw seed entropy (not the words) → 77 bytes for 24 words, fits a 137-byte MIFARE Ultralight C.
+- Encrypts the raw seed entropy (not the words) → 77 bytes for 24 words, fits a 137-byte NTAG213.
 - Argon2id (64 MiB) + AES-256-GCM. Documented, versioned format.
 - **No `INTERNET` permission.** Screenshots blocked, no backups, no clipboard, nothing handed to autofill or
   content capture. No library starts by itself: the app declares only its own screen.
@@ -12,8 +12,8 @@ plus a single-file Python tool to recover it on any computer. Source: <https://g
 - The encrypted backup is decrypted once before it's written, and every write is read back and compared before it's
   reported as success.
 
-> **Beta.** SeedTag is still in development. It has been tested only with MIFARE Ultralight C tags, on a few phones;
-> other tag brands and types (NTAG, Type 4, Type 5 and others) haven't been tried yet, and may not behave as described
+> **Beta.** SeedTag is still in development. It has been tested only with NXP NTAG213 tags, on a few phones;
+> other tags (MIFARE Ultralight C, other NTAG models, Type 4, Type 5 and others) haven't been tried yet, and may not behave as described
 > here. Before relying on a tag, back up to it, then Verify and Restore it, ideally also decrypt it with
 > [`seedtag.py`](#recovering-on-a-computer), and keep another copy of your seed. See [Choosing a tag](#choosing-a-tag) for what's known.
 
@@ -437,7 +437,7 @@ when tapped; leaving SeedTag deletes everything typed in it.
 Any tag Android can read and write as NDEF works. The app uses the generic NDEF API and listens for NFC-A, -B, -F
 and -V. Back up checks the tag's size before anything is typed, and every write checks it again. A blank (not yet
 NDEF-formatted) Type 2 tag has no size on it, so the app works it out from the chip's memory for MIFARE Ultralight,
-Ultralight C, EV1 and AES, NTAG203 and NTAG21x; for any other blank tag the size is only known once it's formatted. Tested hardware: MIFARE Ultralight C.
+Ultralight C, EV1 and AES, NTAG203 and NTAG21x; for any other blank tag the size is only known once it's formatted. Tested hardware: NXP NTAG213.
 
 **Space needed** (the NDEF message: what the app and Android call the tag's NDEF space, and what Back up's size
 check compares; in the chip's raw memory, the TLV wrapper around it takes 3 bytes more):
@@ -476,11 +476,11 @@ datasheets said 10,000), and a backup or an erase takes a handful.
 
 | Tag | Type / Android tech | User memory | 24 words? | Retention | Built-in write protection |
 |---|---|---|---|---|---|
-| MIFARE Ultralight C *(tested)* ¹ | Type 2, NfcA | 144 B | ✓ | 10 y | 3DES key, mutual auth; can restrict writes only (strong) |
+| MIFARE Ultralight C ¹ | Type 2, NfcA | 144 B | ✓ | 10 y | 3DES key, mutual auth; can restrict writes only (strong) |
 | MIFARE Ultralight AES | Type 2, NfcA | 144 B | ✓ | not on NXP's product page | AES-128 mutual auth (strong) |
 | MIFARE Ultralight EV1 (MF0UL21) | Type 2, NfcA | 128 B | ✓ (tight) | 10 y | 32-bit password (weak) |
 | NTAG212 | Type 2, NfcA | 128 B | ✓ (tight) | 10 y | 32-bit password (weak) |
-| NTAG213 / 215 / 216 | Type 2, NfcA | 144 / 504 / 888 B | ✓ | 10 y | 32-bit password, sent in clear (weak) |
+| NTAG213 *(tested)* / 215 / 216 | Type 2, NfcA | 144 / 504 / 888 B | ✓ | 10 y | 32-bit password, sent in clear (weak) |
 | NTAG 424 DNA | Type 4, IsoDep | 416 B (256 B NDEF file) | ✓ | 50 y | AES-128 keys, per-file access rights (strong) |
 | MIFARE DESFire EV3 ² | Type 4, IsoDep | 2–16 KB | ✓ | 25 y | AES keys, per-file access rights (strong) |
 | ICODE SLIX2 | Type 5, NfcV | 316 B | ✓ | 50 y | 32-bit read/write passwords (weak) |
@@ -499,7 +499,7 @@ freezes the data but, on NTAG21x and on Ultralight C tags formatted without NXP'
 chip's own password settings open. Someone holding the tag for a few seconds can then set a read password of their
 own, and no phone can read the backup again. Nothing leaks, but that copy is lost. So keep the tag where strangers
 can't reach it (a metal box or a shielding sleeve also stops it being read from a distance), don't carry it
-around, and keep other copies of the seed. Only Ultralight C has been tested with SeedTag: try
+around, and keep other copies of the seed. Only NTAG213 has been tested with SeedTag: try
 any other tag with your phone (write, verify, restore) before relying on it. **Make tag read-only** uses Android's
 own read-only function, which phones usually only offer for Type 1 and 2 tags (NTAG, MIFARE Ultralight): on the Type 4 and 5 tags
 above (NTAG 424 DNA, DESFire, ICODE, ST25TV) expect it to be refused (untested). If a tag is already read-only, the
@@ -519,6 +519,7 @@ an on-metal version.
 chip, plus the form factor you want:
 
 ```
+NTAG213 NFC card PVC              (the tested chip; holds 24 words)
 NTAG216 NFC card PVC
 NTAG215 NFC sticker
 NTAG216 anti-metal NFC tag
@@ -705,7 +706,7 @@ throwaway mnemonic.
 SeedTag comes **without any warranty**, and its developer isn't responsible for any loss or damage from using it,
 including a lost seed or lost funds. You use it at your own risk (see also the [licenses](#license)).
 
-SeedTag is **beta** software, still in development, and has only been tested with MIFARE Ultralight C tags. Other tag
+SeedTag is **beta** software, still in development, and has only been tested with NXP NTAG213 tags. Other tag
 brands and types may not work as described: test every tag (write, Verify, Restore) before relying on it, and keep
 another copy of your seed.
 

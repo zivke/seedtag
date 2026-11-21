@@ -77,7 +77,7 @@ class SeedBoxTest {
         assertEquals(77, blob.size)
         val text = SeedBox.toBase64(blob)
         assertEquals(104, text.length)
-        // NDEF TLV (2) + record + terminator (1) must fit the Ultralight C's 137 bytes
+        // NDEF TLV (2) + record + terminator (1) must fit the 137 bytes of an NTAG213 or Ultralight C
         assertTrue(2 + NdefText.messageSize(text) + 1 <= 137)
         assertArrayEquals(e, SeedBox.open(blob, "pw".toCharArray()))
         // fresh salt/nonce every time

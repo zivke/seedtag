@@ -19,7 +19,8 @@
     sleeve, and not carrying the tag around.
   - [ ] Proper lock (settings frozen too) or a write password, on a separate branch, tested with spare
     tags.
-  - [ ] Rescue for Ultralight C tags already locked with `FF 0F`.
+  - [ ] Rescue for Ultralight C tags already locked with `FF 0F` (none known: the tested tag turned out to be an
+    NTAG213).
 
 ## Project review (open items from [the 2026-11-10 project review](reports/2026-11-10-project-review.md))
 
@@ -271,21 +272,34 @@ left is around the blob, where nothing checks it:
   - [x] `seedtag.py verify` and `decrypt`: keep accepting lenient text, but say whether it's exactly what
     SeedTag writes (re-encode and compare), so a text copied straight off the tag can be checked.
   - [x] Tests in both suites (an `exact` column and two rows in `blob-text.tsv`; `SeedBox.isExactText`).
-- [ ] **H3: Back up leaves the pages after the end marker as they were** *(device)*. Probably the tail of an
-  older, longer backup, factory content or Erase's zeros: then even an honest tag fails an "everything else is
-  zero" check. First confirm it with an NXP TagInfo dump before and after a Back up (Ultralight C, NTAG21x).
-  Then zero the pages after the terminator with raw page writes and read them back, so a clean tag's dump is
-  predictable.
+- [ ] **H3: Back up leaves the pages after the end marker as they were** *(device)*. Confirmed on 2026-11-21 with
+  four Flipper `.nfc` dumps from NFC Tools (`other/tag-dumps/`, not committed): Android writes the TLV, the message
+  and the terminator, pads that page with 00, and leaves the rest. A 12-word backup over a 24-word one keeps the
+  old backup's last 18 characters after it (harmless: its salt and nonce are gone). Worse, a tag used with another
+  app first keeps that data: one dump had the end of a plain-text BIP39 phrase from an earlier NFC Tools write
+  after the backup. So even an honest tag fails an "everything else is zero" check, and Back up doesn't clear old
+  plain text.
+  - [ ] Zero the pages after the terminator with raw page writes on every Back up and read them back, so a clean
+    tag's dump is predictable (NTAG21x and Ultralight C, through `MifareUltralight`).
+  - [ ] Until then, and for chips it can't do, the Erase intro and README shouldn't imply that Back up clears
+    old data ("You don't have to erase an old backup to write a new one").
+  - [ ] Test plan rows: dumps before and after a Back up over a longer text, on the tested NTAG213.
 - [ ] **H4: no check of the whole tag memory outside SeedTag.** A malicious build passes its own check, so this
-  has to be `seedtag.py`, reading an NXP TagInfo full-scan export (no new dependency; a PC/SC reader would
-  need `pyscard`). Needs a real export from the owner before the parser is written. Own branch, with B5.
-  - [ ] Check page by page: capability container, NDEF TLV, the message exactly as in H2, zeros after the
-    terminator (H3), lock bytes, the Ultralight C counter (16 bits, only counts up), AUTH0/AUTH1 at their
-    defaults (or NTAG21x CFG with password protection off), and no page that fails to read.
-  - [ ] Only for Ultralight C and NTAG21x, whose layout is documented; say plainly that other chips can't be
+  has to be `seedtag.py`, reading a full memory dump (no new dependency; a PC/SC reader would need `pyscard`).
+  Own branch, with B5. The format: the Flipper Zero `.nfc` file that NFC Tools exports (plain text, a header with
+  the chip type, version and signature, "Pages read: N", then "Page N: xx xx xx xx"); samples in
+  `other/tag-dumps/`.
+  - [ ] Check page by page: capability container, the NDEF TLV (after NXP's Lock Control TLV, `01 03 A0 0C 34`
+    on NTAG213), the message exactly as in H2, zeros after the terminator (H3), the static and dynamic lock bytes,
+    CFG0/CFG1 at their defaults (AUTH0 `FF`: no page behind the password; ACCESS `00`), the NFC counter, and every
+    page read. For Ultralight C: its 16-bit counter (only counts up) and AUTH0/AUTH1.
+  - [ ] Only for NTAG21x and Ultralight C, whose layout is documented; say plainly that other chips can't be
     fully checked.
-  - [ ] Find out whether TagInfo tries the Ultralight C factory 3DES key. The key (and the NTAG21x PWD) can't be
-    read, so authenticating with the factory key is the only check that it wasn't changed.
+  - [ ] The NTAG21x PWD and PACK always read as zero (6 bytes nobody can check; PACK's 2 come back to whoever
+    knows the PWD), and so does the Ultralight C's 3DES key. Find out whether NFC Tools' advanced commands can
+    try the factory PWD (`1B FF FF FF FF`) or the Ultralight C factory key.
+  - [ ] Optional: verify NXP's originality signature from the dump, so a fake chip shows (NFC Tools already says
+    "Valid (NXP Public Key)").
 - [ ] **H5: README: what a clean tag's dump looks like**, how to take one, and what stays unchecked (the key or
   PWD pages, other chips). Update the salt and nonce report's "What it doesn't close" point 2 to link here.
 

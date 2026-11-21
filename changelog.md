@@ -143,6 +143,10 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- The beta notice (README, About page, the disclaimer before you start), the
+  MIFARE Classic warning and the README's tag table named MIFARE Ultralight C
+  as the tested tag. It was an NXP NTAG213, as a memory dump showed; no
+  Ultralight C has been tested yet.
 - `seedtag.py`: an installed package that fails (a broken install, or a
   future version that changed how it's called) no longer stops a recovery:
   the tool says so and goes on with the next one, down to its built-in

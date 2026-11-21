@@ -16,6 +16,8 @@ class Type2TlvTest {
         assertEquals(0, Type2Tlv.ndefLength(bytes("03 00 fe 00 00 00 00 00 00 00 00 00 00 00 00 00")))
         // Ultralight C formatted by NXP's tools: a Lock Control TLV first.
         assertEquals(0, Type2Tlv.ndefLength(bytes("01 03 a0 10 44 03 00 fe 00 00 00 00 00 00 00 00")))
+        // NTAG213 as NXP ships it: its own Lock Control TLV (as on the tested tag), NDEF message empty.
+        assertEquals(0, Type2Tlv.ndefLength(bytes("01 03 a0 0c 34 03 00 fe 00 00 00 00 00 00 00 00")))
         // Only a terminator, or NULL padding before it.
         assertEquals(0, Type2Tlv.ndefLength(bytes("fe 00 00 00")))
         assertEquals(0, Type2Tlv.ndefLength(bytes("00 00 fe 03 10")))
