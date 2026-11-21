@@ -254,9 +254,9 @@ itself needs nothing new: v1 has no optional fields, the Argon2 parameters are f
 every blob to one length would hide the word count, which is privacy, not hiding: that's for a v2 (B22). What's
 left is around the blob, where nothing checks it:
 
-- [ ] **H1: README step 5 says the check "rules out … extra data on the tag".** Another NFC app shows only the
-  NDEF message, not the pages after it. Drop the claim, say what such an app shows and what it doesn't, and
-  point to H4 once it exists.
+- [x] **H1: README step 5 says the check "rules out … extra data on the tag".** Another NFC app shows only the
+  NDEF message, not the pages after it. Drop the claim, say what such an app shows and what it doesn't (linking
+  to H4 is part of H5).
 - [ ] **H2: nothing checks the record and text around the blob byte for byte.** Free today: spaces, `-_`, an
   `en` prefix and `=` in the text (accepted since B8); the 2 or 4 unused bits in the last Base64 character
   (12, 15, 21 and 24 words); the language code (up to 63 bytes), the UTF-16 flag, a record ID, and extra

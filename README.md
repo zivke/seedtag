@@ -266,10 +266,17 @@ seed. From safest down:
    packages out; about a minute). It must print the fingerprint the app shows. Read the tag with another NFC app
    too: it should hold one Text record and nothing else. [The dependency report](reports/2026-11-14-dependency-risk.md)
    lists what else a poisoned library could do.
-   This rules out a weak key and extra data on the tag, but not everything. The salt and nonce (28 bytes of the
-   blob) are random by design, so nothing can tell them apart from a secret a poisoned app hid in them, such as the
-   seed encrypted for an attacker who later reads the tag. Against that, only the build itself helps: an APK whose
-   source and build you can check ([Signing a release](#signing-a-release)), and a tag kept out of strangers' reach.
+   This rules out a weak key and extra records on the tag, but not everything. A poisoned app could still hide a
+   secret, such as the seed encrypted for an attacker who later reads the tag, in two places these checks don't
+   see:
+   - **The salt and nonce** (28 bytes of the blob). They're random by design, so nothing can tell them apart from
+     a hidden secret.
+   - **The rest of the tag's memory.** An NFC app shows the message that holds the backup, not the memory after it
+     or the tag's lock and settings bytes. A check of the whole memory is planned; until then, a message that looks
+     right doesn't prove the rest of the tag is clean.
+
+   Against both, only the build itself helps: an APK whose source and build you can check
+   ([Signing a release](#signing-a-release)), and a tag kept out of strangers' reach.
 
 The Back up, Verify and Restore screens remind you of this (*Safest on a spare phone*, second in their checklist,
 explains it under *Learn more*, and so does the About page), say whether airplane mode is on, and warn when USB or
@@ -296,7 +303,8 @@ The safest way to use SeedTag, from start to finish:
    - **Restore** once and compare every word with your paper copy of the seed. This catches a mistyped word that
      still passes the checksum, which Back up can't. Then leave the words screen.
 5. **Check the tag off the phone** ([Using it safely](#using-it-safely), point 5). Read it with any NFC reader app,
-   on any phone: it holds only ciphertext. It should hold one Text record and nothing else. Move the Base64 text to
+   on any phone: it holds only ciphertext. It should hold one Text record and nothing else, though such an app
+   shows only that message, not the rest of the tag's memory (*Using it safely*, point 5). Move the Base64 text to
    an offline computer (a live USB system is ideal) and run `python3 -I -S seedtag.py verify <BASE64>`: it must
    print the same fingerprint.
 6. **Read-only comes last; it's permanent.** Only after steps 4 and 5 pass, use **Make tag read-only**. A write

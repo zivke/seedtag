@@ -19,8 +19,9 @@ still decrypts everywhere, the fingerprint matches, and the tag still holds one 
 the tag with the attacker's key has the seed, without the password.
 
 README point 5 ("check a new tag on another computer") said that check rules out a poisoned library. It rules out
-a weakened key and extra data on the tag, but not this: nothing can tell random bytes from a secret encrypted to
-look random. The README now says so (`b1d666e`).
+a weakened key and extra records on the tag, but not this: nothing can tell random bytes from a secret encrypted
+to look random. The README now says so (`b1d666e`). Nor does it see the tag's memory outside the message (below,
+"What it doesn't close", point 2).
 
 ## Why it isn't a simple fix
 

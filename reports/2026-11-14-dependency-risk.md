@@ -105,7 +105,9 @@ Without `INTERNET` the easy way is closed. These remain:
 2. **Check a new tag with independent code.** Run `python3 -I -S seedtag.py verify <BASE64>` on another, offline
    computer: `-I -S` keeps installed packages out, so only `seedtag.py`'s own Argon2id and AES-GCM run. A tag whose
    key a poisoned Bouncy Castle weakened doesn't open there. Read the tag with another NFC app too, to see that it
-   holds one Text record and nothing else.
+   holds one Text record and nothing else. (Neither check sees a secret hidden in the random salt and nonce, or in
+   the tag's memory outside the message: see [the salt and nonce report](2026-11-18-salt-nonce-channel.md) and
+   `TODO.md`, H1-H5.)
 3. **Recover with `seedtag.py` alone**, offline, the same way (`python3 -I -S`), if you can wait about a minute per
    password tried.
 4. **Treat dependency upgrades as security events:** read the `verification-metadata.xml` diff in the release review,
