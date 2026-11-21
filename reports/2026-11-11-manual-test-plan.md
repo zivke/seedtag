@@ -203,6 +203,11 @@ check the lock read-back after it.
 | 5.6 | `sign-release.sh --expect <wrong hash>` on the signing machine | Refuses, nothing signed. | ⬜ |
 | 5.7 | `sign-release.sh --expect <CI hash>` | Signs; certificate check passes; writes `seedtag.apk.sha256`. | ⬜ |
 | 5.8 | Install the newly signed release over the previous release | Updates in place (same certificate), no uninstall needed. | ✅ (0.1.0 to 0.3.0 were updated this way, presumably) |
+| 5.9 | `seedtag.py` with the tag's text as copied by hand or from an NFC app (board B8): spaces and line breaks, no `=`, `-` and `_`, `en` in front; also a file argument | All accepted, same fingerprint. One character missing or a wrong first character gets its own message, not "wrong password". | ⬜ |
+| 5.10 | `seedtag.py verify --builtin` and `decrypt --builtin` with `cryptography` installed (board B10); `encrypt --builtin` | `(Argon2id from built-in)`, same result. `encrypt --builtin` is refused (exit 2). | ⬜ |
+| 5.11 | `seedtag.py` on Windows with `py` (board B10) | `py seedtag.py verify <FILE>` works as on Linux. | ⬜ |
+| 5.12 | Share a tag's text from NFC Tools (or the NFC app you use) straight into a file, then `python3 -I -S seedtag.py verify <FILE>` (H2) | *The text is exactly what SeedTag writes.* If it says it isn't, that app changes the text: note which app, so the README can name one that doesn't. | ⬜ |
+| 5.13 | First CI run after `-W error` was added to the Python tests (board B10) | Green. | ⬜ |
 
 ## 6. Android 8 to 11
 
@@ -231,6 +236,26 @@ that come through them are dropped. The idle warning covers the screen instead o
 | 6.13 | Privacy basics | Screenshot and screen recording (also with a dialog open), the Recents thumbnail, Home and back, the screen off and on. With SeedTag in front, hold a tag; switch NFC off and on from the quick settings and hold it again (3.8). | Screenshots and recording blocked or black, the thumbnail blank. Everything typed is gone after Home or screen off. No system popup or other app reacts to the tag, also after NFC was switched off and on. | ⬜ |
 | 6.14 | Small screen (1.30) | On the Password step with the keyboard open, and on Length and Done. | Where content goes on below, the bottom fade and ↓ show, and everything can be reached by scrolling. Nothing is cut off at the sides. | ⬜ |
 | 6.15 | Low RAM (1.18, 3.1) | If the phone has little memory (2 GB or less): Back up and Verify, with a few other apps open. | Either it works, or an out-of-memory message appears and the app stays open. It never crashes. | ⬜ |
+
+## 7. Expert board and outside remarks (from 2026-11-16)
+
+Changes on `develop` from the [expert board review](2026-11-16-expert-board-review.md) (B…) and the outside remarks
+on hidden data (H…, `TODO.md`). Each change adds its rows here in the same commit.
+
+| # | Test | Expected | Status |
+|---|---|---|---|
+| 7.1 | Erase texts (B13): the Erase intro, the confirm question for a backup, and *Erased* | The intro says the whole data area is overwritten with zeros and read again, that it clears only this tag, and that Back up overwrites an old backup after asking. *Erased* says someone who copied the backup earlier keeps their copy, and when to move funds. | ⬜ |
+| 7.2 ⚠ | Erase: a very brief tap of a tag holding a backup on the Erase scan (B20a) | Never "blank, nothing to erase": either the backup is shown, or *Couldn't read the tag properly (it may have moved away too soon)…*. | ⬜ |
+| 7.3 ⚠ | Erase: pull the tag away right at the end, after the zeros were read back (B20c; hard to time) | The message says the old backup was already overwritten and to hold the same tag still and tap again; tapping again finishes. No crash. | ⬜ |
+| 7.4 | Erase's password step: type something, then tap *Don't check the password* (B20f), then go back to checking | The field is gone, and when it comes back it's empty. | ⬜ |
+| 7.5 | Back up's words step and the checksum error (B27, B8) | The notice says only English BIP39 phrases, not Electrum, SLIP-39 (Shamir) or Monero. A phrase of valid words with a bad checksum says that if every word is right, it isn't a BIP39 phrase (an Electrum phrase, for example). | ⬜ |
+| 7.6 | Restore, after the words are shown (B27) | An *If your wallet shows no funds* notice: wallet passphrase not stored, other accounts or address types. | ⬜ |
+| 7.7 | Fingerprint texts on *Backup written* and Verify (B27) | They say the fingerprint is SeedTag's own, not the one a wallet shows. | ⬜ |
+| 7.8 ⚠ | Read-only names (B41): the Back up, Verify and Done screens, the confirm dialog, the result | *Make it read-only*, *Make read-only*, *Tag is now read-only*. "Lock" appears only for an attacker locking a tag against reading. | ⬜ |
+| 7.9 | Back up one tag, then Verify a second tag holding a different seed (B41) | Title *Not the backup you just wrote*: a different seed from the backup written in this session, and its fingerprint. Verify the first tag: *Verified*, *Same seed*. | ⬜ |
+| 7.10 | Each Settings link (NFC off banner, accessibility banner, debugging warning) with words or a password entered, then again with nothing entered (B29) | With secrets: *Leave SeedTag?*, background blurred; *Stay* keeps everything; *Clear and open Settings* wipes and opens the page. For NFC it also suggests the quick-settings button. With nothing entered: Settings opens straight away. | ⬜ |
+| 7.11 | A Settings link whose page the phone can't open (B29; it may not happen on your phone) | The main Settings page opens; no crash. | ⬜ |
+| 7.12 | Argon2 steps after the `runKdf` change (B42): Back up's encryption, Verify, Restore and Erase's password check, each once with the right password and once with a wrong one | Same results and messages as before. Tapping again while one runs: nothing starts twice (or *SeedTag is still busy…*). Home during the run, then back: wiped, no result shown late. | ⬜ |
 
 ## Short regression check for every release
 
