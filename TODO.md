@@ -158,6 +158,8 @@ report's tests N1–N12, A1–A3, H1).
     the fix needs in [the salt and nonce report](reports/2026-11-18-salt-nonce-channel.md). A format decision for
     the owner (the report recommends option C, after a review); own branch. The generated passphrase stays a way
     out for a malicious app even then (the report, "What it doesn't close").
+  - The other places to hide data, around the blob and elsewhere on the tag, are under
+    [Hidden data outside the blob](#hidden-data-outside-the-blob-outside-remarks-2026-11-20) below.
 - [ ] **B6: the app never has the user compare the words it encrypts.** A review step before Password, or at least
   "Restore once and compare every word" in the Done steps and the Verify checklist.
 - [ ] **B7: no path to a second tag; retyping the generated passphrase scores "Weak".** "Write the same backup to
@@ -243,6 +245,45 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **Owner questions** (report, last section): 0.4.2 signed from a CI build with a matching hash? The
   container credential's scope; F-Droid; keystore backups and succession; Lock on unconfirmed chips; blocking
   "destroyed content" messages; a trademark check on the name.
+
+## Hidden data outside the blob (outside remarks, 2026-11-20)
+
+Same threat as B5: a poisoned build or library hides the seed on the tag, for whoever reads it later. The blob
+itself needs nothing new: v1 has no optional fields, the Argon2 parameters are fixed by the version byte, and
+`open` accepts only the five lengths the word count gives; the free bytes are the salt and nonce (B5). Padding
+every blob to one length would hide the word count, which is privacy, not hiding: that's for a v2 (B22). What's
+left is around the blob, where nothing checks it:
+
+- [ ] **H1: README step 5 says the check "rules out … extra data on the tag".** Another NFC app shows only the
+  NDEF message, not the pages after it. Drop the claim, say what such an app shows and what it doesn't, and
+  point to H4 once it exists.
+- [ ] **H2: nothing checks the record and text around the blob byte for byte.** Free today: spaces, `-_`, an
+  `en` prefix and `=` in the text (accepted since B8); the 2 or 4 unused bits in the last Base64 character
+  (12, 15, 21 and 24 words); the language code (up to 63 bytes), the UTF-16 flag, a record ID, and extra
+  records (`firstText` takes the first Text record and ignores the rest).
+  - [ ] The app: the read-back after writing (`write`, `checkWritten`) compares the whole NDEF message with
+    `NdefMessage(createTextRecord("en", toBase64(blob)))`, not only the text.
+  - [ ] The app: Verify and Restore say so when a tag's message isn't exactly what SeedTag writes.
+  - [ ] `seedtag.py verify` and `decrypt`: keep accepting lenient text, but say whether it's exactly what
+    SeedTag writes (re-encode and compare), so a text copied straight off the tag can be checked.
+  - [ ] Tests in both suites (a column or rows in `blob-text.tsv`).
+- [ ] **H3: Back up leaves the pages after the end marker as they were** *(device)*. Probably the tail of an
+  older, longer backup, factory content or Erase's zeros: then even an honest tag fails an "everything else is
+  zero" check. First confirm it with an NXP TagInfo dump before and after a Back up (Ultralight C, NTAG21x).
+  Then zero the pages after the terminator with raw page writes and read them back, so a clean tag's dump is
+  predictable.
+- [ ] **H4: no check of the whole tag memory outside SeedTag.** A malicious build passes its own check, so this
+  has to be `seedtag.py`, reading an NXP TagInfo full-scan export (no new dependency; a PC/SC reader would
+  need `pyscard`). Needs a real export from the owner before the parser is written. Own branch, with B5.
+  - [ ] Check page by page: capability container, NDEF TLV, the message exactly as in H2, zeros after the
+    terminator (H3), lock bytes, the Ultralight C counter (16 bits, only counts up), AUTH0/AUTH1 at their
+    defaults (or NTAG21x CFG with password protection off), and no page that fails to read.
+  - [ ] Only for Ultralight C and NTAG21x, whose layout is documented; say plainly that other chips can't be
+    fully checked.
+  - [ ] Find out whether TagInfo tries the Ultralight C factory 3DES key. The key (and the NTAG21x PWD) can't be
+    read, so authenticating with the factory key is the only check that it wasn't changed.
+- [ ] **H5: README: what a clean tag's dump looks like**, how to take one, and what stays unchecked (the key or
+  PWD pages, other chips). Update the salt and nonce report's "What it doesn't close" point 2 to link here.
 
 ## App and docs
 
