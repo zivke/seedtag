@@ -377,9 +377,10 @@ class BlobText(unittest.TestCase):
     def test_matches_vectors(self):
         vecs = rows("blob-text.tsv")
         self.assertGreaterEqual(len(vecs), 20)
-        for what, inp, expected in vecs:
+        for what, inp, expected, exact in vecs:
             text = bytes.fromhex(inp).decode("utf-8")
             with self.subTest(what):
+                self.assertEqual(exact == "yes", seedtag.text_is_exact(text))
                 if expected == "error":
                     with self.assertRaises(ValueError):
                         seedtag.blob_from_text(text)
@@ -403,6 +404,42 @@ class BlobText(unittest.TestCase):
             path = pathlib.Path(d) / "tag.txt"
             path.write_text("en" + v24[:50] + "\n" + v24[50:] + "\n", encoding="utf-8")
             self.assertEqual(base64.b64decode(v24), seedtag._read_blob([str(path)]))
+
+    def test_changes_are_named(self):
+        v24 = rows("seedtag-v1-vectors.tsv")[0][4]
+        self.assertEqual([], seedtag.text_changes(v24))
+        self.assertEqual(["spaces or line breaks", "the letters en in front"],
+                         seedtag.text_changes("en " + v24[:40] + "\n" + v24[40:]))
+        self.assertEqual(["- or _ in place of + or /"], seedtag.text_changes(v24.replace("+", "-")))
+        self.assertEqual(["too few or too many = at the end"], seedtag.text_changes(v24.rstrip("=")))
+        self.assertEqual(["a last character SeedTag wouldn't write (it decodes to the same bytes)"],
+                         seedtag.text_changes(v24[:-2] + "1="))
+
+    def run_verify(self, text):
+        pw, _, _, _, _, _ = rows("seedtag-v1-vectors.tsv")[0]
+        stderr = io.StringIO()
+        with mock.patch.object(seedtag.getpass, "getpass", return_value=pw), \
+                mock.patch.object(seedtag, "open_forgiving", return_value=(bytes(32), None)), \
+                contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(0, seedtag.main(["verify", text]))
+        return stderr.getvalue()
+
+    def test_verify_says_whether_the_text_is_exact(self):
+        v24 = rows("seedtag-v1-vectors.tsv")[0][4]
+        self.assertIn("exactly what SeedTag writes.", self.run_verify(v24))
+        out = self.run_verify(v24.rstrip("="))
+        self.assertIn("isn't exactly what SeedTag writes: it has too few or too many = at the end", out)
+        self.assertIn("may have hidden data", out)
+
+    def test_a_files_last_line_break_is_not_a_change(self):
+        v24 = rows("seedtag-v1-vectors.tsv")[0][4]
+        with tempfile.TemporaryDirectory() as d:
+            path = pathlib.Path(d) / "tag.txt"
+            for ending in ("", "\n", "\r\n"):
+                path.write_bytes((v24 + ending).encode())
+                self.assertIn("exactly what SeedTag writes.", self.run_verify(str(path)))
+            path.write_bytes((v24 + "\n\n").encode())
+            self.assertIn("it has spaces or line breaks", self.run_verify(str(path)))
 
     def test_wrong_password_mentions_the_text(self):
         pw, _, _, _, b64, _ = rows("seedtag-v1-vectors.tsv")[0]

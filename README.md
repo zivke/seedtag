@@ -304,9 +304,10 @@ The safest way to use SeedTag, from start to finish:
      still passes the checksum, which Back up can't. Then leave the words screen.
 5. **Check the tag off the phone** ([Using it safely](#using-it-safely), point 5). Read it with any NFC reader app,
    on any phone: it holds only ciphertext. It should hold one Text record and nothing else, though such an app
-   shows only that message, not the rest of the tag's memory (*Using it safely*, point 5). Move the Base64 text to
-   an offline computer (a live USB system is ideal) and run `python3 -I -S seedtag.py verify <BASE64>`: it must
-   print the same fingerprint.
+   shows only that message, not the rest of the tag's memory (*Using it safely*, point 5). Save the Base64 text
+   unchanged into a file, move it to an offline computer (a live USB system is ideal) and run
+   `python3 -I -S seedtag.py verify <FILE>`: it must print the same fingerprint, and say the text is exactly what
+   SeedTag writes.
 6. **Read-only comes last; it's permanent.** Only after steps 4 and 5 pass, use **Make tag read-only**. A write
    password for the tag is planned; once it's in the app, its instructions here will say where it fits, before
    making the tag read-only.
@@ -604,6 +605,13 @@ alike. A backup's text is 84, 88, 92, 100 or 104 characters long (12, 15, 18, 21
 the end, and starts with `A`. If you type it in by hand, a missing or extra character, or a wrong first one, gets
 its own message. A wrong character elsewhere can't be told from a wrong password: both end in "wrong password or
 corrupted blob", so check the text as well as the password.
+
+`decrypt` and `verify` also say, before asking for the password, whether the text is exactly what SeedTag writes:
+the Base64 with its `=` at the end and nothing else, not even a space. Typing it in or copying it through another
+program can change that, and the backup still opens. But if you saved the text from the tag unchanged (shared
+from the NFC app straight into a file) and it isn't exact, something other than SeedTag wrote the tag or changed
+it, and may have hidden data in it ([Using it safely](#using-it-safely), point 5). A file's last line break
+doesn't count.
 
 ## Warnings: other apps on the phone
 

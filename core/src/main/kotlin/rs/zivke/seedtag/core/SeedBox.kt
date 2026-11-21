@@ -263,6 +263,19 @@ object SeedBox {
      * missing or extra `=` at the end are all accepted. Same rules as blob_from_text() in
      * seedtag.py, checked against blob-text.tsv.
      */
+    /**
+     * Whether [text] is exactly what SeedTag writes for its blob: standard Base64 with its `=` and
+     * nothing else. Whatever [fromBase64] forgives makes it false, and so do unused bits in the last
+     * character that aren't zero, which decoders ignore. Same as text_is_exact() in seedtag.py,
+     * checked against blob-text.tsv.
+     */
+    fun isExactText(text: String): Boolean =
+        try {
+            toBase64(fromBase64(text)) == text
+        } catch (_: SeedTagException.Malformed) {
+            false
+        }
+
     fun fromBase64(text: String): ByteArray {
         var s = text.filterNot { isPasswordSpace(it) }
         if (s.startsWith("enA")) s = s.substring(2) // every SeedTag text starts with A

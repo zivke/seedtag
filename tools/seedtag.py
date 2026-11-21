@@ -38,8 +38,10 @@ Run it on an offline machine.
 
 BLOB is the tag's text, or a file that holds it; without it, you're asked
 for it. Spaces and line breaks in it, missing = at the end, and the "en"
-some NFC apps show in front of it are fine. On Windows, type py instead of
-python3.
+some NFC apps show in front of it are fine. decrypt and verify also say
+whether the text is exactly what SeedTag writes: if you copied it unchanged
+from the tag and it isn't, the tag holds something SeedTag doesn't write.
+On Windows, type py instead of python3.
 
 Add --builtin to decrypt or verify to use only the built-in Argon2id and
 AES-GCM, even when a package is installed. If an installed package fails,
@@ -70,6 +72,7 @@ import unicodedata
 VERSION = 0x01
 MAX_FUTURE_VERSION = 0x0F  # a first byte above VERSION up to this is a newer SeedTag format
 SALT_LEN, NONCE_LEN, TAG_LEN = 16, 12, 16
+_OVERHEAD = 1 + SALT_LEN + NONCE_LEN + TAG_LEN
 ARGON_T, ARGON_M_KIB, ARGON_P, KEY_LEN = 3, 65536, 1, 32
 
 WORDLIST = """
@@ -430,6 +433,37 @@ def blob_from_text(text: str) -> bytes:
     return base64.b64decode(body + "=" * (-len(body) % 4))
 
 
+def text_is_exact(text: str) -> bool:
+    """Whether text is exactly what SeedTag writes for its blob: standard Base64 with its = and
+    nothing else. Whatever blob_from_text forgives makes it False, and so do unused bits in the last
+    character that aren't zero, which decoders ignore. Same as SeedBox.isExactText in the app,
+    checked against blob-text.tsv."""
+    try:
+        return base64.b64encode(blob_from_text(text)).decode() == text
+    except ValueError:
+        return False
+
+
+def text_changes(text: str) -> "list[str]":
+    """How a text that blob_from_text accepts differs from what SeedTag writes, in words."""
+    canon = base64.b64encode(blob_from_text(text)).decode()
+    out = []
+    if any(c in PASSWORD_SPACES for c in text):
+        out.append("spaces or line breaks")
+    s = "".join(c for c in text if c not in PASSWORD_SPACES)
+    if s.startswith("enA"):
+        out.append("the letters en in front")
+        s = s[2:]
+    if "-" in s or "_" in s:
+        out.append("- or _ in place of + or /")
+    body = s.replace("-", "+").replace("_", "/").rstrip("=")
+    if len(s) - len(s.rstrip("=")) != len(canon) - len(canon.rstrip("=")):
+        out.append("too few or too many = at the end")
+    if body != canon.rstrip("="):
+        out.append("a last character SeedTag wouldn't write (it decodes to the same bytes)")
+    return out
+
+
 def open_blob(blob: bytes, password: str) -> bytes:
     if not blob or blob[0] != VERSION:
         if blob and VERSION < blob[0] <= MAX_FUTURE_VERSION:
@@ -731,13 +765,30 @@ class AesGcmBuiltin:
 
 # -------------------------------------------------------------------- CLI ---
 
-def _read_blob(argv) -> bytes:
-    """The tag's text from the command line or typed in, or from a file named either way."""
+def _read_text(argv) -> str:
+    """The tag's text from the command line or typed in, or from a file named either way. A file's
+    last line break is dropped: editors add one."""
     s = argv[0] if argv else input("Tag text (Base64), or a file that holds it: ")
     if s.strip() and os.path.isfile(s.strip()):
-        with open(s.strip(), encoding="utf-8", errors="replace") as fh:
+        with open(s.strip(), encoding="utf-8", errors="replace", newline="") as fh:
             s = fh.read()
-    return blob_from_text(s)
+        s = s[:-2] if s.endswith("\r\n") else s[:-1] if s.endswith("\n") else s
+    return s
+
+
+def _read_blob(argv) -> bytes:
+    return blob_from_text(_read_text(argv))
+
+
+def _say_if_exact(text: str) -> None:
+    if text_is_exact(text):
+        print("The text is exactly what SeedTag writes.", file=sys.stderr)
+        return
+    changes = text_changes(text)
+    print(f"note: the text isn't exactly what SeedTag writes: it has {', '.join(changes[:-1]) + ' and ' if changes[1:] else ''}{changes[-1]}. That's expected "
+          "if you typed it, or if the program you copied it with changed it, and the backup still opens. "
+          "But if you copied it unchanged from the tag, the tag holds something SeedTag doesn't write: "
+          "whatever wrote it may have hidden data in it.", file=sys.stderr)
 
 
 def main(argv):
@@ -773,7 +824,10 @@ def main(argv):
             print(base64.b64encode(blob).decode())
             print(f"fingerprint: {fingerprint(entropy)}", file=sys.stderr)
         else:
-            blob = _read_blob(rest)
+            text = _read_text(rest)
+            blob = blob_from_text(text)
+            if blob[:1] == bytes([VERSION]) and len(blob) - _OVERHEAD in (16, 20, 24, 28, 32):
+                _say_if_exact(text)  # before the password: it's about the text only
             entropy, fix = open_forgiving(blob, getpass.getpass("Password: "))
             if fix:
                 print(f"note: the password only matched with {FIXES[fix]} ignored; "

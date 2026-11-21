@@ -29,6 +29,11 @@ All notable user-visible changes to SeedTag. The format follows
   still goes on (for practice, say).
 - `seedtag.py decrypt --builtin` and `verify --builtin` use only the
   built-in Argon2id and AES-GCM, even when a package is installed.
+- `seedtag.py decrypt` and `verify` say, before asking for the password,
+  whether the tag's text is exactly what SeedTag writes. Text saved from
+  the tag unchanged that isn't exact means something else wrote or changed
+  the tag, and may have hidden data in it. The recommended procedure has
+  you check a tag this way.
 
 ### Changed
 - README: *Storing a tag*, on what physically kills a tag (heat, wireless
