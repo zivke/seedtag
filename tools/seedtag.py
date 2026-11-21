@@ -35,6 +35,7 @@ Run it on an offline machine.
     python3 seedtag.py decrypt [BLOB]   # Base64 blob + password -> words
     python3 seedtag.py verify  [BLOB]   # like decrypt, but only prints OK / FAIL
                                         # plus a short fingerprint, not the words
+    python3 seedtag.py check   DUMP     # is anything on the tag besides the backup?
 
 BLOB is the tag's text, or a file that holds it; without it, you're asked
 for it. Spaces and line breaks in it, missing = at the end, and the "en"
@@ -42,6 +43,12 @@ some NFC apps show in front of it are fine. decrypt and verify also say
 whether the text is exactly what SeedTag writes: if you copied it unchanged
 from the tag and it isn't, the tag holds something SeedTag doesn't write.
 On Windows, type py instead of python3.
+
+DUMP is a full memory dump of the tag as a Flipper Zero .nfc file (NFC Tools
+exports one). check needs no password: it checks every page of an NTAG213,
+215 or 216 for anything SeedTag doesn't write (data after the backup, other
+records, a password-protected area, changed settings) and exits 1 if it finds
+any. decrypt and verify also take such a dump in place of BLOB.
 
 Add --builtin to decrypt or verify to use only the built-in Argon2id and
 AES-GCM, even when a package is installed. If an installed package fails,
@@ -763,6 +770,239 @@ class AesGcmBuiltin:
         return bytes(out)
 
 
+# -------------------------------------------------------------- tag dumps ---
+#
+# `check` reads a full memory dump of the tag and says whether anything is on it besides the backup:
+# a hidden copy of the seed could be anywhere a normal NFC app doesn't show (after the message, in the
+# lock and settings pages). The dump is the Flipper Zero ".nfc" text file, which NFC Tools and the
+# Flipper export. Only NXP NTAG213/215/216 so far: their memory layout is documented and checked here
+# page by page.
+
+# Pages in the dump -> chip, its GET_VERSION reply, the capability container's size byte.
+_NTAG = {
+    45: ("NTAG213", "0004040201000f03", 0x12),
+    135: ("NTAG215", "0004040201001103", 0x3E),
+    231: ("NTAG216", "0004040201001303", 0x6D),
+}
+
+
+def parse_dump(text: str) -> "tuple[dict, dict]":
+    """The header fields and the pages ({number: 4 bytes}) of a Flipper .nfc dump. Raises ValueError
+    if it isn't one."""
+    fields, pages = {}, {}
+    for line in text.splitlines():
+        key, sep, value = line.partition(":")
+        if not sep:
+            continue
+        key, value = key.strip(), value.strip()
+        if key.startswith("Page ") and key[5:].isdigit():
+            try:
+                page = bytes.fromhex(value)
+            except ValueError:
+                raise ValueError(f"{key} isn't 4 bytes of hex: {value!r}")
+            if len(page) != 4:
+                raise ValueError(f"{key} isn't 4 bytes of hex: {value!r}")
+            pages[int(key[5:])] = page
+        else:
+            fields[key] = value
+    if fields.get("Filetype") != "Flipper NFC device" or not pages:
+        raise ValueError("this isn't a Flipper .nfc dump (the file NFC Tools and the Flipper Zero export).")
+    return fields, pages
+
+
+def _tlvs(data: bytes) -> "tuple[list, int | None]":
+    """The TLVs in a Type 2 data area ([data], from page 4) as (type, value) pairs, and where the free
+    bytes after the terminator start (None if there's no terminator). Raises ValueError for a length
+    that runs past the end."""
+    out, i = [], 0
+    while i < len(data):
+        t = data[i]
+        if t == 0x00:
+            i += 1
+            continue
+        if t == 0xFE:
+            return out, i + 1
+        if i + 1 >= len(data):
+            raise ValueError("a TLV is cut off at the end of the data area")
+        length, header = data[i + 1], 2
+        if length == 0xFF:
+            if i + 3 >= len(data):
+                raise ValueError("a TLV is cut off at the end of the data area")
+            length, header = int.from_bytes(data[i + 2:i + 4], "big"), 4
+        if i + header + length > len(data):
+            raise ValueError("a TLV runs past the end of the data area")
+        out.append((t, data[i + header:i + header + length]))
+        i += header + length
+    return out, None
+
+
+def seedtag_message(text: str) -> bytes:
+    """The NDEF message SeedTag writes for [text]: one short Text record, UTF-8, language "en"."""
+    payload = b"\x02en" + text.encode("utf-8")
+    return bytes([0xD1, 1, len(payload)]) + b"T" + payload
+
+
+_EMPTY_MESSAGES = (b"", bytes([0xD8, 0, 0, 0]), bytes([0xD0, 0, 0]))  # nothing; Android's / the spec's empty record
+
+
+def check_dump(text: str) -> "tuple[list[tuple[str, str]], str | None]":
+    """Checks a dump page by page. Returns (level, message) lines, level OK, NOTE, WARN or FAIL, and
+    the backup's text if the tag holds one. Raises ValueError if the dump can't be checked at all."""
+    fields, pages = parse_dump(text)
+    total = int(fields.get("Pages total", "0") or 0)
+    if total not in _NTAG:
+        raise ValueError(f"this dump is of a {fields.get('NTAG/Ultralight type') or fields.get('Device type') or 'tag'} "
+                         f"with {total or 'an unknown number of'} pages: only NTAG213, NTAG215 and NTAG216 can be "
+                         "checked so far.")
+    chip, version, cc_size = _NTAG[total]
+    out = []
+
+    def ok(m): out.append(("OK", m))
+    def note(m): out.append(("NOTE", m))
+    def warn(m): out.append(("WARN", m))
+    def fail(m): out.append(("FAIL", m))
+
+    missing = [n for n in range(total) if n not in pages]
+    if missing:
+        fail(f"{len(missing)} of {total} pages weren't read (from page {missing[0]}). A page that won't read can "
+             "be behind a password: hold the tag still and dump it again.")
+        return out, None
+    ok(f"{chip}: all {total} pages read.")
+    if fields.get("NTAG/Ultralight type", chip) != chip:
+        warn(f"The dump calls the chip {fields['NTAG/Ultralight type']}, but its page count is an {chip}'s.")
+    got_version = fields.get("Mifare version", "").replace(" ", "").lower()
+    if got_version and got_version != version:
+        fail(f"The chip's version ({fields['Mifare version']}) isn't an NXP {chip}'s: it may be a clone, whose "
+             "memory can hold more than the pages shown.")
+
+    p0, p1, p2, p3 = (pages[n] for n in range(4))
+    if p0[3] != 0x88 ^ p0[0] ^ p0[1] ^ p0[2] or p2[0] != p1[0] ^ p1[1] ^ p1[2] ^ p1[3]:
+        fail("The serial number's check bytes (pages 0-2) don't match: not what an NXP chip reports.")
+    elif not got_version or got_version == version:
+        ok("The serial number's check bytes match" + (f", and the chip says it's an NXP {chip}." if got_version else "."))
+
+    dyn, cfg0, cfg1, pwd, pack = (pages[total - k] for k in (5, 4, 3, 2, 1))
+    static_lock, dyn_lock = p2[2:4], dyn[0:3]
+    if p3[0:3] != bytes([0xE1, 0x10, cc_size]) or p3[3] not in (0x00, 0x0F):
+        fail(f"The capability container (page 3) is {p3.hex(' ')}, not E1 10 {cc_size:02X} 00 (or 0F when "
+             "read-only).")
+    locked = any(static_lock) or any(dyn_lock) or p3[3] == 0x0F
+    if not locked:
+        ok("Not read-only: no lock bit is set.")
+    else:
+        warn(f"Lock bits are set (page 2: {static_lock.hex(' ')}, page {total - 5}: {dyn_lock.hex(' ')}, "
+             f"capability container {p3[3]:02X}). Expected after Make read-only. If nobody made this tag "
+             "read-only, something else set them, and lock bits can carry a few bits of data.")
+    if dyn[3] != 0xBD:
+        fail(f"Page {total - 5}, byte 3 is {dyn[3]:02X}, not the chip's fixed BD.")
+    if cfg0 == bytes([0x04, 0x00, 0x00, 0xFF]) and cfg1 == bytes([0x00, 0x05, 0x00, 0x00]):
+        ok("Settings at the factory defaults: no page is behind a password (AUTH0 FF), and the settings "
+           "aren't locked.")
+    else:
+        if cfg0[3] != 0xFF:
+            fail(f"From page {cfg0[3]} on, the tag is behind a password (AUTH0 {cfg0[3]:02X}): pages there can "
+                 "hold data nobody can read without it. SeedTag never sets one.")
+        if cfg0[:3] != bytes([0x04, 0x00, 0x00]) or cfg1 != bytes([0x00, 0x05, 0x00, 0x00]):
+            fail(f"The settings (pages {total - 4}-{total - 3}: {cfg0.hex(' ')} / {cfg1.hex(' ')}) aren't the "
+                 "factory defaults (04 00 00 FF / 00 05 00 00). SeedTag never changes them.")
+    if any(pwd) or any(pack[:2]):
+        fail(f"Pages {total - 2}-{total - 1} (password and its reply) don't read as zero, which a real chip "
+             "always returns for them.")
+    else:
+        note(f"Pages {total - 2}-{total - 1} hold the tag's password and its 2-byte reply. They always read as "
+             "zero, so no dump shows whether they were changed: 6 bytes nobody can check. With AUTH0 FF they "
+             "protect nothing.")
+    if any(pack[2:]):
+        fail(f"Page {total - 1}, bytes 2-3 aren't zero.")
+    counters = {k: v for k, v in fields.items() if k.startswith("Counter ") and v not in ("0", "")}
+    if counters:
+        fail(f"A counter isn't zero ({', '.join(f'{k}: {v}' for k, v in counters.items())}). SeedTag never uses "
+             "the chip's counters, and a counter's value can carry data.")
+
+    data = b"".join(pages[n] for n in range(4, total - 5))
+    try:
+        tlvs, free = _tlvs(data)
+    except ValueError as e:
+        fail(f"The data area's structure is broken: {e}.")
+        return out, None
+    message, others = None, []
+    for t, v in tlvs:
+        if t == 0x03 and message is None:
+            message = v
+        elif t == 0x01 and len(v) == 3 and (v[0] >> 4 << (v[2] & 0x0F)) + (v[0] & 0x0F) >= 16 + len(data):
+            pass  # Lock Control: where the dynamic lock bytes are, after the data area (NXP's formatting)
+        else:
+            others.append(t)
+    if others:
+        fail("The data area holds more than one message: blocks of type "
+             f"{', '.join(f'{t:02X}' for t in others)} besides it. SeedTag writes only the message.")
+    if free is None:
+        fail("The data area has no end marker (FE) after the message.")
+    backup = None
+    if message is None:
+        fail("No NDEF message on the tag.")
+    elif message in _EMPTY_MESSAGES:
+        ok("Empty: no backup on the tag.")
+    else:
+        backup = _backup_text(message)
+        words = _words_in(backup) if backup is not None and seedtag_message(backup) == message else None
+        if words:
+            ok(f"The message is exactly a SeedTag backup ({words} words), nothing else.")
+        else:
+            fail("The message isn't exactly what SeedTag writes (one Text record, language en, the backup's "
+                 "Base64 and nothing else). Check it with verify for details.")
+    if free is not None:
+        rest = data[free:]
+        dirty = [i for i, b in enumerate(rest) if b]
+        if not dirty:
+            ok(f"All {len(rest)} bytes after the message are zero.")
+        else:
+            first, last = (4 + (free + dirty[0]) // 4), (4 + (free + dirty[-1]) // 4)
+            fail(f"{len(dirty)} of the {len(rest)} bytes after the message aren't zero (pages {first}-{last}). "
+                 "Anyone can read them with an app that shows the whole memory. If another app, or a SeedTag "
+                 "older than the one that clears them, ever wrote this tag, it's what was on it before. If not, "
+                 "it's hidden data. Back up with a current SeedTag clears them, and so does Erase.")
+    return out, backup
+
+
+def _words_in(text: str) -> "int | None":
+    """The word count of the v1 backup [text] is, exactly as SeedTag writes it; None if it isn't one."""
+    if not text_is_exact(text):
+        return None
+    blob = blob_from_text(text)
+    n = len(blob) - _OVERHEAD
+    return n * 3 // 4 if blob[:1] == bytes([VERSION]) and n in (16, 20, 24, 28, 32) else None
+
+
+def dump_text(text: str) -> str:
+    """The backup's text from a dump: the first record's, if it's a Text record."""
+    _, pages = parse_dump(text)
+    data = b"".join(pages[n] for n in sorted(pages) if n >= 4)
+    tlvs, _ = _tlvs(data)
+    message = next((v for t, v in tlvs if t == 0x03), None)
+    backup = _backup_text(message) if message else None
+    if backup is None:
+        raise ValueError("the dump holds no Text record: the tag is empty, or it isn't a SeedTag backup.")
+    return backup
+
+
+def _backup_text(message: bytes) -> "str | None":
+    """The text of [message]'s first record if it's a short UTF-8 Text record, else None."""
+    if len(message) < 4 or message[0] & 0x17 != 0x11 or message[1] != 1:  # SR, TNF well-known, type length 1
+        return None
+    id_len = message[3] if message[0] & 0x08 else 0
+    start = 3 + (1 if message[0] & 0x08 else 0)
+    if message[start:start + 1] != b"T":
+        return None
+    payload = message[start + 1 + id_len:start + 1 + id_len + message[2]]
+    if not payload or payload[0] & 0x80:
+        return None
+    try:
+        return payload[1 + (payload[0] & 0x3F):].decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
 # -------------------------------------------------------------------- CLI ---
 
 def _read_text(argv) -> str:
@@ -772,6 +1012,8 @@ def _read_text(argv) -> str:
     if s.strip() and os.path.isfile(s.strip()):
         with open(s.strip(), encoding="utf-8", errors="replace", newline="") as fh:
             s = fh.read()
+        if s.startswith("Filetype: Flipper NFC device"):
+            return dump_text(s)  # a memory dump: the backup's text, as the tag holds it
         s = s[:-2] if s.endswith("\r\n") else s[:-1] if s.endswith("\n") else s
     return s
 
@@ -791,20 +1033,42 @@ def _say_if_exact(text: str) -> None:
           "whatever wrote it may have hidden data in it.", file=sys.stderr)
 
 
+def _check(argv) -> int:
+    if len(argv) != 1 or not os.path.isfile(argv[0]):
+        print("check needs a dump file: python3 seedtag.py check <FILE.nfc>", file=sys.stderr)
+        return 2
+    try:
+        with open(argv[0], encoding="utf-8", errors="replace") as fh:
+            lines, backup = check_dump(fh.read())
+    except ValueError as e:
+        print(f"FAIL: {e}", file=sys.stderr)
+        return 1
+    for level, message in lines:
+        print(f"{level:<5} {message}")
+    if any(level == "FAIL" for level, _ in lines):
+        print("\nNOT CLEAN: this tag holds more than SeedTag writes, or isn't what it should be (FAIL above).")
+        return 1
+    print("\nClean: every page holds only what SeedTag writes, or the chip's defaults.")
+    if backup:
+        print(f"Now check the backup itself: python3 -I -S seedtag.py verify {argv[0]}")
+    return 0
+
+
 def main(argv):
     global kdf_used, builtin_only
     kdf_used = None
     _broken.clear()
-    if not argv or argv[0] not in ("encrypt", "decrypt", "verify"):
+    if not argv or argv[0] not in ("encrypt", "decrypt", "verify", "check"):
         print(__doc__)
         return 2
     cmd, rest = argv[0], [a for a in argv[1:] if a != "--builtin"]
     builtin = len(rest) != len(argv) - 1
-    if builtin and cmd == "encrypt":
-        print("--builtin works with decrypt and verify only: encrypt needs the cryptography package.",
-              file=sys.stderr)
+    if builtin and cmd in ("encrypt", "check"):
+        print("--builtin works with decrypt and verify only.", file=sys.stderr)
         return 2
     builtin_only = builtin
+    if cmd == "check":
+        return _check(rest)
     try:
         if cmd == "encrypt":
             words = normalize_words(getpass.getpass("Mnemonic (hidden): "))

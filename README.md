@@ -272,10 +272,11 @@ seed. From safest down:
    - **The salt and nonce** (28 bytes of the blob). They're random by design, so nothing can tell them apart from
      a hidden secret.
    - **The rest of the tag's memory.** An NFC app shows the message that holds the backup, not the memory after it
-     or the tag's lock and settings bytes. A check of the whole memory is planned; until then, a message that looks
-     right doesn't prove the rest of the tag is clean.
+     or the tag's lock and settings bytes. `seedtag.py check` checks all of it on an NTAG213, 215 or 216, from a
+     memory dump ([Recovering on a computer](#recovering-on-a-computer)); on other tags, a message that looks right
+     doesn't prove the rest of the tag is clean.
 
-   Against both, only the build itself helps: an APK whose source and build you can check
+   Against the salt and nonce, only the build itself helps: an APK whose source and build you can check
    ([Signing a release](#signing-a-release)), and a tag kept out of strangers' reach.
 
 The Back up, Verify and Restore screens remind you of this (*Safest on a spare phone*, second in their checklist,
@@ -600,6 +601,7 @@ or later, recovering a tag needs neither this app, nor this website, nor any pac
 ```bash
 pip install cryptography          # optional, much faster; before going offline
 python3 seedtag.py verify  <BASE64>   # OK + fingerprint, no words
+python3 seedtag.py check   <DUMP>     # anything on the tag besides the backup? (no password)
 python3 seedtag.py decrypt <BASE64>   # prints the words
 python3 seedtag.py decrypt --builtin <BASE64>   # the same with the built-in code only (slow)
 python3 seedtag.py encrypt            # create a tag string on the computer instead
@@ -625,6 +627,23 @@ program can change that, and the backup still opens. But if you saved the text f
 from the NFC app straight into a file) and it isn't exact, something other than SeedTag wrote the tag or changed
 it, and may have hidden data in it ([Using it safely](#using-it-safely), point 5). A file's last line break
 doesn't count.
+
+`check` goes further: it reads a dump of the tag's whole memory and says whether anything is on it besides the
+backup. Take the dump with NFC Tools, as a Flipper Zero `.nfc` file:
+
+1. Open NFC Tools and go to the **OTHER** tab.
+2. Tap **Read memory**, then hold the tag to the phone's NFC spot.
+3. Open the three-dots menu at the top right and choose **Export .nfc**.
+4. Choose the file name and location, and tap **SAVE**.
+
+Move the file to the computer and run `python3 -I -S seedtag.py check <FILE.nfc>`. It needs no password and takes
+no time. For an NXP NTAG213, 215 or 216 it checks every page:
+the chip's version and serial number, the lock bits, the settings (no page behind a password, nothing changed from
+the factory), that the message is exactly a SeedTag backup and nothing else, and that every byte after it is zero.
+It prints a line for each, and *Clean* or *NOT CLEAN* (exit code 1). Lock bits set by **Make tag read-only** are
+only a warning. What no dump can show: the chip's own password and its reply always read as zero (6 bytes), and a
+genuine chip's signature isn't checked (NFC Tools shows it). Other chips aren't supported yet. `decrypt` and
+`verify` take the same dump file in place of the text.
 
 ## Warnings: other apps on the phone
 

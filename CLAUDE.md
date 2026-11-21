@@ -126,10 +126,13 @@ Two Gradle modules plus the Python tool:
     (`scanPrompt`) the screen is blurred on Android 12+ and covered below; `ScrollHints` adds the bottom/top fades and the ↓ button to a
     `StepScreen` whose content goes on below what's visible.
 - **`tools/seedtag.py`**: single file, wordlist embedded, `encrypt` /
-  `decrypt` / `verify`. Python 3.8+; uses `cryptography` (AES-GCM, and
+  `decrypt` / `verify` / `check`. Python 3.8+; uses `cryptography` (AES-GCM, and
   Argon2id from ≥ 44), with `argon2-cffi` as the Argon2id fallback. Without
   them, decrypt falls back to its built-in plain-Python Argon2id and AES-GCM
   decryption (slow, standard library only); encrypt needs `cryptography`.
+  `check` reads a full memory dump (Flipper `.nfc`, as NFC Tools exports it) and
+  checks every page of an NTAG213/215/216 for anything besides the backup; no
+  crypto, no password.
 
 ## Blob format v1 (do not change in place)
 

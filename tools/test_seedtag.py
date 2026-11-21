@@ -451,5 +451,84 @@ class BlobText(unittest.TestCase):
         self.assertIn("one wrong character gives the same error", stderr.getvalue())
 
 
+
+def make_dump(message: bytes, rest: bytes = b"", cfg0="04 00 00 FF", cfg1="00 05 00 00", lock="00 00",
+              drop=None) -> str:
+    """A Flipper .nfc dump of an NTAG213 (made-up serial number) holding [message], then [rest]."""
+    uid = bytes.fromhex("04 11 22 33 44 55 66")
+    pages = [uid[:3] + bytes([0x88 ^ uid[0] ^ uid[1] ^ uid[2]]), uid[3:7],
+             bytes([uid[3] ^ uid[4] ^ uid[5] ^ uid[6], 0x48]) + bytes.fromhex(lock), bytes.fromhex("E1 10 12 00")]
+    data = bytes.fromhex("01 03 A0 0C 34") + bytes([0x03, len(message)]) + message + b"\xfe" + rest
+    data += bytes(144 - len(data))
+    pages += [data[i:i + 4] for i in range(0, 144, 4)]
+    pages += [bytes.fromhex("00 00 00 BD"), bytes.fromhex(cfg0), bytes.fromhex(cfg1), bytes(4), bytes(4)]
+    lines = ["Filetype: Flipper NFC device", "Version: 4", "Device type: NTAG/Ultralight",
+             "NTAG/Ultralight type: NTAG213", "Mifare version: 00 04 04 02 01 00 0F 03",
+             "Pages total: 45", f"Pages read: {45 - (drop is not None)}"]
+    lines += [f"Page {n}: {p.hex(' ').upper()}" for n, p in enumerate(pages) if n != drop]
+    return "\n".join(lines) + "\n"
+
+
+class TagDump(unittest.TestCase):
+    """seedtag.py check: a tag's whole memory, from a Flipper .nfc dump."""
+
+    def setUp(self):
+        self.text = rows("seedtag-v1-vectors.tsv")[0][4]
+        self.message = seedtag.seedtag_message(self.text)
+
+    def levels(self, dump):
+        lines, backup = seedtag.check_dump(dump)
+        return [level for level, _ in lines], lines, backup
+
+    def test_a_clean_backup(self):
+        levels, lines, backup = self.levels(make_dump(self.message))
+        self.assertNotIn("FAIL", levels)
+        self.assertNotIn("WARN", levels)
+        self.assertEqual(self.text, backup)
+        self.assertIn("exactly a SeedTag backup (24 words)", " ".join(m for _, m in lines))
+
+    def test_an_empty_tag(self):
+        for empty in (b"", bytes([0xD8, 0, 0, 0])):
+            levels, _, backup = self.levels(make_dump(empty))
+            self.assertNotIn("FAIL", levels)
+            self.assertIsNone(backup)
+
+    def test_what_isnt_clean(self):
+        def fails(dump, words):
+            _, lines, _ = self.levels(dump)
+            found = [m for level, m in lines if level == "FAIL"]
+            self.assertTrue(any(words in m for m in found), (words, found))
+        fails(make_dump(self.message, rest=b"\x00old text"), "bytes after the message aren't zero")
+        fails(make_dump(self.message, cfg0="04 00 00 10"), "behind a password")
+        fails(make_dump(self.message, cfg1="40 05 00 00"), "aren't the factory defaults")
+        fails(make_dump(seedtag.seedtag_message(self.text[:50] + " " + self.text[50:])), "isn't exactly")
+        two = bytes([0x91]) + self.message[1:] + bytes([0x51, 1, 1]) + b"T\x00"  # a second record
+        fails(make_dump(two), "isn't exactly")
+        fails(make_dump(self.message, drop=20), "pages weren't read")
+        fails(make_dump(self.message) + "Counter 2: 1234\n", "counter isn't zero")
+
+    def test_lock_bits_are_a_warning(self):
+        levels, _, _ = self.levels(make_dump(self.message, lock="FF FF"))
+        self.assertIn("WARN", levels)
+        self.assertNotIn("FAIL", levels)
+
+    def test_only_ntag21x(self):
+        with self.assertRaisesRegex(ValueError, "only NTAG213, NTAG215 and NTAG216"):
+            seedtag.check_dump(make_dump(self.message).replace("Pages total: 45", "Pages total: 48"))
+        with self.assertRaisesRegex(ValueError, "isn't a Flipper .nfc dump"):
+            seedtag.check_dump(self.text)
+
+    def test_cli_and_verify_read_the_dump(self):
+        with tempfile.TemporaryDirectory() as d:
+            clean, dirty = pathlib.Path(d) / "clean.nfc", pathlib.Path(d) / "dirty.nfc"
+            clean.write_text(make_dump(self.message), encoding="utf-8")
+            dirty.write_text(make_dump(self.message, rest=b"\x00secret"), encoding="utf-8")
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(0, seedtag.main(["check", str(clean)]))
+                self.assertEqual(1, seedtag.main(["check", str(dirty)]))
+            self.assertIn("Clean:", out.getvalue())
+            self.assertIn("NOT CLEAN", out.getvalue())
+            self.assertEqual(self.text, seedtag._read_text([str(clean)]))
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

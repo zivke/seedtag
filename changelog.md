@@ -40,6 +40,13 @@ All notable user-visible changes to SeedTag. The format follows
   app), and what to do otherwise. After writing, the read-back compares
   the whole message, not only the text.
 
+- `seedtag.py check <DUMP>`: reads a full memory dump of the tag (a Flipper
+  Zero `.nfc` file, as NFC Tools exports it) and checks every page of an
+  NTAG213, 215 or 216 for anything besides the backup: data after it,
+  other records, a password-protected area, changed settings, counters.
+  No password needed. `decrypt` and `verify` take the dump in place of the
+  text.
+
 ### Changed
 - README: *Storing a tag*, on what physically kills a tag (heat, wireless
   chargers and induction hobs, bending), and on writing a fresh set of tags

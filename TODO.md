@@ -289,22 +289,27 @@ left is around the blob, where nothing checks it:
     the writes past the end fail every time. Rare (a corrupt CC); Cancel ends it, and the backup is fine.
 - [ ] **H4: no check of the whole tag memory outside SeedTag.** A malicious build passes its own check, so this
   has to be `seedtag.py`, reading a full memory dump (no new dependency; a PC/SC reader would need `pyscard`).
-  Own branch, with B5. The format: the Flipper Zero `.nfc` file that NFC Tools exports (plain text, a header with
-  the chip type, version and signature, "Pages read: N", then "Page N: xx xx xx xx"); samples in
-  `other/tag-dumps/`.
-  - [ ] Check page by page: capability container, the NDEF TLV (after NXP's Lock Control TLV, `01 03 A0 0C 34`
-    on NTAG213), the message exactly as in H2, zeros after the terminator (H3), the static and dynamic lock bytes,
-    CFG0/CFG1 at their defaults (AUTH0 `FF`: no page behind the password; ACCESS `00`), the NFC counter, and every
-    page read. For Ultralight C: its 16-bit counter (only counts up) and AUTH0/AUTH1.
-  - [ ] Only for NTAG21x and Ultralight C, whose layout is documented; say plainly that other chips can't be
-    fully checked.
+  The format: the Flipper Zero `.nfc` file that NFC Tools exports; samples in `other/tag-dumps/`.
+  - [x] `seedtag.py check <DUMP>` for NTAG213/215/216, page by page: every page read, the chip's version and
+    serial check bytes, capability container, static and dynamic lock bytes (set: a warning), CFG0/CFG1 at the
+    factory defaults (AUTH0 `FF`), PWD/PACK reading zero, the counters, the TLVs (only NXP's Lock Control TLV
+    besides the message), the message exactly SeedTag's, zeros after the terminator. `decrypt` and `verify` take
+    the dump too. Tests in `TagDump`.
+  - [ ] Ultralight C: its 16-bit counter (only counts up), AUTH0/AUTH1, the unreadable key pages. Needs a dump of
+    a real Ultralight C to see how NFC Tools writes it.
   - [ ] The NTAG21x PWD and PACK always read as zero (6 bytes nobody can check; PACK's 2 come back to whoever
     knows the PWD), and so does the Ultralight C's 3DES key. Find out whether NFC Tools' advanced commands can
     try the factory PWD (`1B FF FF FF FF`) or the Ultralight C factory key.
+  - [ ] The NFC counter reads only when it's enabled; with ACCESS `00` it's off, and the dump's counters say 0
+    whatever it holds. Check what NFC Tools writes for an enabled one.
   - [ ] Optional: verify NXP's originality signature from the dump, so a fake chip shows (NFC Tools already says
     "Valid (NXP Public Key)").
 - [ ] **H5: README: what a clean tag's dump looks like**, how to take one, and what stays unchecked (the key or
   PWD pages, other chips). Update the salt and nonce report's "What it doesn't close" point 2 to link here.
+  - [x] How to take one (NFC Tools: OTHER, Read memory, Export .nfc) and what `check` can't see: README,
+    *Recovering on a computer*.
+  - [ ] What a clean dump looks like, page by page, for someone checking without `seedtag.py`.
+  - [ ] The salt and nonce report's point 2.
 
 ## App and docs
 

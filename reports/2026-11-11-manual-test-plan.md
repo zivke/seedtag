@@ -208,6 +208,8 @@ check the lock read-back after it.
 | 5.11 | `seedtag.py` on Windows with `py` (board B10) | `py seedtag.py verify <FILE>` works as on Linux. | ⬜ |
 | 5.12 | Share a tag's text from NFC Tools (or the NFC app you use) straight into a file, then `python3 -I -S seedtag.py verify <FILE>` (H2) | *The text is exactly what SeedTag writes.* If it says it isn't, that app changes the text: note which app, so the README can name one that doesn't. | ⬜ |
 | 5.13 | First CI run after `-W error` was added to the Python tests (board B10) | Green. | ⬜ |
+| 5.14 | `seedtag.py check` (H4): dump the NTAG213 with NFC Tools (OTHER, Read memory, ⋮ Export .nfc, as in the README) after a Back up with this version, then after writing a long text with NFC Tools and a SeedTag backup from before H3 (or just the text), and an empty tag after Erase | After this version's Back up and after Erase: *Clean*, exit 0. With old data after the backup: *NOT CLEAN*, the FAIL line names the pages, exit 1. | ⬜ |
+| 5.15 | `python3 -I -S seedtag.py verify <DUMP>` with the dump from 5.14 (H4) | Asks for the password and prints the same fingerprint as the app; says the text is exactly what SeedTag writes. | ⬜ |
 
 ## 6. Android 8 to 11
 
