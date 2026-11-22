@@ -119,9 +119,15 @@ import androidx.compose.ui.window.DialogWindowProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import rs.zivke.seedtag.core.Bip39
+import rs.zivke.seedtag.core.EraseCheck
+import rs.zivke.seedtag.core.Haptic
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
+import rs.zivke.seedtag.core.Rest
 import rs.zivke.seedtag.core.SeedBox
+import rs.zivke.seedtag.core.TagCheck
+import rs.zivke.seedtag.core.TagContent
+import rs.zivke.seedtag.core.TagStep
 
 // ============================================================== theme ===
 //

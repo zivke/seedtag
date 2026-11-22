@@ -65,8 +65,8 @@
     report, item 6).
   - [x] CI running `make test`, `make build` and `check-apk` (`.github/workflows/build.yml`).
   - [ ] Split `Ui.kt` by screen, after `tag-write-password` is merged (it changes `Ui.kt` a lot).
-  - [ ] Move the tag-flow logic into a pure-Kotlin state machine with tests, after `tag-write-password` is
-    merged (it changes the view model and `TagIo`).
+  - [x] Move the tag-flow logic into a pure-Kotlin state machine with tests. Done before `tag-write-password`
+    after all (board B16; decided 2026-11-22): that branch is re-applied onto it.
   - [x] Clarify the wrapper wording (8.14 jar, 8.11.1 distribution: both were right); remove the unused
     `Bip39.normalize(String)`.
 
@@ -186,8 +186,16 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B15: tag results read live view-model fields.** Carry fingerprint, target and text in the request and
   result; `Failed` with `changedTag`, always shown; `resetErase()` and closing ConfirmErase / ConfirmLock in
   `wipeAll()`; a dialog priority queue; clear stale Done / Verified after Erase.
-- [ ] **B16: no automated tests for the tag flow.** Pure helpers into `core` with tests, then the `TagFlow` reducer
-  (the TODO lines on the state machine say both "before" and "after" the branch merge: pick one).
+- [x] **B16: no automated tests for the tag flow.** Pure helpers into `core` with tests, then the `TagFlow` reducer
+  (the TODO lines on the state machine say both "before" and "after" the branch merge: pick one). Before, decided
+  2026-11-22, on branch `b16-tag-flow-tests`.
+  - [x] `TagModel.kt`: the request and result types, `OverwriteTarget.matches`, `EraseFiller`,
+    `Type2Memory.wrapPage`, `TagContent.of`; `TagModelTest`.
+  - [x] `BackAction.kt` for `back()` / `backStaysInApp`.
+  - [x] `TagFlow.kt`: every purpose and result, stale results, staying armed, the claim from the NFC thread;
+    `TagFlowTest`. Erase is no longer a parallel copy in the view model. Behaviour unchanged (B15 is next).
+  - [ ] Not done: the idle timer with an injected clock. It's three `delay`s in `IdleWatch`, restarted by
+    Compose on every touch; a clock-driven copy would be new code to get wrong, for little to test.
 - [ ] **B17: `tag-write-password` drift and design gaps.** Drop `7e99a92`, re-apply `c235d3c`, land the pure
   additions first; fresh-tap check before "Protected"; compare all of CFG0/CFG1; map a NAK after AUTH to "wrong
   key"; Erase aware of protection; README: the NTAG password goes over the air in the clear.

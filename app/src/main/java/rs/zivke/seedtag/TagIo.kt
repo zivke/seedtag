@@ -13,125 +13,21 @@ import android.nfc.tech.MifareUltralight
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 import android.nfc.tech.NfcV
+import rs.zivke.seedtag.core.EraseCheck
+import rs.zivke.seedtag.core.EraseFiller
 import rs.zivke.seedtag.core.NdefText
+import rs.zivke.seedtag.core.OverwriteTarget
+import rs.zivke.seedtag.core.Rest
 import rs.zivke.seedtag.core.SeedBox
+import rs.zivke.seedtag.core.TagCheck
+import rs.zivke.seedtag.core.TagContent
+import rs.zivke.seedtag.core.TagRequest
+import rs.zivke.seedtag.core.TagResult
+import rs.zivke.seedtag.core.TagStep
+import rs.zivke.seedtag.core.Type2Memory
 import rs.zivke.seedtag.core.Type2Tlv
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
-
-/** What the UI wants done with the next tag that touches the phone. */
-sealed interface TagRequest {
-    /** First Back up step: find out whether the tag can take a backup, and how big. Writes nothing. */
-    data object Check : TagRequest
-    /** Write [text]; refuses to overwrite a non-empty tag unless it's the [overwrite] the user confirmed. */
-    data class Write(val text: String, val overwrite: OverwriteTarget? = null) : TagRequest
-    /** Read the tag back and compare with [expected] (second tap after formatting a blank tag). */
-    data class CheckWritten(val expected: String) : TagRequest
-    data object Read : TagRequest
-    /** Make the tag read-only, but only if it holds exactly [expected]. */
-    data class Lock(val expected: String) : TagRequest
-    /** The Erase tab, first tap: what the tag holds and whether it can be erased. Writes nothing. */
-    data object Inspect : TagRequest
-    /** Erase [target]: overwrite all of its NDEF data with zeros, then leave it empty. */
-    data class Erase(val target: OverwriteTarget) : TagRequest
-    /** Finish [Rest.Interrupted]: clear the old data after the backup, if the tag holds exactly [expected]. */
-    data class ClearRest(val expected: String) : TagRequest
-}
-
-/**
- * The tag's data area after the backup, where Android's write leaves whatever was there before (the
- * end of a longer backup, or anything another app wrote).
- */
-enum class Rest {
-    /** Overwritten with zeros and read back, or zero already. */
-    Cleared,
-    /** Not a tag whose layout SeedTag knows (only NTAG and MIFARE Ultralight): older data may remain. */
-    NotPossible,
-    /** The tag moved away while it was being cleared: the backup is fine, older data may remain. */
-    Interrupted,
-}
-
-/**
- * The non-empty tag the user agreed to overwrite: its UID and the NDEF message it held (not secret,
- * it's what anyone can read from the tag). Any other tag, or this one with different content, has
- * to be confirmed again.
- */
-class OverwriteTarget(private val uid: ByteArray, private val message: ByteArray) {
-    /** [current] null: the tag holds no NDEF message, which matches a target that held none either. */
-    fun matches(tag: Tag, current: NdefMessage?): Boolean {
-        // Random UIDs (ISO 14443-3 NUIDs start with 08h) change on every tap: only the content can tell.
-        val uidStable = uid.isNotEmpty() && !(uid.size == 4 && uid[0] == 0x08.toByte())
-        val bytes = current?.toByteArray() ?: ByteArray(0)
-        return bytes.contentEquals(message) && (!uidStable || tag.id.contentEquals(uid))
-    }
-}
-
-enum class TagContent { Empty, Backup, NewerBackup, Other }
-
-/**
- * What the Erase tab's scan found. [ndef]: it's NDEF-formatted (a blank tag has nothing to erase).
- * [text]: the first Text record (for a backup, the Base64 blob: not secret, anyone can read it from
- * the tag), so the password check needs no second scan. [target]: the tag and content an erase is
- * bound to, null if it can't be erased.
- */
-data class EraseCheck(
-    val supported: Boolean,
-    val ndef: Boolean,
-    val writable: Boolean,
-    val content: TagContent,
-    val capacity: Int?,
-    val text: String?,
-    val target: OverwriteTarget?,
-)
-
-/**
- * What the first Back up step found. [supported]: the tag can hold NDEF at all. [ndef]: it's
- * NDEF-formatted; if not, it's blank and gets formatted on the first write. [capacity]: bytes
- * for the NDEF message, null if unknown; for a blank tag it's [estimated] from the chip's memory.
- * [classic]: a MIFARE Classic tag, which many phones can't read at all, so the backup might not be
- * readable when it's needed.
- */
-data class TagCheck(
-    val supported: Boolean,
-    val ndef: Boolean,
-    val capacity: Int?,
-    val estimated: Boolean = false,
-    val writable: Boolean = true,
-    val content: TagContent = TagContent.Empty,
-    val classic: Boolean = false,
-) {
-    /** Longest backup that fits, null if none does or the size is unknown. */
-    val maxWords: Int? get() = capacity?.let(SeedBox::maxWordsFor)
-    val tooSmall: Boolean get() = capacity != null && maxWords == null
-    val usable: Boolean get() = supported && writable && !tooSmall
-}
-
-/**
- * What the tag I/O is doing right now, for the scan prompt: [step] of [of], or a single read when [of]
- * is 0. [writes]: the operation changes the tag, so it mustn't be interrupted (no Cancel meanwhile).
- */
-data class TagStep(val label: String, val step: Int = 0, val of: Int = 0, val writes: Boolean = false)
-
-sealed interface TagResult {
-    data class Checked(val check: TagCheck) : TagResult
-    /** [text] was written and read back; [rest]: what happened to the old data after it. */
-    data class Written(val text: String, val rest: Rest) : TagResult
-    /** The result of [TagRequest.ClearRest]. */
-    data class RestCleared(val rest: Rest) : TagResult
-    /** A blank tag was formatted with [text], but couldn't be read back on the same tap. */
-    data class WrittenUnchecked(val text: String) : TagResult
-    /** [differences]: how the tag's message differs from what SeedTag writes ([TagIo.differences]); empty if it doesn't. */
-    data class Read(val text: String, val differences: List<String> = emptyList()) : TagResult
-    data object Locked : TagResult
-    /** Lock found the tag already not writable: nothing was changed, and it may not be permanent. */
-    data object AlreadyReadOnly : TagResult
-    /** Tag already holds data; [existing] is its text if it was a Text record; [target] identifies it. */
-    data class NotEmpty(val existing: String?, val target: OverwriteTarget) : TagResult
-    data class Inspected(val check: EraseCheck) : TagResult
-    /** Every byte of the tag's NDEF data was overwritten with zeros, and the tag is now empty. */
-    data object Erased : TagResult
-    data class Failed(val message: String) : TagResult
-}
 
 /** Blocking tag I/O. Call only from the NFC reader-mode callback thread. */
 object TagIo {
@@ -227,7 +123,7 @@ object TagIo {
             val existing = readMessage(it)
             if (existing == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
             if (existing != null && existing.records.any { r -> r.tnf != NdefRecord.TNF_EMPTY }) {
-                if (req.overwrite?.matches(tag, existing) != true) {
+                if (req.overwrite?.matches(tag.id, existing.toByteArray()) != true) {
                     val text = runCatching { firstText(existing) }.getOrNull()
                     return TagResult.NotEmpty(text, OverwriteTarget(tag.id ?: ByteArray(0), existing.toByteArray()))
                 }
@@ -300,15 +196,7 @@ object TagIo {
     }
 
     private fun contentOf(msg: NdefMessage?): TagContent =
-        if (msg == null || isEmpty(msg)) {
-            TagContent.Empty
-        } else {
-            when (SeedBox.kindOf(runCatching { firstText(msg) }.getOrNull())) {
-                SeedBox.Kind.Current -> TagContent.Backup
-                SeedBox.Kind.Newer -> TagContent.NewerBackup
-                SeedBox.Kind.NotBackup -> TagContent.Other
-            }
-        }
+        TagContent.of(msg == null || isEmpty(msg), msg?.let { runCatching { firstText(it) }.getOrNull() })
 
     private fun isEmpty(msg: NdefMessage) = msg.records.all { r -> r.tnf == NdefRecord.TNF_EMPTY }
 
@@ -340,7 +228,7 @@ object TagIo {
             if (current == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
             // Only the tag that was scanned, with what it held then. A tag already holding the zeros
             // is one whose erase was interrupted: it holds nothing any more, so it may be finished.
-            if (!target.matches(tag, current) && !(current != null && isFiller(current))) {
+            if (!target.matches(tag.id, current?.toByteArray()) && !(current != null && isFiller(current))) {
                 return TagResult.Failed(
                     "This isn't the tag you scanned, or what it holds has changed since. Nothing was changed. Cancel and scan it again.",
                 )
@@ -384,25 +272,13 @@ object TagIo {
 
     private val EMPTY = NdefMessage(NdefRecord(NdefRecord.TNF_EMPTY, null, null, null))
 
-    /**
-     * One record of zeros (TNF unknown, no type) whose message is as close to [maxSize] bytes as an
-     * NDEF record can be: exactly, except for a few sizes just above 255 bytes, where the short
-     * record format ends and up to 3 bytes at the end stay as they were.
-     */
-    private fun fillerFor(maxSize: Int): NdefMessage {
-        fun msg(n: Int) = NdefMessage(NdefRecord(NdefRecord.TNF_UNKNOWN, null, null, ByteArray(n)))
-        var n = (maxSize - 3).coerceAtLeast(0)
-        while (n > 0 && msg(n).byteArrayLength > maxSize) n--
-        return msg(n)
-    }
+    /** [EraseFiller]'s record for an NDEF area of [maxSize] bytes. */
+    private fun fillerFor(maxSize: Int): NdefMessage =
+        NdefMessage(NdefRecord(NdefRecord.TNF_UNKNOWN, null, null, ByteArray(EraseFiller.payloadFor(maxSize))))
 
-    /** A message that is one of [fillerFor]'s records: what an interrupted erase leaves behind. */
-    private fun isFiller(msg: NdefMessage): Boolean = msg.records.size == 1 && msg.records[0].let { r ->
-        r.tnf == NdefRecord.TNF_UNKNOWN && r.type.isEmpty() && r.payload.all { b -> b == 0.toByte() }
-    }
-
-    /** A SeedTag backup, of this format or a newer one ([SeedBox.kindOf]). */
-    fun looksLikeBackup(text: String?): Boolean = SeedBox.kindOf(text) != SeedBox.Kind.NotBackup
+    /** What an interrupted erase leaves behind ([EraseFiller.isFiller]). */
+    private fun isFiller(msg: NdefMessage): Boolean = msg.records.firstOrNull()
+        ?.let { r -> EraseFiller.isFiller(msg.records.size, r.tnf.toInt(), r.type, r.payload) } ?: false
 
     private fun tooSmall(text: String, needed: Int, has: Int, estimated: Boolean): String {
         val words = (runCatching { SeedBox.fromBase64(text).size }.getOrDefault(0) - SeedBox.OVERHEAD) * 3 / 4
@@ -620,7 +496,7 @@ object TagIo {
         return try {
             ul.use {
                 it.connect()
-                val pages = wrapPage(it)
+                val pages = Type2Memory.wrapPage(it::readPages)
                 if (pages == null) unprobeable += uid
                 pages?.let(DATA_BYTES::get)?.minus(7)
             }
@@ -630,17 +506,6 @@ object TagIo {
             unprobeable += uid
             null
         }
-    }
-
-    private fun wrapPage(ul: MifareUltralight): Int? {
-        val head = ul.readPages(0)
-        if (head.size != 16) return null
-        for (p in intArrayOf(0x0D, 0x11, 0x27, 0x2A, 0x39, 0x84, 0xE4)) {
-            val r = ul.readPages(p)
-            if (r.size != 16) return null
-            for (k in 1..3) if ((0 until 4).all { r[4 * k + it] == head[it] }) return p + k
-        }
-        return null
     }
 
     private fun firstText(msg: NdefMessage?): String? =

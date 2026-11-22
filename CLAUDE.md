@@ -92,6 +92,15 @@ Two Gradle modules plus the Python tool:
   - `Type2Tlv.kt`: NDEF TLV length in a Type 2 tag's raw data area, to double-check
     a tag every NDEF read called empty before writing to it without asking; and where
     the free bytes after the terminator start (`freeAfterTerminator`), which Back up zeroes.
+  - `TagModel.kt`: what the app asks of a tag and what comes back (`TagRequest`,
+    `TagResult`, `TagCheck`, `EraseCheck`, …), and the pure parts of tag I/O:
+    `OverwriteTarget.matches`, `EraseFiller`, `Type2Memory.wrapPage`, `TagContent.of`.
+  - `TagFlow.kt`: the tag flow as an immutable state machine (`TagFlow`): which
+    scan waits for a tag, what earlier scans found, and what each result does.
+    Each call returns the next state and `TagEffect`s (buzz, a `TagNotice`
+    dialog, decrypt, Done, Erase reset) that the view model carries out.
+    `TagFlowTest` drives it with fake taps. Change tag-flow behaviour here, with a test.
+  - `BackAction.kt`: what system Back does.
   - `Errors.kt`: `SeedTagException` subclasses; messages are shown to the user
     and must never contain secrets.
 - **`app/`**: Compose, single activity.
@@ -107,13 +116,15 @@ Two Gradle modules plus the Python tool:
     permission) for the offline advice; Wi-Fi / Bluetooth state would need
     permissions, so they're only mentioned.
   - `SeedTagViewModel.kt`: all UI state and flows. Argon2 runs on
-    `Dispatchers.Default`. The pending tag operation is an `AtomicReference`
-    because the reader callback runs on a binder thread. A failed tag operation
+    `Dispatchers.Default`. The tag flow is a `TagFlow` in Compose state, changed
+    only on the main thread through `apply()`; its pending scan is mirrored in an
+    `AtomicReference`, which the reader callback (a binder thread) takes, then posts
+    `claimed`, the steps and the result back in order. A failed tag operation
     stays armed so the user can just tap again. `holdsSecrets` is true while
     words, a password or restored words are in memory; `touched()` (every
     `ACTION_DOWN` in `MainActivity`) restarts the idle timer, and
     `idleTimeout()` wipes after `IDLE_WARN_MS` + `IDLE_GRACE_MS`. `back()` and
-    `backStaysInApp` decide what system Back does (`Dialog.ConfirmBack` before
+    `backStaysInApp` decide what system Back does (`BackAction`) (`Dialog.ConfirmBack` before
     anything is lost). A successful write resets Verify and Restore
     (`readAnother()`).
   - `TagIo.kt`: blocking NFC I/O (check, write + read-back, then zeroing the old data
