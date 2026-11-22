@@ -143,6 +143,12 @@ AAD   = 0x01
 tag   = one NDEF Text record, lang "en", standard Base64 of blob
 ```
 
+`FORMAT.md` (0BSD) is the full description: the record, what readers forgive,
+the vector files, and the envelope v0.4.2 and later use to recognise a backup
+without decrypting it (first Text record, standard Base64, 61–200 bytes, first
+byte `02`–`0F` = newer SeedTag format). A v2 must keep that envelope. Keep
+`FORMAT.md` in step with `SeedBox.kt` and `seedtag.py`.
+
 Existing tags in the field depend on this. Any change to parameters or layout
 is a **new version byte**, with `open` still accepting v1, matching changes in
 `seedtag.py`, and new rows in the vector files. Generate vectors with
@@ -176,8 +182,9 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
 
 - Keep `core` free of Android imports so `make test` stays a plain JVM test.
   Add a test when BIP39 or crypto behavior changes, in Kotlin and Python.
-- Licenses: the app and everything else are `GPL-3.0-or-later` (`LICENSE`); `tools/seedtag.py`
-  alone is `0BSD`, so recovery is never in legal doubt: keep it that way. Every source file starts
+- Licenses: the app and everything else are `GPL-3.0-or-later` (`LICENSE`); `tools/seedtag.py`,
+  `FORMAT.md` and SeedTag's own vector files (`.license` next to each) are `0BSD`, so recovery and
+  independent decoders are never in legal doubt: keep it that way. Every source file starts
   with an `SPDX-License-Identifier` line and `Copyright (C) 2026 zivke`; add them to new files.
 - No new dependencies without asking. Bouncy Castle is the only crypto library.
 - Every download is pinned: the wrapper jar (`gradle-wrapper.jar.sha256`, checked by `make`), the

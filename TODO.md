@@ -207,7 +207,10 @@ report's tests N1–N12, A1–A3, H1).
   - [x] (f) Clear the erase password on "Don't check the password".
   - [ ] On Type 2, a raw page check after the zero fill (from B13).
 - [ ] **B21: no known-answer self-test** for Argon2id and AES-GCM before the first seal.
-- [ ] **B22: write down the format envelope** a v2 must keep; `FORMAT.md` and the vectors under 0BSD or CC0.
+- [x] **B22: write down the format envelope** a v2 must keep; `FORMAT.md` and the vectors under 0BSD or CC0.
+  `FORMAT.md` (0BSD, section 4 the envelope, v2 points listed but not decided), `.license` files for the three
+  vector files, README and CLAUDE.md link to it; `kindOf`'s size limits tested. The board's "45-200 bytes" is
+  wrong: 45 is the overhead, the smallest blob is 61.
 - [ ] **B23: system screen readers and accessibility overlays are outside every warning.** Neutral notice when any
   service or touch exploration is on; README line on accessibility overlays.
 - [ ] **B24: adb can probably mirror secure windows on Android ≤ 11.** Say so in the debugging notice and README.

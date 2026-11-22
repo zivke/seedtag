@@ -560,6 +560,10 @@ the encrypted backup on you, and it looks like jewellery, not a seed backup. Thi
 
 ## Format v1
 
+[FORMAT.md](FORMAT.md) has the full description, enough to write your own decoder: the record on the tag, what
+readers accept, the test vectors, and what every later format keeps so that older versions still recognise it.
+In short:
+
 ```
 blob  = 0x01 | salt[16] | nonce[12] | AES-256-GCM(entropy)[len+16]
 key   = Argon2id(UTF-8(NFKD(password)), salt, t=3, m=65536 KiB, p=1, v1.3, len=32)
@@ -779,5 +783,8 @@ SeedTag is free and has no ads. If you've found it useful, you can support its d
   commit and what was changed.
 - `tools/seedtag.py`: [BSD Zero Clause](tools/seedtag.py) (`0BSD`, the full text is in the file's header), so
   anyone can always use it to recover a tag, for any purpose.
+- [FORMAT.md](FORMAT.md) and the vector files it describes (`seedtag-v1-vectors.tsv`, `blob-text.tsv`,
+  `password-variants.tsv`; each has a `.license` file): `0BSD` too, so anyone can write a decoder, under any
+  license. `bip39-vectors.tsv` is Trezor's reference set (python-mnemonic, MIT).
 
 Each source file names its license in an `SPDX-License-Identifier` line. See [changelog.md](changelog.md) for changes.

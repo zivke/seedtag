@@ -7,6 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- `FORMAT.md`: the tag format in full, enough to write an independent
+  decoder, with the envelope that versions from 0.4.2 on use to recognise a
+  backup in a newer format, and what a v2 must keep. It and the test vector
+  files are under `0BSD`, like `seedtag.py`.
 - **Erase**, a fourth tab after Back up, Verify and Restore: scan a tag to see what it holds, then
   erase it. For a SeedTag backup you can first check its password, to be
   sure it's the backup you mean, or erase it without checking. It asks

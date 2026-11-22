@@ -132,6 +132,12 @@ class SeedBoxTest {
         assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(withFirst(0x00)))
         assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(withFirst(0x10)))
         assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(SeedBox.toBase64(blob.copyOf(40))))
+        // The sizes FORMAT.md promises (section 4): 61 to 200 bytes.
+        fun sized(n: Int, first: Int) = SeedBox.toBase64(ByteArray(n).also { it[0] = first.toByte() })
+        assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(sized(60, 0x01)))
+        assertEquals(SeedBox.Kind.Current, SeedBox.kindOf(sized(61, 0x01)))
+        assertEquals(SeedBox.Kind.Newer, SeedBox.kindOf(sized(200, 0x02)))
+        assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(sized(201, 0x02)))
         assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf("https://example.com"))
         assertEquals(SeedBox.Kind.NotBackup, SeedBox.kindOf(null))
     }
