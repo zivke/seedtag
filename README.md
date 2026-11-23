@@ -422,8 +422,8 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
 Verify and Restore are two steps, like Back up: type the password and scan, then the result. Once the tag has
 been decrypted, the password field and keyboard are gone; **Verify another tag** or **Restore another tag** starts
 again from an empty password. Writing a new backup clears both too, so what they show is never left over from
-before it. Switching to another tab clears a password typed on Verify, Restore or Erase and hides restored words;
-if there's one to lose, the app asks first (**Clear and switch** or **Stay**). The words then need another restore
+before it. Switching to another tab clears the words typed on Back up, a password typed on Verify, Restore or
+Erase, and hides restored words; if there's one to lose, the app asks first (**Clear and switch** or **Stay**). The words then need another restore
 to be seen again.
 
 When a screen goes on below what's visible, for example above the word keypad or the password keyboard, its bottom

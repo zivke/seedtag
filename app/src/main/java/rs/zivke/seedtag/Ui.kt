@@ -2452,11 +2452,23 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Sett
         is Dialog.ConfirmTab -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },
-            title = { Text(if (d.words) "Hide the restored words?" else "Clear the password?") },
+            title = {
+                Text(
+                    when {
+                        d.backup && d.words -> "Clear the words?"
+                        d.words -> "Hide the restored words?"
+                        else -> "Clear the password?"
+                    },
+                )
+            },
             text = {
                 GuardDialogWindow()
                 Text(
                     when {
+                        d.backup && d.words ->
+                            "Switching to ${d.to.title} clears the words you typed for the backup" +
+                                (if (d.password) " and its password" else "") + ". They aren't kept anywhere: to back " +
+                                "up, you'll have to type them again."
                         d.words && d.password ->
                             "Switching to ${d.to.title} hides the restored words and clears the password you typed. " +
                                 "Neither is kept anywhere: to see the words again, restore the tag once more."

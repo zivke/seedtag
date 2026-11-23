@@ -364,6 +364,7 @@ left is around the blob, where nothing checks it:
 - [ ] ***Safest on a spare phone* item.** Change its last paragraph to: "If you don't have a spare phone, you can
   use your everyday phone after making sure it's offline, but be aware that it is a less safe option. For more
   details, read the "Go offline first"" (`SPARE_PHONE_DETAILS` in `Ui.kt`).
-- [ ] **Words survive switching tabs.** In Back up, type all the words and the password, then cancel the write and
+- [x] **Words survive switching tabs.** In Back up, type all the words and the password, then cancel the write and
   go back twice: you can now switch between Back up, Verify, Restore and Erase without the words on the Back up
-  tab ever being cleared.
+  tab ever being cleared. Leaving Back up with words typed now asks (*Clear the words?*, `Dialog.ConfirmTab`
+  with `backup`) and clears them; device row 7.37.

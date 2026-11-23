@@ -166,6 +166,10 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- Going back from the words to the word count showed the tabs again, and
+  switching to Verify, Restore or Erase from there kept the typed seed words
+  in memory, without asking. Switching from Back up now asks first (*Clear
+  the words?*) and clears them.
 - Leaving the app, or the idle timeout, didn't close *Erase this tag?* or
   *Make it read-only?*, and kept the Erase tab's scan: whoever picked up the
   phone later could still confirm them. Clearing now closes every question
