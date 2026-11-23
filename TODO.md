@@ -65,8 +65,8 @@
     report, item 6).
   - [x] CI running `make test`, `make build` and `check-apk` (`.github/workflows/build.yml`).
   - [ ] Split `Ui.kt` by screen, after `tag-write-password` is merged (it changes `Ui.kt` a lot).
-  - [ ] Move the tag-flow logic into a pure-Kotlin state machine with tests, after `tag-write-password` is
-    merged (it changes the view model and `TagIo`).
+  - [x] Move the tag-flow logic into a pure-Kotlin state machine with tests. Done before `tag-write-password`
+    after all (board B16; decided 2026-11-22): that branch is re-applied onto it.
   - [x] Clarify the wrapper wording (8.14 jar, 8.11.1 distribution: both were right); remove the unused
     `Bip39.normalize(String)`.
 
@@ -178,16 +178,32 @@ report's tests N1–N12, A1–A3, H1).
   - [ ] CI on the newest Python (needs `actions/setup-python`, pinned by SHA; with B37).
 - [ ] **B11: the APK-to-tag binding is one person reading a run header.** Build-provenance attestation checked by
   `sign-release.sh`, or a host rebuild from a throwaway clone for `--expect`.
-- [ ] **B12: raw empty check and format guard skip non-NXP Type 2 tags** *(device: N4)*. Raw reads through `NfcA`.
+- [x] **B12: raw empty check and format guard skip non-NXP Type 2 tags** *(device: N4)*. Raw reads through `NfcA`.
+  Confirmed on 2026-11-23 with an "NTAG213-compatible" tag (UID from 1Dh, Android offers only NfcA and Ndef): a
+  12-word backup over a text record left 11 pages of the old text. All raw Type 2 access (empty check, format
+  guard, size probe, clearing after the backup) now goes through `NfcA` (`Type2Raw`); Erase ends with the same
+  zeroing and a raw check (`TagResult.Erased(rest)`); `Type2Memory.freePages` and the commands tested. Device rows
+  7.28-7.31.
 - [x] **B13: Erase over-promises.** "The tag's whole NDEF area was overwritten and read back"; erasing doesn't undo
   copies already read (move the funds if the password may be known); replace a backup by writing over it.
 - [ ] **B14: reproducibility not shown since the toolchain bump.** Run CI on `develop`, compare with `make build`,
   record both hashes; repeat after every toolchain change.
-- [ ] **B15: tag results read live view-model fields.** Carry fingerprint, target and text in the request and
+- [x] **B15: tag results read live view-model fields.** Carry fingerprint, target and text in the request and
   result; `Failed` with `changedTag`, always shown; `resetErase()` and closing ConfirmErase / ConfirmLock in
-  `wipeAll()`; a dialog priority queue; clear stale Done / Verified after Erase.
-- [ ] **B16: no automated tests for the tag flow.** Pure helpers into `core` with tests, then the `TagFlow` reducer
-  (the TODO lines on the state machine say both "before" and "after" the branch merge: pick one).
+  `wipeAll()`; a dialog priority queue; clear stale Done / Verified after Erase. On `b16-tag-flow-tests`:
+  `Pending.fingerprint`, `TagRequest.Erase(target, text)`, `TagNotice.LateFailure`, `TagEffect.Emptied`, a late
+  `Erased` resets the tab if its scan is the one erased, `wiped()` drops the Erase scan; *Still there?* sits on
+  top of the dialog (`below` + `idle`) instead of a queue. A test per case in `TagFlowTest`; device rows 7.32-7.36.
+- [x] **B16: no automated tests for the tag flow.** Pure helpers into `core` with tests, then the `TagFlow` reducer
+  (the TODO lines on the state machine say both "before" and "after" the branch merge: pick one). Before, decided
+  2026-11-22, on branch `b16-tag-flow-tests`.
+  - [x] `TagModel.kt`: the request and result types, `OverwriteTarget.matches`, `EraseFiller`,
+    `Type2Memory.wrapPage`, `TagContent.of`; `TagModelTest`.
+  - [x] `BackAction.kt` for `back()` / `backStaysInApp`.
+  - [x] `TagFlow.kt`: every purpose and result, stale results, staying armed, the claim from the NFC thread;
+    `TagFlowTest`. Erase is no longer a parallel copy in the view model. Behaviour unchanged (B15 is next).
+  - [ ] Not done: the idle timer with an injected clock. It's three `delay`s in `IdleWatch`, restarted by
+    Compose on every touch; a clock-driven copy would be new code to get wrong, for little to test.
 - [ ] **B17: `tag-write-password` drift and design gaps.** Drop `7e99a92`, re-apply `c235d3c`, land the pure
   additions first; fresh-tap check before "Protected"; compare all of CFG0/CFG1; map a NAK after AUTH to "wrong
   key"; Erase aware of protection; README: the NTAG password goes over the air in the clear.

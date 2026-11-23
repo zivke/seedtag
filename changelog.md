@@ -53,6 +53,10 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- README, *Buying one*: how to check that an NTAG is genuine NXP before it
+  holds a backup (NFC Tools: the chip named, a serial number starting with
+  04, *Signature Valid*), and that "magic" UID-changeable tags exist for
+  NTAG and Ultralight too.
 - A password that doesn't open a tag (on Verify, Restore or Erase's
   password check) no longer ends at "Wrong password, or the tag data is
   corrupted". The message says what to check, in order: compare the
@@ -162,14 +166,42 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- Leaving the app, or the idle timeout, didn't close *Erase this tag?* or
+  *Make it read-only?*, and kept the Erase tab's scan: whoever picked up the
+  phone later could still confirm them. Clearing now closes every question
+  and forgets the scan.
+- A backup or an erase that finished after you left the app (a call, the
+  power button) was handled as if nothing had changed meanwhile: *Backup
+  written* came back without its fingerprint, a failure that may have
+  changed the tag ("part of what it held may already be gone") wasn't shown
+  at all, and the Erase tab kept the scan of a tag that was now empty.
+- A tag that moved away while being made read-only got "moved away too
+  early", although part of it may already be read-only for good. It now
+  says so.
+- After erasing the tag that holds the backup just written, Back up still
+  said *Backup written* and Verify *Same seed*: both now start afresh, and
+  Lock is no longer offered for it.
+- *Still there?* replaced whatever message was open, and a late tag result
+  could replace *Still there?* during its last minute, so everything was
+  cleared without a warning on screen. It now sits on top: **Keep** brings
+  back the message, and late results wait behind it.
 - Back up no longer leaves old data on the tag after the backup. Android
   writes only the backup itself, so the rest of the tag's memory kept
   whatever was there: the end of a longer, older backup, or anything
   another app wrote before, such as a seed in plain text, readable with an
-  app that shows a tag's whole memory. On NTAG and MIFARE Ultralight tags,
-  Back up now overwrites it with zeros and reads it back (*Clear old data*
-  finishes it if the tag moved away); on other tags, *Backup written* says
-  that old data may still be there.
+  app that shows a tag's whole memory. On NFC Forum Type 2 tags (NTAG,
+  MIFARE Ultralight, and compatible chips from other makers), Back up now
+  overwrites it with zeros, up to the end of the data area, and reads it
+  back (*Clear old data* finishes it if the tag moved away); on other tags,
+  *Backup written* says that old data may still be there. Erase does the
+  same after emptying a Type 2 tag, and *Tag erased* says whether its
+  memory was checked page by page.
+- On Type 2 chips from makers other than NXP (sold as "NTAG213
+  compatible"), which Android doesn't offer as MIFARE Ultralight, the raw
+  checks didn't run: a tag that a too-quick tap read as empty could be
+  written or formatted without the overwrite question, and old data after
+  the backup wasn't cleared. They now use raw NFC-A commands, which work on
+  any Type 2 chip.
 - The beta notice (README, About page, the disclaimer before you start), the
   MIFARE Classic warning and the README's tag table named MIFARE Ultralight C
   as the tested tag. It was an NXP NTAG213, as a memory dump showed; no

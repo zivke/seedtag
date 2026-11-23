@@ -362,11 +362,14 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    punctuation.
    A password that starts or ends with a space, or has two spaces in a row, is refused: a written copy rarely shows
    that, and only the exact spaces would decrypt the tag.
-   If the tag already has data, the app asks before overwriting it (on NTAG and MIFARE Ultralight tags, a tag that
-   reads as empty is double-checked in its raw data first, so a bad read isn't taken for an empty tag).
+   If the tag already has data, the app asks before overwriting it (on NFC Forum Type 2 tags, such as NTAG and MIFARE
+   Ultralight, a tag that reads as empty is double-checked in its raw data first, so a bad read isn't taken for an
+   empty tag).
    Android writes only the backup and leaves the rest of the tag's memory as it was: the end of a longer, older
-   backup, or anything another app wrote there before, such as a seed in plain text. So after writing, on NTAG and
-   MIFARE Ultralight tags, Back up also overwrites the memory after the backup with zeros and reads it back. If
+   backup, or anything another app wrote there before, such as a seed in plain text. So after writing, on Type 2
+   tags (NTAG, MIFARE Ultralight, and compatible chips from other makers, which Android doesn't always offer as
+   MIFARE Ultralight), Back up also overwrites the memory after the backup with zeros, up to the end of the data
+   area and never the lock or configuration pages after it, and reads it back. If
    the tag moves away meanwhile, *Backup written* says so, and *Clear old data* finishes it. On other tags it
    can't, and *Backup written* says that old data may still be there: use a new tag if this one ever held
    anything nobody should read. A blank,
@@ -405,10 +408,11 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    or this one with different content, is refused. Erasing first overwrites the tag's whole NDEF area with zeros
    and reads that back, then leaves the tag empty. Writing an empty message alone wouldn't do: on NTAG and MIFARE
    Ultralight tags it only rewrites the first few bytes, and the rest of the old ciphertext stays in the chip,
-   readable by any app that reads its memory directly. What the app checks is the NDEF area as Android reports it:
-   on Type 4 and Type 5 tags, and on chips that move data around internally, it can't see whether old copies
-   remain elsewhere in the memory, and on a few sizes just above 255 bytes up to 3 bytes at the end stay as they
-   were.
+   readable by any app that reads its memory directly. On Type 2 tags the app then also reads the data area page by
+   page, zeroes anything left after the empty message, and checks that it's all zeros; *Tag erased* says whether
+   that check was done. On Type 4 and Type 5 tags, what the app checks is the NDEF area as Android reports it: on
+   those, and on chips that move data around internally, it can't see whether old copies remain elsewhere in the
+   memory.
    **Erasing clears only the tag.** If someone copied the backup from it earlier (any phone can do that in a
    second), they still have their copy, and they can open it if they know or guess your password. So if you think
    the tag may have been copied and your password may be known or isn't strong, erasing doesn't protect you: move
@@ -429,7 +433,9 @@ Leaving or closing the app (home button, Recents, screen off) deletes everything
 ever saved on the phone. So that a screen timeout doesn't wipe a half-typed phrase, the screen stays on while
 words, a password or restored words are on the phone. Instead, SeedTag has its own timeout: after 3 minutes without a
 touch it asks *Still there?* (with a buzz), with the screen behind it blurred (covered before Android 12), and
-clears everything a minute later unless you tap **Keep**. The power
+clears everything a minute later unless you tap **Keep**, which brings back whatever message was open. Clearing
+also closes every question still open (*Erase this tag?*, *Make it read-only?*, …) and forgets the Erase tab's
+scan, so whoever picks up the phone later can't answer them. The power
 button still turns the screen off, and that clears everything. Back on the Words and Password steps does what their
 **Back** button does (going back from the password asks first, since it clears the password). Anywhere else, Back
 asks before leaving while something would be lost. So do the links to Settings (*Turn on NFC*, the accessibility
@@ -541,12 +547,17 @@ NTAG216 NFC ring
 
 - Only buy a listing that names the chip, e.g. "Chip: NTAG216". "13.56 MHz IC card", "NFC compatible" or
   "S50" without a chip name is usually MIFARE Classic 1K.
-- Skip "UID changeable", "Gen1a", "CUID" or "magic card" (Classic clones), and "NTAG21x compatible" (unknown
-  clones whose memory and retention aren't documented).
+- Skip "UID changeable", "Gen1a", "CUID" or "magic card" (they exist for NTAG and Ultralight too, not only
+  Classic: their extra commands may mean that a lock isn't permanent), and "NTAG21x compatible" (unknown clones
+  whose memory and retention aren't documented).
 - For durability prefer PVC cards, epoxy tags or coin tags over paper stickers.
-- A cheap listing can carry a fake chip. NXP's free **NFC TagInfo** app shows the real chip and whether it's
-  genuine NXP silicon. Buy a few, test one with a throwaway phrase first, and prefer sellers who name the chip
-  maker.
+- A cheap listing can carry a chip from another maker, sold as the real one. Check every NTAG before it holds a
+  backup: in NFC Tools' READ tab, the tag type names the chip (*NXP - NTAG213*, not just *Mifare Ultralight*),
+  the serial number starts with `04` (NXP's code), and it says **Signature Valid** (NXP's signature over the
+  serial number, which another maker's chip can't carry). NXP's free **NFC TagInfo** app shows the same. A tag
+  that fails any of these still works with SeedTag, but nobody documents how long it keeps its data: use it for
+  practice, not for the backup. Buy a few, test one with a throwaway phrase first, and prefer sellers who name
+  the chip maker.
 
 **Idea: an NFC ring.** An epoxy or ceramic ring with an NTAG215/216 inside (search `NTAG216 NFC ring`) keeps
 the encrypted backup on you, and it looks like jewellery, not a seed backup. Things to know:

@@ -119,9 +119,15 @@ import androidx.compose.ui.window.DialogWindowProvider
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import rs.zivke.seedtag.core.Bip39
+import rs.zivke.seedtag.core.EraseCheck
+import rs.zivke.seedtag.core.Haptic
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
+import rs.zivke.seedtag.core.Rest
 import rs.zivke.seedtag.core.SeedBox
+import rs.zivke.seedtag.core.TagCheck
+import rs.zivke.seedtag.core.TagContent
+import rs.zivke.seedtag.core.TagStep
 
 // ============================================================== theme ===
 //
@@ -1541,8 +1547,9 @@ private fun DoneStep(vm: SeedTagViewModel) {
                 Tone.Info,
                 "Old data may still be on the tag",
                 "Writing a backup leaves whatever the tag held before in the memory after the backup. SeedTag clears it " +
-                    "only on NTAG and MIFARE Ultralight tags, so on this one it may still be there: an app that shows " +
-                    "the tag's whole memory would show it. If this tag ever held something nobody should read (a seed in " +
+                    "only on NFC Forum Type 2 tags (NTAG, MIFARE Ultralight and compatible chips) whose memory layout it " +
+                    "can be sure of. On this tag it couldn't, so the old data may still be there: an app that shows the " +
+                    "tag's whole memory would show it. If this tag ever held something nobody should read (a seed in " +
                     "plain text, say), use a new tag instead.",
             )
             Rest.Cleared, null -> Unit

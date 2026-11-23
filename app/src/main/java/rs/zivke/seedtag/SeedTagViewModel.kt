@@ -17,12 +17,24 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import rs.zivke.seedtag.core.BackAction
 import rs.zivke.seedtag.core.Bip39
+import rs.zivke.seedtag.core.EraseCheck
+import rs.zivke.seedtag.core.Haptic
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
+import rs.zivke.seedtag.core.Pending
+import rs.zivke.seedtag.core.Rest
+import rs.zivke.seedtag.core.ScanPrompt
 import rs.zivke.seedtag.core.SecretChars
 import rs.zivke.seedtag.core.SeedBox
 import rs.zivke.seedtag.core.SeedTagException
+import rs.zivke.seedtag.core.Sealed
+import rs.zivke.seedtag.core.TagCheck
+import rs.zivke.seedtag.core.TagContent
+import rs.zivke.seedtag.core.TagEffect
+import rs.zivke.seedtag.core.TagFlow
+import rs.zivke.seedtag.core.TagNotice
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 import java.util.concurrent.atomic.AtomicBoolean
@@ -48,8 +60,6 @@ sealed interface MnemonicStatus {
     data class Valid(val count: Int) : MnemonicStatus
 }
 
-/** [working]: a tag was found and is being read or written, null while waiting for one. */
-data class ScanPrompt(val title: String, val error: String? = null, val working: TagStep? = null)
 /**
  * [matchesBackup]: compared with the backup written in this session ([backupFingerprint]), null if
  * there was none.
@@ -65,6 +75,8 @@ data class VerifyResult(
     val passwordFix: PasswordFix = PasswordFix.None,
     val restored: Boolean = false,
     val tagDifferences: List<String> = emptyList(),
+    /** The tag's text (the Base64 blob, not secret): which tag this result is about. */
+    val tagText: String? = null,
 )
 
 /** A system Settings screen the app links to. */
@@ -105,14 +117,6 @@ sealed interface Dialog {
     }
 }
 
-/**
- * Vibration for things that happen without a tap: a tag was handled, something succeeded or failed.
- * [Found]: the NFC-spot finder saw a tag; a longer buzz, so it's felt through a hand on the phone.
- * [Detected]: a scan's tag was found and the app is working with it; one short, firm pulse.
- */
-enum class Haptic { Tick, Success, Failure, Found, Detected }
-
-private enum class Purpose { Check, BackupWrite, ClearRest, Verify, Restore, Lock, Inspect, Erase }
 
 const val STRAY_SPACES =
     "The password starts or ends with a space, or has two spaces in a row. A written copy rarely shows that, " +
@@ -130,8 +134,6 @@ const val IDLE_WARN_MS = 3 * 60_000L
 /** ...and wipes everything if there's no answer within this. */
 const val IDLE_GRACE_MS = 60_000L
 
-/** [id] tells a result for the current scan from one that arrives after Cancel or a new scan. */
-private data class Pending(val request: TagRequest, val purpose: Purpose, val id: Long)
 
 class SeedTagViewModel : ViewModel() {
 
@@ -190,27 +192,16 @@ class SeedTagViewModel : ViewModel() {
     var step by mutableStateOf(BackupStep.Tag)
         private set
     /** What the first step found out about the tag (nothing secret). Kept until Back up starts over. */
-    var tagCheck by mutableStateOf<TagCheck?>(null)
-        private set
+    val tagCheck: TagCheck? get() = flow.tagCheck
     /** Number of words chosen before typing; one of Bip39.validWordCounts. */
     var wordCount by mutableStateOf(24)
         private set
     var generatedPassphrase by mutableStateOf(false)
         private set
     /** Fingerprint of the backup last written and read back in this session. */
-    var backupFingerprint by mutableStateOf<String?>(null)
-        private set
-    private var pendingText: String? = null
-    /** Fingerprint of [pendingText]: it becomes [backupFingerprint] only once the tag is written. */
-    private var pendingFingerprint: String? = null
-    /** The non-empty tag the overwrite dialog asked about: Overwrite applies to it alone. */
-    private var overwriteTarget: OverwriteTarget? = null
-    /** Tag text (Base64 blob, no secret) last written or decrypted: the only tag Lock will touch. */
-    private var lockTarget: String? = null
-    /** The old data after the backup just written (shown on Done), and that backup's text. */
-    var backupRest by mutableStateOf<Rest?>(null)
-        private set
-    private var writtenText: String? = null
+    val backupFingerprint: String? get() = flow.backupFingerprint
+    /** The old data after the backup just written (shown on Done). */
+    val backupRest: Rest? get() = flow.backupRest
 
     // ---- passwords ------------------------------------------------------------
     // Zeroable char buffers, edited in place by the app's keyboard: never Strings, which would
@@ -286,8 +277,7 @@ class SeedTagViewModel : ViewModel() {
 
     // ---- erase ----------------------------------------------------------------
     /** What the Erase scan found (nothing secret), null before the scan. */
-    var eraseCheck by mutableStateOf<EraseCheck?>(null)
-        private set
+    val eraseCheck: EraseCheck? get() = flow.eraseCheck
     /** The backup on [eraseCheck], decrypted with the password typed: word count and fingerprint. */
     var eraseVerified by mutableStateOf<VerifyResult?>(null)
         private set
@@ -308,16 +298,57 @@ class SeedTagViewModel : ViewModel() {
     // ---- shared ---------------------------------------------------------------
     var busy by mutableStateOf<String?>(null)
         private set
-    var scanPrompt by mutableStateOf<ScanPrompt?>(null)
-        private set
-    var dialog by mutableStateOf<Dialog?>(null)
+    val scanPrompt: ScanPrompt? get() = flow.prompt
+    /** The dialog under [Dialog.StillThere]: comes back after Keep, and late results land here, not over it. */
+    private var below by mutableStateOf<Dialog?>(null)
+    /** *Still there?* is up, on top of [below]. */
+    private var idle by mutableStateOf(false)
+
+    /**
+     * The dialog shown: [Dialog.StillThere] while the idle timeout asks, on top of whatever was open.
+     * Setting [Dialog.StillThere] raises it; anything else replaces the dialog under it.
+     */
+    var dialog: Dialog?
+        get() = if (idle) Dialog.StillThere else below
+        set(value) { if (value == Dialog.StillThere) idle = true else below = value }
 
     private val _haptics = MutableSharedFlow<Haptic>(extraBufferCapacity = 8)
     /** Played by the UI; emitted on the main thread. */
     val haptics: SharedFlow<Haptic> = _haptics
 
-    /** Read from the NFC binder thread, hence atomic rather than Compose state. */
+    /**
+     * The tag flow: scans, what they found, and what a tag's result does ([TagFlow], tested in core).
+     * Main thread only; changed through [apply].
+     */
+    private var flow by mutableStateOf(TagFlow())
+    /** [TagFlow.pending], for the NFC binder thread to take atomically. */
     private val pending = AtomicReference<Pending?>(null)
+
+    /** Takes [next]'s flow, then carries out its effects in order. */
+    private fun apply(next: TagFlow.Next) {
+        val before = flow
+        flow = next.flow
+        if (next.flow.pending !== before.pending) pending.set(next.flow.pending)
+        next.effects.forEach { effect ->
+            when (effect) {
+                is TagEffect.Buzz -> _haptics.tryEmit(effect.haptic)
+                is TagEffect.Notify -> dialog = dialogFor(effect.notice)
+                is TagEffect.Decrypt -> decrypt(effect.text, effect.reveal, effect.differences)
+                TagEffect.BackupWritten -> {
+                    // A Verify or Restore from before this backup describes another tag, or compared
+                    // with an older backup: clear it, and a password typed there.
+                    readAnother()
+                    wipeBackup()
+                    step = BackupStep.Done
+                }
+                TagEffect.EraseDone -> clearEraseState()
+                is TagEffect.Emptied -> {
+                    if (effect.wasBackup && step == BackupStep.Done) step = BackupStep.Tag
+                    if (verifyResult?.tagText == effect.text) { verifyResult = null; restoredWords = null }
+                }
+            }
+        }
+    }
     /** The NFC-spot finder is open: tags that arrive with no scan pending are only counted. */
     private val probing = AtomicBoolean(false)
     var probe by mutableStateOf<ProbeResult?>(null)
@@ -326,8 +357,6 @@ class SeedTagViewModel : ViewModel() {
     fun startProbe() { probe = null; probing.set(true) }
     fun stopProbe() { probing.set(false); probe = null }
 
-    /** Bumped on every arm and cancel. Main thread only. */
-    private var scanId = 0L
     /** Bumped by wipeAll(): Argon2 work that finishes after it is thrown away. */
     private var wipes = 0L
 
@@ -391,10 +420,7 @@ class SeedTagViewModel : ViewModel() {
     /** Word counts the checked tag has room for (all of them if its size is unknown). */
     fun fitsTag(n: Int): Boolean = tagCheck?.maxWords?.let { n <= it } ?: true
 
-    fun scanToCheck() {
-        tagCheck = null
-        arm(TagRequest.Check, Purpose.Check, "Hold the tag you'll use to the back of the phone")
-    }
+    fun scanToCheck() = apply(flow.scanToCheck())
 
     fun continueAfterCheck() {
         if (tagCheck?.usable == true) step = BackupStep.Length
@@ -402,7 +428,7 @@ class SeedTagViewModel : ViewModel() {
 
     /** "Check another tag" / "Change tag": back to the first step. */
     fun checkAnotherTag() {
-        tagCheck = null; clearPrefix(); step = BackupStep.Tag
+        apply(flow.checkAnotherTag()); clearPrefix(); step = BackupStep.Tag
     }
 
     fun chooseLength(n: Int) {
@@ -505,10 +531,7 @@ class SeedTagViewModel : ViewModel() {
                         "Try again, and if it keeps failing, don't make backups on this phone.",
                 )
             } else {
-                val (text, fp) = sealed
-                pendingFingerprint = fp
-                pendingText = text
-                arm(TagRequest.Write(text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write the backup")
+                apply(flow.write(Sealed(sealed.first, sealed.second)))
             }
         }
     }
@@ -565,45 +588,39 @@ class SeedTagViewModel : ViewModel() {
 
     fun confirmOverwrite() {
         dialog = null
-        val text = pendingText ?: return
-        val target = overwriteTarget ?: return
-        arm(TagRequest.Write(text, target), Purpose.BackupWrite, "Hold the same tag again to overwrite it")
+        apply(flow.overwrite())
     }
 
-    fun scanForVerify() = scanForRead(Purpose.Verify)
-    fun scanForRestore() = scanForRead(Purpose.Restore)
+    fun scanForVerify() = scanForRead(reveal = false)
+    fun scanForRestore() = scanForRead(reveal = true)
 
-    private fun scanForRead(purpose: Purpose) {
+    private fun scanForRead(reveal: Boolean) {
         if (readPassword.isEmpty()) return showError("Enter the password first.")
         verifyResult = null; restoredWords = null
-        arm(TagRequest.Read, purpose, "Hold the tag to the back of the phone to read it")
+        apply(flow.scanToRead(reveal))
     }
 
     fun requestLock() {
-        if (lockTarget == null) return showError("Write or verify the tag first.")
+        if (flow.lockTarget == null) return showError("Write or verify the tag first.")
         dialog = Dialog.ConfirmLock
     }
 
     fun confirmLock() {
         dialog = null
-        val target = lockTarget ?: return
-        arm(TagRequest.Lock(target), Purpose.Lock, "Hold the same tag to make it permanently read-only")
+        apply(flow.lock())
     }
 
     /** Done's "Clear old data", after [Rest.Interrupted]: only the tag that holds the backup just written. */
-    fun clearRest() {
-        val text = writtenText ?: return
-        arm(TagRequest.ClearRest(text), Purpose.ClearRest, "Hold the same tag to clear the old data after the backup")
-    }
+    fun clearRest() = apply(flow.clearRest())
 
-    fun cancelScan() { scanId++; pending.set(null); scanPrompt = null }
+    fun cancelScan() = apply(flow.cancel())
 
     // ---- erase ----------------------------------------------------------------
 
     /** Erase, first tap: see what the tag holds. Nothing is written. */
     fun scanToErase() {
         resetErase()
-        arm(TagRequest.Inspect, Purpose.Inspect, "Hold the tag to the phone to see what it holds")
+        apply(flow.scanToErase())
     }
 
     /** Decrypts the backup the scan read (no second scan), to be sure it's the one to erase. */
@@ -637,18 +654,21 @@ class SeedTagViewModel : ViewModel() {
 
     fun confirmErase() {
         dialog = null
-        val target = eraseCheck?.target ?: return
-        arm(TagRequest.Erase(target), Purpose.Erase, "Hold the same tag to erase it")
+        apply(flow.erase())
     }
 
     /** Back to the start of Erase: nothing scanned, no password, and its scan canceled. */
     private fun resetErase() {
+        apply(flow.resetErase())
+        clearEraseState()
+    }
+
+    /** The Erase tab's own state, outside [TagFlow]: the password, the decrypted check, the confirmation. */
+    private fun clearEraseState() {
         eraseSession++
-        val p = pending.get()?.purpose
-        if (p == Purpose.Inspect || p == Purpose.Erase) cancelScan()
-        eraseCheck = null; eraseVerified = null; eraseWithPassword = false
+        eraseVerified = null; eraseWithPassword = false
         clearPasswords(PwField.Erase)
-        if (dialog is Dialog.ConfirmErase) dialog = null
+        if (below is Dialog.ConfirmErase) below = null
     }
 
     fun hideRestored() { restoredWords = null }
@@ -659,16 +679,11 @@ class SeedTagViewModel : ViewModel() {
     }
 
     fun startOver() {
-        wipeBackup(); step = BackupStep.Tag; tagCheck = null; backupFingerprint = null; lockTarget = null
-        backupRest = null; writtenText = null
+        wipeBackup(); step = BackupStep.Tag
+        apply(flow.startOver())
     }
 
     // ================================================================= NFC ===
-
-    private fun arm(request: TagRequest, purpose: Purpose, title: String) {
-        pending.set(Pending(request, purpose, ++scanId))
-        scanPrompt = ScanPrompt(title)
-    }
 
     /** Called on the NFC reader thread. Blocking I/O is fine here. */
     fun onTagDiscovered(tag: Tag) {
@@ -677,17 +692,10 @@ class SeedTagViewModel : ViewModel() {
             if (probing.get()) probed(tag)
             return
         }
-        // Steps and the result are posted to the main thread in order, so the result always comes last.
-        val result = TagIo.perform(tag, p.request) { step -> viewModelScope.launch { working(p, step) } }
-        viewModelScope.launch { handle(p, result) }
-    }
-
-    /** The scan [p]'s tag is being worked with: say so at once (the first step comes before any I/O). */
-    private fun working(p: Pending, step: TagStep) {
-        if (p.id != scanId) return
-        val prompt = scanPrompt ?: return
-        if (prompt.working == null) _haptics.tryEmit(Haptic.Detected)
-        scanPrompt = prompt.copy(working = step, error = null)
+        // Posted to the main thread in order: the claim first, then the steps, the result last.
+        viewModelScope.launch { apply(flow.claimed(p)) }
+        val result = TagIo.perform(tag, p.request) { step -> viewModelScope.launch { apply(flow.working(p, step)) } }
+        viewModelScope.launch { apply(flow.handle(p, result)) }
     }
 
     /** Only the info Android hands over with the tag (no I/O): its type, NDEF size and lock state. */
@@ -703,119 +711,51 @@ class SeedTagViewModel : ViewModel() {
         }
     }
 
-    private fun handle(p: Pending, r: TagResult) {
-        // Canceled, left the app or started another scan while the tag was busy: drop results
-        // that only ask for more input. Writes and locks did happen, so those are still shown, but
-        // without closing the prompt of a newer scan that's waiting for a tag.
-        val stale = p.id != scanId
-        fun closePrompt() { if (!stale || pending.get() == null) scanPrompt = null }
-        when (r) {
-            is TagResult.Checked -> {
-                if (stale) return
-                scanPrompt = null
-                tagCheck = r.check
-                _haptics.tryEmit(if (r.check.usable && !r.check.classic) Haptic.Success else Haptic.Failure)
-            }
-            is TagResult.Failed -> {
-                if (stale) return
-                _haptics.tryEmit(Haptic.Failure)
-                // stay armed so the user can simply tap again
-                pending.set(p)
-                scanPrompt = scanPrompt?.copy(error = r.message, working = null) ?: ScanPrompt("Hold the tag to the phone", r.message)
-            }
-            is TagResult.NotEmpty -> {
-                if (stale) return
-                scanPrompt = null
-                _haptics.tryEmit(Haptic.Failure)
-                overwriteTarget = r.target
-                dialog = Dialog.ConfirmOverwrite(TagIo.looksLikeBackup(r.existing))
-            }
-            is TagResult.WrittenUnchecked -> {
-                _haptics.tryEmit(Haptic.Tick)
-                if (stale) {
-                    // Canceled: don't bring the scan prompt back by itself.
-                    closePrompt()
-                    dialog = Dialog.Info(
-                        "Written, not checked",
-                        "The backup was written to the blank tag, but the scan was canceled before it could be read back. " +
-                            "Tap Encrypt & write tag again and hold the same tag: the app asks before overwriting it, then " +
-                            "writes and checks it.",
-                    )
-                    return
-                }
-                arm(TagRequest.CheckWritten(r.text), Purpose.BackupWrite, "Written. Hold the tag to the phone once more to check it")
-            }
-            is TagResult.Written -> {
-                closePrompt()
-                _haptics.tryEmit(Haptic.Success)
-                // A Verify or Restore from before this backup describes another tag, or compared
-                // with an older backup: clear it, and a password typed there.
-                backupFingerprint = pendingFingerprint
-                readAnother()
-                wipeBackup()
-                lockTarget = r.text
-                writtenText = r.text
-                backupRest = r.rest
-                step = BackupStep.Done
-            }
-            is TagResult.RestCleared -> {
-                if (r.rest == Rest.Interrupted) {
-                    if (stale) return
-                    _haptics.tryEmit(Haptic.Failure)
-                    pending.set(p) // stay armed: tap again
-                    scanPrompt = scanPrompt?.copy(error = "The tag moved away too early. Hold it still and try again.", working = null)
-                        ?: ScanPrompt("Hold the tag to the phone", "The tag moved away too early. Hold it still and try again.")
-                    return
-                }
-                closePrompt()
-                _haptics.tryEmit(Haptic.Success)
-                backupRest = r.rest
-            }
-            is TagResult.Locked -> {
-                closePrompt()
-                _haptics.tryEmit(Haptic.Success)
-                dialog = Dialog.Info(
-                    "Tag is now read-only",
-                    "Its data can never be rewritten or erased. Keep the tag where strangers can't reach it: on many " +
-                        "chips, someone holding it could still lock it against reading.",
-                )
-            }
-            is TagResult.AlreadyReadOnly -> {
-                if (stale) return
-                scanPrompt = null
-                dialog = Dialog.Info(
-                    "Already read-only",
-                    "This tag was already read-only, so SeedTag didn't change it. It can't tell whether that's permanent: " +
-                        "some tags are only marked read-only and can still be rewritten with other tools.",
-                )
-            }
-            is TagResult.Inspected -> {
-                if (stale) return
-                scanPrompt = null
-                eraseCheck = r.check
-            }
-            is TagResult.Erased -> {
-                closePrompt()
-                _haptics.tryEmit(Haptic.Success)
-                // Lock must not be offered for a tag that no longer holds that backup.
-                if (eraseCheck?.text != null && eraseCheck?.text == lockTarget) lockTarget = null
-                if (!stale) resetErase()
-                dialog = Dialog.Info(
-                    "Tag erased",
-                    "The tag's whole data area was overwritten with zeros and read again, confirming the tag to be " +
-                        "empty. It can take a new backup.\n\nErasing clears only this tag. If someone copied the backup from it " +
-                        "earlier (any phone can do that in a second), they still have their copy, and they can open it " +
-                        "if they know or guess your password. So if you think the tag may have been copied and your " +
-                        "password may be known or isn't strong, erasing doesn't protect you: move your funds to a new " +
-                        "seed.",
-                )
-            }
-            is TagResult.Read -> {
-                if (stale) return
-                scanPrompt = null
-                decrypt(r.text, reveal = p.purpose == Purpose.Restore, differences = r.differences)
-            }
-        }
+    /** The words for a dialog the tag flow asks for. */
+    private fun dialogFor(n: TagNotice): Dialog = when (n) {
+        is TagNotice.ConfirmOverwrite -> Dialog.ConfirmOverwrite(n.looksLikeSeedTag)
+        // Its message may say to tap again, but no scan is waiting any more.
+        is TagNotice.LateFailure -> Dialog.Info(
+            "The tag may have changed",
+            n.message + "\n\nThis happened after the scan had ended (you left the app, or tapped Cancel). Holding the tag " +
+                "to the phone does nothing until you start that step again.",
+        )
+        TagNotice.WrittenUnchecked -> Dialog.Info(
+            "Written, not checked",
+            "The backup was written to the blank tag, but the scan was canceled before it could be read back. " +
+                "Tap Encrypt & write tag again and hold the same tag: the app asks before overwriting it, then " +
+                "writes and checks it.",
+        )
+        TagNotice.Locked -> Dialog.Info(
+            "Tag is now read-only",
+            "Its data can never be rewritten or erased. Keep the tag where strangers can't reach it: on many " +
+                "chips, someone holding it could still lock it against reading.",
+        )
+        TagNotice.AlreadyReadOnly -> Dialog.Info(
+            "Already read-only",
+            "This tag was already read-only, so SeedTag didn't change it. It can't tell whether that's permanent: " +
+                "some tags are only marked read-only and can still be rewritten with other tools.",
+        )
+        is TagNotice.Erased -> Dialog.Info(
+            "Tag erased",
+            when (n.rest) {
+                Rest.Cleared ->
+                    "The tag's whole data area was overwritten with zeros and then read back page by page: nothing " +
+                        "it held is left in it. It can take a new backup."
+                Rest.NotPossible ->
+                    "The tag's data was overwritten with zeros and read again, and the tag is empty. It can take a new " +
+                        "backup. On this kind of tag, SeedTag can't also check its memory page by page."
+                Rest.Interrupted ->
+                    "The tag's data was overwritten with zeros and read again, and the tag is empty. It moved away " +
+                        "before SeedTag could also check its memory page by page: to be sure nothing is left, scan " +
+                        "it and erase it once more."
+            } +
+                "\n\nErasing clears only this tag. If someone copied the backup from it " +
+                "earlier (any phone can do that in a second), they still have their copy, and they can open it " +
+                "if they know or guess your password. So if you think the tag may have been copied and your " +
+                "password may be known or isn't strong, erasing doesn't protect you: move your funds to a new " +
+                "seed.",
+        )
     }
 
     private fun decrypt(text: String, reveal: Boolean, differences: List<String>) {
@@ -833,9 +773,9 @@ class SeedTagViewModel : ViewModel() {
         ) { (words, fp, fix) ->
             verifyResult = VerifyResult(
                 words.size, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix, restored = reveal,
-                tagDifferences = differences,
+                tagDifferences = differences, tagText = text,
             )
-            lockTarget = text
+            apply(flow.opened(text))
             if (reveal) restoredWords = words
             clearPasswords(PwField.Read)
             _haptics.tryEmit(Haptic.Success)
@@ -855,21 +795,28 @@ class SeedTagViewModel : ViewModel() {
                 !readPassword.isEmpty() || !erasePassword.isEmpty() || restoredWords != null
         }
 
+    private val backAction: BackAction?
+        get() = BackAction.of(
+            pageOpen = page != null,
+            onWordsStep = tab == Screen.Backup && step == BackupStep.Words,
+            onPasswordStep = tab == Screen.Backup && step == BackupStep.Password,
+            holdsSecrets = holdsSecrets,
+        )
+
     /** System Back is handled by [back] rather than leaving the app. */
-    val backStaysInApp: Boolean
-        get() = page != null || (tab == Screen.Backup && (step == BackupStep.Words || step == BackupStep.Password)) ||
-            holdsSecrets
+    val backStaysInApp: Boolean get() = backAction != null
 
     /**
      * System Back: closes a top-bar page, does what the step's own Back button does on the Words and
-     * Password steps, and elsewhere asks before leaving the app with secrets in memory.
+     * Password steps, and elsewhere asks before leaving the app with secrets in memory ([BackAction]).
      */
     fun back() {
-        when {
-            page != null -> page = null
-            tab == Screen.Backup && step == BackupStep.Words -> backToLength()
-            tab == Screen.Backup && step == BackupStep.Password -> requestBackToWords()
-            holdsSecrets -> dialog = Dialog.ConfirmBack(toWords = false)
+        when (backAction) {
+            BackAction.ClosePage -> page = null
+            BackAction.BackToLength -> backToLength()
+            BackAction.BackToWords -> requestBackToWords()
+            BackAction.AskToLeave -> dialog = Dialog.ConfirmBack(toWords = false)
+            null -> Unit
         }
     }
 
@@ -884,13 +831,13 @@ class SeedTagViewModel : ViewModel() {
         // A tag is being read or written right now: that isn't idle, and the scan mustn't be canceled.
         if (scanPrompt?.working != null) { touched(); return }
         cancelScan()
-        dialog = Dialog.StillThere
+        idle = true // over the dialog that's open, which comes back after Keep
         _haptics.tryEmit(Haptic.Found) // the longer buzz: felt even with the phone lying on the table
     }
 
     /** "Keep" in the still-there dialog. */
     fun stillThere() {
-        if (dialog == Dialog.StillThere) dialog = null
+        idle = false
         touched()
     }
 
@@ -909,21 +856,24 @@ class SeedTagViewModel : ViewModel() {
 
     private fun wipeBackup() {
         words.clear(); clearPrefix(); clearPasswords(PwField.Password, PwField.Repeat); hideWords = true; wordCount = 24
-        generatedPassphrase = false; pendingText = null; pendingFingerprint = null; overwriteTarget = null
+        generatedPassphrase = false
     }
 
     /** Called when the app leaves the foreground: drop every secret from the UI state. */
     fun wipeAll() {
         wipes++
-        cancelScan()
+        apply(flow.wiped())
         if (step != BackupStep.Done && step != BackupStep.Tag) step = BackupStep.Length
         wipeBackup()
-        clearPasswords(PwField.Read, PwField.Erase); restoredWords = null
-        val d = dialog
+        clearPasswords(PwField.Read); restoredWords = null
+        clearEraseState() // its scan went with the flow's wipe
+        // Every question goes, so nobody picking up the phone later can answer one. Messages stay.
+        idle = false
+        val d = below
         if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
             d is Dialog.ConfirmBack || d is Dialog.ConfirmSettings || d is Dialog.ConfirmTab ||
-            d is Dialog.ConfirmClearWords || d == Dialog.StillThere
-        ) dialog = null
+            d is Dialog.ConfirmClearWords || d is Dialog.ConfirmErase || d == Dialog.ConfirmLock
+        ) below = null
     }
 
     private fun showError(msg: String) {
