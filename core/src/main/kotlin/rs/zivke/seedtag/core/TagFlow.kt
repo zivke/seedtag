@@ -33,6 +33,7 @@ sealed interface TagNotice {
     /** A scan that was canceled, or the app left, ended in a failure that may have changed the tag. */
     data class LateFailure(val message: String) : TagNotice
     data object AlreadyReadOnly : TagNotice
+    data object CantMakeReadOnly : TagNotice
     /** [rest]: whether the data area was then checked page by page. */
     data class Erased(val rest: Rest) : TagNotice
 }
@@ -227,6 +228,7 @@ data class TagFlow(
                 else closed.copy(backupRest = r.rest).next(buzz(Haptic.Success))
             TagResult.Locked -> closed.next(buzz(Haptic.Success), notify(TagNotice.Locked))
             TagResult.AlreadyReadOnly -> copy(prompt = null).next(notify(TagNotice.AlreadyReadOnly))
+            TagResult.CantMakeReadOnly -> copy(prompt = null).next(buzz(Haptic.Failure), notify(TagNotice.CantMakeReadOnly))
             is TagResult.Inspected -> copy(prompt = null, eraseCheck = r.check).next()
             is TagResult.Erased -> {
                 // Taken whether or not the scan is current: the tag is empty either way.
@@ -259,8 +261,8 @@ data class TagFlow(
         /** Results that only ask for more input: dropped when they arrive for a canceled or older scan. */
         val TagResult.onlyAsks: Boolean
             get() = when (this) {
-                is TagResult.Checked, is TagResult.NotEmpty, TagResult.AlreadyReadOnly, is TagResult.Inspected,
-                is TagResult.Read -> true
+                is TagResult.Checked, is TagResult.NotEmpty, TagResult.AlreadyReadOnly, TagResult.CantMakeReadOnly,
+                is TagResult.Inspected, is TagResult.Read -> true
                 is TagResult.Failed -> !changedTag
                 is TagResult.RestCleared -> rest == Rest.Interrupted
                 is TagResult.WrittenUnchecked, is TagResult.Written, TagResult.Locked, is TagResult.Erased -> false

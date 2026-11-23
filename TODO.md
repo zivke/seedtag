@@ -356,9 +356,10 @@ left is around the blob, where nothing checks it:
   - The app comes without any guarantees, and the developer is not responsible for any damage.
   - Users must make sure for themselves that no malware is already installed on their phone. The app
     can't cover every possible attack vector.
-- [ ] **Lock on a tag that can't be made read-only.** Show the message, but don't wait for another tag to be
+- [x] **Lock on a tag that can't be made read-only.** Show the message, but don't wait for another tag to be
   scanned: that doesn't make sense. (Today the scan stays armed with *This tag can't be made read-only from this
-  phone…*, `TagIo.lock`.)
+  phone…*, `TagIo.lock`.) Now `TagResult.CantMakeReadOnly`: a message (*Can't be made read-only*), the scan ends;
+  tested in `TagFlowTest`, device row 7.38.
 - [ ] ***Erase this backup?* wording.** Say "Make sure you have the seed saved somewhere else", and drop the
   closing "Then hold the same tag to the phone." (`Ui.kt`, `Dialog.ConfirmErase`).
 - [ ] ***Safest on a spare phone* item.** Change its last paragraph to: "If you don't have a spare phone, you can

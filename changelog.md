@@ -166,6 +166,9 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- **Make tag read-only** on a tag this phone can't make read-only said so,
+  but then kept waiting for another tag, which can't help. It now says so in
+  a message and ends the scan.
 - Going back from the words to the word count showed the tabs again, and
   switching to Verify, Restore or Erase from there kept the typed seed words
   in memory, without asking. Switching from Back up now asks first (*Clear

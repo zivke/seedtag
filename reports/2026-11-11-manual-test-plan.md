@@ -284,6 +284,7 @@ on hidden data (H…, `TODO.md`). Each change adds its rows here in the same com
 | 7.35 | B15d: Back up a tag, Verify it (*Same seed*), then Erase that tag | *Tag erased*. Back up is back at *Check your tag*, not *Backup written*; Verify shows no result; *Make tag read-only* isn't offered for it. | ⬜ |
 | 7.36 | B15f: open a message (e.g. a wrong password's dialog on Verify), leave the phone untouched 3 minutes so *Still there?* comes up, tap **Keep**. Then again, without Keep, for the full minute | Keep: *Still there?* closes and the wrong-password message is back. Without Keep: *Cleared* after the minute. | ⬜ |
 | 7.37 | Back up: type all the words and a password, tap **Back** twice (to the word count); tap Verify. Then **Stay**; then again, **Clear and switch**, and back to Back up. Also with only a few words typed (Back once from the Words step) | *Clear the words?* asks first (no password is mentioned: going back from the password step already cleared it). Stay keeps everything. After Clear and switch, Back up's word count step has no words: choosing a count starts from the first word. With no words typed, switching tabs doesn't ask. | ⬜ |
+| 7.38 | Make read-only on a tag this phone can't make read-only (e.g. a MIFARE Classic, NTAG 424 or Type 4 tag holding a backup, or any tag Android doesn't offer it for), after Verify of it | A buzz and *Can't be made read-only* (nothing was changed). The scan prompt is gone: no *Hold the tag* waiting for another one. Make read-only can be tried again. | ⬜ |
 
 ## Short regression check for every release
 

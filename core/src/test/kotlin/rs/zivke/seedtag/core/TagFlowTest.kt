@@ -75,6 +75,7 @@ class TagFlowTest {
         val canceled = busy.cancel().flow
         for (r in listOf(
             TagResult.Checked(usable), TagResult.Failed("x"), TagResult.NotEmpty(null, target), TagResult.AlreadyReadOnly,
+            TagResult.CantMakeReadOnly,
             TagResult.Inspected(EraseCheck(true, true, true, TagContent.Other, 137, null, target)), TagResult.Read(text),
             TagResult.RestCleared(Rest.Interrupted),
         )) {
@@ -187,6 +188,12 @@ class TagFlowTest {
         assertEquals(listOf(TagNotice.Locked), locked.notices)
         assertEquals(Haptic.Success, locked.buzzes.last())
         assertEquals(listOf(TagNotice.AlreadyReadOnly), opened.lock().tap(TagResult.AlreadyReadOnly).notices)
+        // A tag this phone can't make read-only: said once, and the scan ends (holding it again wouldn't help).
+        val cant = opened.lock().tap(TagResult.CantMakeReadOnly)
+        assertEquals(listOf(TagNotice.CantMakeReadOnly), cant.notices)
+        assertNull(cant.flow.pending)
+        assertNull(cant.flow.prompt)
+        assertEquals(text, cant.flow.lockTarget)
     }
 
     @Test

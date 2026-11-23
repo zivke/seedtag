@@ -749,6 +749,11 @@ class SeedTagViewModel : ViewModel() {
             "This tag was already read-only, so SeedTag didn't change it. It can't tell whether that's permanent: " +
                 "some tags are only marked read-only and can still be rewritten with other tools.",
         )
+        TagNotice.CantMakeReadOnly -> Dialog.Info(
+            "Can't be made read-only",
+            "This tag can't be made read-only from this phone. Android usually only offers it for NFC Forum Type 1 " +
+                "and 2 tags (NTAG, MIFARE Ultralight). Nothing was changed: the backup on it is as it was.",
+        )
         is TagNotice.Erased -> Dialog.Info(
             "Tag erased",
             when (n.rest) {

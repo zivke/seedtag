@@ -441,12 +441,7 @@ object TagIo {
             // Android reports a tag as not writable from its capability container alone, which can be
             // set without the lock bits: SeedTag made no change and can't tell whether it's permanent.
             if (!it.isWritable) return TagResult.AlreadyReadOnly
-            if (!it.canMakeReadOnly()) {
-                return TagResult.Failed(
-                    "This tag can't be made read-only from this phone. Android usually only offers it for NFC Forum Type 1 " +
-                        "and 2 tags (NTAG, MIFARE Ultralight). Nothing was changed.",
-                )
-            }
+            if (!it.canMakeReadOnly()) return TagResult.CantMakeReadOnly
             report(TagStep("Making it read-only", 2, LOCK_STEPS, writes = true))
             return try {
                 if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Making it read-only failed. The tag is unchanged.")

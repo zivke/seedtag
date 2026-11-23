@@ -129,6 +129,11 @@ sealed interface TagResult {
     data object Locked : TagResult
     /** Lock found the tag already not writable: nothing was changed, and it may not be permanent. */
     data object AlreadyReadOnly : TagResult
+    /**
+     * Lock found the right tag, but this phone can't make it read-only: nothing was changed, and holding
+     * it again wouldn't help, so the scan ends.
+     */
+    data object CantMakeReadOnly : TagResult
     /** Tag already holds data; [existing] is its text if it was a Text record; [target] identifies it. */
     data class NotEmpty(val existing: String?, val target: OverwriteTarget) : TagResult
     data class Inspected(val check: EraseCheck) : TagResult
