@@ -714,7 +714,12 @@ class SeedTagViewModel : ViewModel() {
     /** The words for a dialog the tag flow asks for. */
     private fun dialogFor(n: TagNotice): Dialog = when (n) {
         is TagNotice.ConfirmOverwrite -> Dialog.ConfirmOverwrite(n.looksLikeSeedTag)
-        is TagNotice.LateFailure -> Dialog.Error(n.message)
+        // Its message may say to tap again, but no scan is waiting any more.
+        is TagNotice.LateFailure -> Dialog.Info(
+            "The tag may have changed",
+            n.message + "\n\nThis happened after the scan had ended (you left the app, or tapped Cancel). Holding the tag " +
+                "to the phone does nothing until you start that step again.",
+        )
         TagNotice.WrittenUnchecked -> Dialog.Info(
             "Written, not checked",
             "The backup was written to the blank tag, but the scan was canceled before it could be read back. " +

@@ -448,7 +448,16 @@ object TagIo {
                 )
             }
             report(TagStep("Making it read-only", 2, LOCK_STEPS, writes = true))
-            return if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Making it read-only failed. The tag is unchanged.")
+            return try {
+                if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Making it read-only failed. The tag is unchanged.")
+            } catch (e: IOException) {
+                // The lock bits and the capability container are separate writes: some may be done, for good.
+                TagResult.Failed(
+                    "The tag moved away while it was being made read-only, so part of it may already be read-only for good. " +
+                        "Reading it still works either way: Verify it, then hold the same tag still and make it read-only again.",
+                    changedTag = true,
+                )
+            }
         }
     }
 

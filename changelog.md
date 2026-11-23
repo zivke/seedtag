@@ -175,6 +175,9 @@ All notable user-visible changes to SeedTag. The format follows
   written* came back without its fingerprint, a failure that may have
   changed the tag ("part of what it held may already be gone") wasn't shown
   at all, and the Erase tab kept the scan of a tag that was now empty.
+- A tag that moved away while being made read-only got "moved away too
+  early", although part of it may already be read-only for good. It now
+  says so.
 - After erasing the tag that holds the backup just written, Back up still
   said *Backup written* and Verify *Same seed*: both now start afresh, and
   Lock is no longer offered for it.
