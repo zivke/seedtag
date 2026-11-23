@@ -27,7 +27,8 @@ sealed interface TagNotice {
     data object WrittenUnchecked : TagNotice
     data object Locked : TagNotice
     data object AlreadyReadOnly : TagNotice
-    data object Erased : TagNotice
+    /** [rest]: whether the data area was then checked page by page. */
+    data class Erased(val rest: Rest) : TagNotice
 }
 
 /** What the app does besides taking the new [TagFlow]: the parts that live outside it. */
@@ -199,13 +200,13 @@ data class TagFlow(
             TagResult.Locked -> closed.next(buzz(Haptic.Success), notify(TagNotice.Locked))
             TagResult.AlreadyReadOnly -> copy(prompt = null).next(notify(TagNotice.AlreadyReadOnly))
             is TagResult.Inspected -> copy(prompt = null, eraseCheck = r.check).next()
-            TagResult.Erased -> {
+            is TagResult.Erased -> {
                 // Lock must not be offered for a tag that no longer holds that backup.
                 val erasedText = eraseCheck?.text
                 val lock = if (erasedText != null && erasedText == lockTarget) null else lockTarget
-                if (stale) closed.copy(lockTarget = lock).next(buzz(Haptic.Success), notify(TagNotice.Erased))
+                if (stale) closed.copy(lockTarget = lock).next(buzz(Haptic.Success), notify(TagNotice.Erased(r.rest)))
                 else closed.copy(lockTarget = lock, eraseCheck = null)
-                    .next(buzz(Haptic.Success), TagEffect.EraseDone, notify(TagNotice.Erased))
+                    .next(buzz(Haptic.Success), TagEffect.EraseDone, notify(TagNotice.Erased(r.rest)))
             }
             is TagResult.Read -> copy(prompt = null).next(TagEffect.Decrypt(r.text, p.purpose == Purpose.Restore, r.differences))
         }
@@ -220,7 +221,7 @@ data class TagFlow(
                 is TagResult.Checked, is TagResult.Failed, is TagResult.NotEmpty, TagResult.AlreadyReadOnly,
                 is TagResult.Inspected, is TagResult.Read -> true
                 is TagResult.RestCleared -> rest == Rest.Interrupted
-                is TagResult.WrittenUnchecked, is TagResult.Written, TagResult.Locked, TagResult.Erased -> false
+                is TagResult.WrittenUnchecked, is TagResult.Written, TagResult.Locked, is TagResult.Erased -> false
             }
     }
 }

@@ -94,7 +94,8 @@ Two Gradle modules plus the Python tool:
     the free bytes after the terminator start (`freeAfterTerminator`), which Back up zeroes.
   - `TagModel.kt`: what the app asks of a tag and what comes back (`TagRequest`,
     `TagResult`, `TagCheck`, `EraseCheck`, …), and the pure parts of tag I/O:
-    `OverwriteTarget.matches`, `EraseFiller`, `Type2Memory.wrapPage`, `TagContent.of`.
+    `OverwriteTarget.matches`, `EraseFiller`, `TagContent.of`, and `Type2Memory`: the
+    raw READ / WRITE commands, `wrapPage`, and `freePages` (what Back up and Erase zero).
   - `TagFlow.kt`: the tag flow as an immutable state machine (`TagFlow`): which
     scan waits for a tag, what earlier scans found, and what each result does.
     Each call returns the next state and `TagEffect`s (buzz, a `TagNotice`
@@ -128,8 +129,11 @@ Two Gradle modules plus the Python tool:
     anything is lost). A successful write resets Verify and Restore
     (`readAnother()`).
   - `TagIo.kt`: blocking NFC I/O (check, write + read-back, then zeroing the old data
-    Android leaves after the backup on Type 2 tags, read, lock, erase), returns a
-    `TagResult`, never throws.
+    Android leaves after the backup on Type 2 tags, read, lock, erase, then the same
+    zeroing and a raw check), returns a `TagResult`, never throws. Raw Type 2 access
+    goes through `NfcA` (`Type2Raw`, any chip with SAK 00h), not `MifareUltralight`,
+    which Android offers only for NXP UIDs. Never write past the data area: the lock
+    and configuration pages follow it (AUTH0 = 00 would lock the tag behind a password).
   - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
     `IdleWatch` keeps the screen on while `holdsSecrets` and shows *Still
     there?* (`Dialog.StillThere`); behind it, both Back questions

@@ -3,9 +3,11 @@
 
 package rs.zivke.seedtag.core
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -101,5 +103,49 @@ class TagModelTest {
         assertEquals(BackAction.BackToWords, BackAction.of(false, false, onPasswordStep = true, holdsSecrets = false))
         assertEquals(BackAction.AskToLeave, BackAction.of(false, false, false, holdsSecrets = true))
         assertNull(BackAction.of(false, false, false, false))
+    }
+
+    @Test
+    fun type2Commands() {
+        assertArrayEquals(bytes(0x30, 0x03), Type2Memory.readCommand(3))
+        assertArrayEquals(bytes(0xA2, 0x1D, 0, 0, 0, 0), Type2Memory.writeCommand(0x1D, ByteArray(4)))
+        assertThrows(IllegalArgumentException::class.java) { Type2Memory.writeCommand(4, ByteArray(3)) }
+        assertThrows(IllegalArgumentException::class.java) { Type2Memory.readCommand(256) }
+    }
+
+    /**
+     * An NTAG213's data area (144 bytes, pages 4 to 27h) as a tested NTAG213-compatible chip held it:
+     * the factory Lock Control TLV, a 12-word backup (91-byte message) written over a longer text record
+     * that repeated "empty", whose end Android left after the terminator.
+     */
+    private fun overwritten(): ByteArray {
+        val text = javaClass.getResource("/seedtag-v1-vectors.tsv")!!.readText().lines()[1].split("\t")[4]
+        assertEquals(84, text.length)
+        val message = bytes(0xD1, 0x01, 0x57, 0x54, 0x02, 0x65, 0x6E) + text.toByteArray(Charsets.US_ASCII)
+        // Android pads the terminator's page with zeros; the old text goes on from the next page.
+        val head = bytes(0x01, 0x03, 0xA0, 0x0C, 0x34, 0x03, message.size) + message + bytes(0xFE, 0x00)
+        return head + ("mpty" + "empty".repeat(30)).toByteArray(Charsets.US_ASCII).copyOf(144 - head.size)
+    }
+
+    @Test
+    fun freePagesAreAfterTheTerminatorsPage() {
+        val data = overwritten()
+        assertEquals(144, data.size)
+        // The terminator is in page 1Ch, as on the chip; pages 1Dh to 27h still held "empty…".
+        assertEquals(0xFE.toByte(), data[4 * (0x1C - 4) + 2])
+        assertEquals(0x1D..0x27, Type2Memory.freePages(data))
+        assertFalse(Type2Memory.allZero(data, 0x1D..0x27))
+        assertArrayEquals("mpty".toByteArray(), Type2Memory.page(data, 0x1D))
+        // Cleared: zeros from page 1Dh to the end, the backup and its page untouched.
+        val cleared = data.copyOf().also { it.fill(0, 4 * (0x1D - 4), it.size) }
+        assertTrue(Type2Memory.allZero(cleared, 0x1D..0x27))
+        assertFalse(Type2Memory.allZero(cleared, 0x1C..0x27))
+        // An erased NTAG213: the empty message, then zeros from page 7.
+        val erased = bytes(0x01, 0x03, 0xA0, 0x0C, 0x34, 0x03, 0x04, 0xD8, 0, 0, 0, 0xFE) + ByteArray(132)
+        assertEquals(7..0x27, Type2Memory.freePages(erased))
+        // A message to the very end leaves nothing; an odd layout leaves nothing to write.
+        val full = bytes(0x03, 0x8E) + ByteArray(142)
+        assertTrue(Type2Memory.freePages(full)!!.isEmpty())
+        assertNull(Type2Memory.freePages(bytes(0x02, 0x03, 0, 0, 0) + data.copyOfRange(5, 144))) // Memory Control TLV
     }
 }

@@ -166,10 +166,19 @@ All notable user-visible changes to SeedTag. The format follows
   writes only the backup itself, so the rest of the tag's memory kept
   whatever was there: the end of a longer, older backup, or anything
   another app wrote before, such as a seed in plain text, readable with an
-  app that shows a tag's whole memory. On NTAG and MIFARE Ultralight tags,
-  Back up now overwrites it with zeros and reads it back (*Clear old data*
-  finishes it if the tag moved away); on other tags, *Backup written* says
-  that old data may still be there.
+  app that shows a tag's whole memory. On NFC Forum Type 2 tags (NTAG,
+  MIFARE Ultralight, and compatible chips from other makers), Back up now
+  overwrites it with zeros, up to the end of the data area, and reads it
+  back (*Clear old data* finishes it if the tag moved away); on other tags,
+  *Backup written* says that old data may still be there. Erase does the
+  same after emptying a Type 2 tag, and *Tag erased* says whether its
+  memory was checked page by page.
+- On Type 2 chips from makers other than NXP (sold as "NTAG213
+  compatible"), which Android doesn't offer as MIFARE Ultralight, the raw
+  checks didn't run: a tag that a too-quick tap read as empty could be
+  written or formatted without the overwrite question, and old data after
+  the backup wasn't cleared. They now use raw NFC-A commands, which work on
+  any Type 2 chip.
 - The beta notice (README, About page, the disclaimer before you start), the
   MIFARE Classic warning and the README's tag table named MIFARE Ultralight C
   as the tested tag. It was an NXP NTAG213, as a memory dump showed; no

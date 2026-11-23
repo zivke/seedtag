@@ -128,8 +128,12 @@ sealed interface TagResult {
     /** Tag already holds data; [existing] is its text if it was a Text record; [target] identifies it. */
     data class NotEmpty(val existing: String?, val target: OverwriteTarget) : TagResult
     data class Inspected(val check: EraseCheck) : TagResult
-    /** Every byte of the tag's NDEF data was overwritten with zeros, and the tag is now empty. */
-    data object Erased : TagResult
+    /**
+     * Every byte of the tag's NDEF data was overwritten with zeros, and the tag is now empty. [rest]:
+     * whether its data area was then checked page by page ([Rest.Cleared]), couldn't be on this kind
+     * of tag, or the tag moved away first.
+     */
+    data class Erased(val rest: Rest) : TagResult
     data class Failed(val message: String) : TagResult
 }
 
@@ -156,8 +160,46 @@ object EraseFiller {
         records == 1 && tnf == TNF_UNKNOWN && type.isEmpty() && payload.all { it == 0.toByte() }
 }
 
-/** Type 2 tag memory, read with READ (16 bytes, 4 pages, from a page on). */
+/**
+ * Type 2 tag memory (NTAG, MIFARE Ultralight and compatible chips): 4-byte pages, the data area from
+ * page 4, read with READ (16 bytes, 4 pages, from a page on) and written with WRITE (one page). Raw
+ * commands, so they work on any Type 2 chip, also those Android doesn't offer as MifareUltralight.
+ */
 object Type2Memory {
+    /** The data area starts here. */
+    const val FIRST_DATA_PAGE = 4
+
+    /** READ (30h): 16 bytes from [page]. The reader adds the CRC. */
+    fun readCommand(page: Int): ByteArray {
+        require(page in 0..255) { "page $page" }
+        return byteArrayOf(0x30, page.toByte())
+    }
+
+    /** WRITE (A2h): [data] (4 bytes) to [page]. */
+    fun writeCommand(page: Int, data: ByteArray): ByteArray {
+        require(page in 0..255 && data.size == 4) { "page $page, ${data.size} bytes" }
+        return byteArrayOf(0xA2.toByte(), page.toByte()) + data
+    }
+
+    /**
+     * The tag pages Back up and Erase zero: the whole pages after the one that holds the TLVs'
+     * terminator, to the end of the data area [data] (from page 4). Never the terminator's own page:
+     * a write torn there could damage the message before it, and Android fills the rest of it with
+     * zeros. Empty if the message runs to the end; null if [Type2Tlv.freeAfterTerminator] isn't sure
+     * of the layout, so nothing may be written.
+     */
+    fun freePages(data: ByteArray): IntRange? {
+        val free = Type2Tlv.freeAfterTerminator(data) ?: return null
+        return FIRST_DATA_PAGE + (free + 3) / 4 until FIRST_DATA_PAGE + data.size / 4
+    }
+
+    /** The 4 bytes of tag page [page] in the data area [data] (from page 4). */
+    fun page(data: ByteArray, page: Int): ByteArray =
+        data.copyOfRange(4 * (page - FIRST_DATA_PAGE), 4 * (page - FIRST_DATA_PAGE) + 4)
+
+    /** Whether every page of [pages] in the data area [data] is zero. */
+    fun allZero(data: ByteArray, pages: IntRange): Boolean = pages.all { p -> page(data, p).all { it == 0.toByte() } }
+
     /** Pages probed for the wrap, from small chips to large, each a few pages before a known chip's end. */
     private val PROBES = intArrayOf(0x0D, 0x11, 0x27, 0x2A, 0x39, 0x84, 0xE4)
 

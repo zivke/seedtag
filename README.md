@@ -362,11 +362,14 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    punctuation.
    A password that starts or ends with a space, or has two spaces in a row, is refused: a written copy rarely shows
    that, and only the exact spaces would decrypt the tag.
-   If the tag already has data, the app asks before overwriting it (on NTAG and MIFARE Ultralight tags, a tag that
-   reads as empty is double-checked in its raw data first, so a bad read isn't taken for an empty tag).
+   If the tag already has data, the app asks before overwriting it (on NFC Forum Type 2 tags, such as NTAG and MIFARE
+   Ultralight, a tag that reads as empty is double-checked in its raw data first, so a bad read isn't taken for an
+   empty tag).
    Android writes only the backup and leaves the rest of the tag's memory as it was: the end of a longer, older
-   backup, or anything another app wrote there before, such as a seed in plain text. So after writing, on NTAG and
-   MIFARE Ultralight tags, Back up also overwrites the memory after the backup with zeros and reads it back. If
+   backup, or anything another app wrote there before, such as a seed in plain text. So after writing, on Type 2
+   tags (NTAG, MIFARE Ultralight, and compatible chips from other makers, which Android doesn't always offer as
+   MIFARE Ultralight), Back up also overwrites the memory after the backup with zeros, up to the end of the data
+   area and never the lock or configuration pages after it, and reads it back. If
    the tag moves away meanwhile, *Backup written* says so, and *Clear old data* finishes it. On other tags it
    can't, and *Backup written* says that old data may still be there: use a new tag if this one ever held
    anything nobody should read. A blank,
@@ -405,10 +408,11 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    or this one with different content, is refused. Erasing first overwrites the tag's whole NDEF area with zeros
    and reads that back, then leaves the tag empty. Writing an empty message alone wouldn't do: on NTAG and MIFARE
    Ultralight tags it only rewrites the first few bytes, and the rest of the old ciphertext stays in the chip,
-   readable by any app that reads its memory directly. What the app checks is the NDEF area as Android reports it:
-   on Type 4 and Type 5 tags, and on chips that move data around internally, it can't see whether old copies
-   remain elsewhere in the memory, and on a few sizes just above 255 bytes up to 3 bytes at the end stay as they
-   were.
+   readable by any app that reads its memory directly. On Type 2 tags the app then also reads the data area page by
+   page, zeroes anything left after the empty message, and checks that it's all zeros; *Tag erased* says whether
+   that check was done. On Type 4 and Type 5 tags, what the app checks is the NDEF area as Android reports it: on
+   those, and on chips that move data around internally, it can't see whether old copies remain elsewhere in the
+   memory.
    **Erasing clears only the tag.** If someone copied the backup from it earlier (any phone can do that in a
    second), they still have their copy, and they can open it if they know or guess your password. So if you think
    the tag may have been copied and your password may be known or isn't strong, erasing doesn't protect you: move

@@ -274,6 +274,10 @@ on hidden data (H…, `TODO.md`). Each change adds its rows here in the same com
 | 7.25 | B16: during any scan, lift the tag too early once (an error in the prompt, it stays open), then tap properly; and Cancel a scan, then tap the tag | The second tap works without starting over. After Cancel, nothing happens and no prompt comes back. | ⬜ |
 | 7.26 | B16: Verify, then Lock with **another** tag held (refused), and Verify again: *same seed as the backup just written* | Lock refuses the other tag and changes nothing. Verify compares with the backup just written. | ⬜ |
 | 7.27 | B16: Erase a tag that holds the backup just written (scan, Erase, hold it) | *Tag erased*; the Erase tab is back at its start. Done's *Make tag read-only* then says *Write or verify the tag first.* (Done still shows *Backup written*: B15d, not changed here.) | ⬜ |
+| 7.28 | B12: on the NTAG213-compatible tag (UID not starting with 04, NFC Tools lists only NfcA and Ndef), write a long text record with NFC Tools, then Back up a 12-word throwaway seed over it; export its memory (*Read memory*) | *Backup written* with no notice about old data. The dump: the backup, `FE 00` in its last page, then `00 00 00 00` in every page up to 27h; pages 28h onwards as before (`00 00 00 BD`, `00 00 00 FF`, …), unchanged. | ✅ |
+| 7.29 | B12: Erase that tag (scan, **Erase without checking**, hold it), then export its memory | *Tag erased* says the data area was read back page by page and nothing is left. The dump: `34 03 04 D8` / `00 00 00 FE` in pages 5-6, zeros up to page 27h; pages 28h onwards unchanged. Then Back up still works on it. | ✅ |
+| 7.30 | B12: on that tag, Back up over a backup with a very quick tap (touch and pull away at once), a few times | Never written without the overwrite question: either the question, or *Couldn't read the tag properly*. | ✅ |
+| 7.31 | B12 regression on the NXP NTAG213: Back up over a longer text record, then Erase; export memory after each | The same as 7.28 and 7.29 (zeros up to page 27h, pages 28h-2Ch unchanged: `00 00 00 BD`, `04 00 00 FF`, `00 05 00 00`). | ✅ |
 
 ## Short regression check for every release
 

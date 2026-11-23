@@ -9,8 +9,8 @@ import android.nfc.NdefRecord
 import android.nfc.Tag
 import android.nfc.TagLostException
 import android.nfc.tech.MifareClassic
-import android.nfc.tech.MifareUltralight
 import android.nfc.tech.Ndef
+import android.nfc.tech.NfcA
 import android.nfc.tech.NdefFormatable
 import android.nfc.tech.NfcV
 import rs.zivke.seedtag.core.EraseCheck
@@ -26,6 +26,7 @@ import rs.zivke.seedtag.core.TagResult
 import rs.zivke.seedtag.core.TagStep
 import rs.zivke.seedtag.core.Type2Memory
 import rs.zivke.seedtag.core.Type2Tlv
+import java.io.Closeable
 import java.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 
@@ -81,7 +82,7 @@ object TagIo {
     private const val WRITE_STEPS = 4
     private const val CLEARING = "Clearing old data after the backup"
     private const val LOCK_STEPS = 2
-    private const val ERASE_STEPS = 5
+    private const val ERASE_STEPS = 6
 
     /** Exactly the message SeedTag writes for [text]: one Text record, language "en", nothing else. */
     private fun messageFor(text: String) = NdefMessage(NdefRecord.createTextRecord("en", text))
@@ -266,7 +267,10 @@ object TagIo {
             if (after != null && !isEmpty(after)) {
                 return TagResult.Failed("The tag was overwritten with zeros but isn't empty yet. Hold the same tag still and tap again to finish.")
             }
-            return TagResult.Erased
+            // On a Type 2 tag, the same as after a backup: zero what's left after the empty message
+            // (the filler can leave a few bytes, see EraseFiller) and read the data area back raw.
+            report(TagStep("Checking its memory page by page", 6, ERASE_STEPS, writes = true))
+            return TagResult.Erased(clearRest(tag, it))
         }
     }
 
@@ -312,38 +316,34 @@ object TagIo {
     }
 
     /**
-     * After a backup was written and checked: overwrite with zeros the data area after its TLVs'
-     * terminator, where Android's write leaves the old bytes, and read it back. Only on a Type 2 tag
-     * (NTAG, MIFARE Ultralight) whose layout [Type2Tlv.freeAfterTerminator] is sure of. Only whole pages
-     * after the terminator's page are written: a write torn on that page could damage the backup, and
-     * Android fills the rest of it with zeros anyway. [ndef] is closed for the raw I/O (one technology
-     * at a time). Never throws: the backup is already fine.
+     * After a backup was written and checked, or a tag erased: overwrite with zeros the data area
+     * after its TLVs' terminator, where Android's write leaves the old bytes, and read it back. Only
+     * on a Type 2 tag ([Type2Raw]: NTAG, MIFARE Ultralight and compatible chips) whose layout
+     * [Type2Memory.freePages] is sure of, and only those pages: never the lock or configuration
+     * pages after the data area. [ndef] is closed for the raw I/O (one technology at a time). Never
+     * throws: the backup, or the empty tag, is already fine.
      */
     private fun clearRest(tag: Tag, ndef: Ndef): Rest {
-        val ul = MifareUltralight.get(tag) ?: return Rest.NotPossible
+        val raw = Type2Raw.of(tag) ?: return Rest.NotPossible
         ndef.close()
         return try {
-            ul.use {
+            raw.use {
                 it.connect()
                 val data: ByteArray
-                val first: Int
+                val pages: IntRange
                 try {
-                    val cc = it.readPages(3)
+                    val cc = it.read(3)
                     if ((cc[0].toInt() and 0xFF) != 0xE1) return Rest.NotPossible
                     data = readDataArea(it, (cc[2].toInt() and 0xFF) * 8)
-                    first = Type2Tlv.freeAfterTerminator(data) ?: return Rest.NotPossible
+                    pages = Type2Memory.freePages(data) ?: return Rest.NotPossible
                 } catch (e: TagLostException) {
                     throw e
                 } catch (e: IOException) {
                     return Rest.NotPossible // a page it won't read: not a layout to write to blindly
                 }
-                val firstPage = (first + 3) / 4
                 val zeros = ByteArray(4)
-                for (page in firstPage until data.size / 4) {
-                    if (!data.copyOfRange(4 * page, 4 * page + 4).contentEquals(zeros)) it.writePage(4 + page, zeros)
-                }
-                val back = readDataArea(it, data.size)
-                if ((4 * firstPage until back.size).all { i -> back[i] == 0.toByte() }) Rest.Cleared else Rest.Interrupted
+                for (page in pages) if (!Type2Memory.page(data, page).contentEquals(zeros)) it.write(page, zeros)
+                if (Type2Memory.allZero(readDataArea(it, data.size), pages)) Rest.Cleared else Rest.Interrupted
             }
         } catch (e: IOException) {
             Rest.Interrupted
@@ -353,16 +353,43 @@ object TagIo {
     }
 
     /** The data area from page 4, [size] bytes; READ returns four pages at a time. */
-    private fun readDataArea(ul: MifareUltralight, size: Int): ByteArray {
+    private fun readDataArea(raw: Type2Raw, size: Int): ByteArray {
         val out = ByteArray(size)
         var offset = 0
         while (offset < size) {
-            val pages = ul.readPages(4 + offset / 4)
-            if (pages.isEmpty()) throw IOException("empty read")
+            val pages = raw.read(Type2Memory.FIRST_DATA_PAGE + offset / 4)
             pages.copyInto(out, offset, 0, minOf(pages.size, size - offset))
             offset += pages.size
         }
         return out
+    }
+
+    /**
+     * A Type 2 tag's raw READ and WRITE ([Type2Memory]'s commands) through NfcA, so they work on any
+     * Type 2 chip. Android offers MifareUltralight only when the UID starts with 04h (NXP), so
+     * NTAG213-compatible chips from other makers would be left out (board finding B12). Type 2
+     * chips answer with SAK 00h; [of] is null for any other tag.
+     */
+    private class Type2Raw(private val nfcA: NfcA) : Closeable {
+        fun connect() = nfcA.connect()
+
+        /** 16 bytes (4 pages) from [page]. Anything shorter is a NAK, or not a Type 2 chip. */
+        fun read(page: Int): ByteArray {
+            val r = nfcA.transceive(Type2Memory.readCommand(page))
+            if (r.size < 16) throw IOException("READ $page: ${r.size} bytes")
+            return r.copyOf(16)
+        }
+
+        /** The reply (ACK or NAK) isn't relied on: whatever is written is read back afterwards. */
+        fun write(page: Int, data: ByteArray) {
+            nfcA.transceive(Type2Memory.writeCommand(page, data))
+        }
+
+        override fun close() = nfcA.close()
+
+        companion object {
+            fun of(tag: Tag): Type2Raw? = NfcA.get(tag)?.takeIf { it.sak.toInt() == 0 }?.let(::Type2Raw)
+        }
     }
 
     private fun read(tag: Tag): TagResult {
@@ -426,17 +453,17 @@ object TagIo {
         ndef.ndefMessage ?: ndef.ndefMessage ?: ndef.cachedNdefMessage
 
     /**
-     * For a tag that every NDEF read called empty ([readMessage] null): on a Type 2 tag, read the TLVs
-     * from page 4 directly, and say whether an NDEF message is there after all. Then the reads failed
+     * For a tag that every NDEF read called empty ([readMessage] null): on a Type 2 tag ([Type2Raw]),
+     * read the TLVs from page 4 directly, and say whether an NDEF message is there after all. Then the reads failed
      * rather than found nothing, and writing without asking could destroy a backup. Other tag types,
      * and TLVs too odd to tell, count as empty, as before. [ndef] is closed for the raw read (one
      * technology at a time) and connected again afterwards.
      */
     private fun type2HoldsData(tag: Tag, ndef: Ndef): Boolean {
-        val ul = MifareUltralight.get(tag) ?: return false
+        val raw = Type2Raw.of(tag) ?: return false
         ndef.close()
         try {
-            val data = ul.use { it.connect(); it.readPages(4) + it.readPages(8) } // pages 4 to 11
+            val data = raw.use { it.connect(); it.read(4) + it.read(8) } // pages 4 to 11
             return (Type2Tlv.ndefLength(data) ?: 0) > 0
         } finally {
             ndef.connect()
@@ -446,14 +473,14 @@ object TagIo {
     /**
      * Android offers only NdefFormatable when its NDEF check at discovery failed, which a too-quick
      * tap can cause on a tag that already holds data. The capability container says whether it's
-     * NDEF-formatted: on a Type 2 tag (MIFARE Ultralight / NTAG), byte 0 of page 3 is E1h; on a
+     * NDEF-formatted: on a Type 2 tag (MIFARE Ultralight, NTAG and compatible chips), byte 0 of page 3 is E1h; on a
      * Type 5 tag (ICODE, ST25TV), byte 0 of block 0 is E1h or E2h. Other tag types can't be checked
      * and are formatted as before (MIFARE Classic, which the README says to avoid).
      */
     private fun looksNdefFormatted(tag: Tag): Boolean {
-        MifareUltralight.get(tag)?.use {
+        Type2Raw.of(tag)?.use {
             it.connect()
-            return (it.readPages(3)[0].toInt() and 0xFF) == 0xE1
+            return (it.read(3)[0].toInt() and 0xFF) == 0xE1
         }
         NfcV.get(tag)?.use {
             it.connect()
@@ -490,13 +517,13 @@ object TagIo {
      * may refuse a probe, which ends the session: it's remembered and not probed again.
      */
     private fun blankCapacity(tag: Tag): Int? {
-        val ul = MifareUltralight.get(tag) ?: return null
+        val raw = Type2Raw.of(tag) ?: return null
         val uid = tag.id.joinToString("") { "%02x".format(it) }
         if (uid in unprobeable) return null
         return try {
-            ul.use {
+            raw.use {
                 it.connect()
-                val pages = Type2Memory.wrapPage(it::readPages)
+                val pages = Type2Memory.wrapPage(it::read)
                 if (pages == null) unprobeable += uid
                 pages?.let(DATA_BYTES::get)?.minus(7)
             }

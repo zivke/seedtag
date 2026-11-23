@@ -198,12 +198,16 @@ class TagFlowTest {
         assertEquals(check, inspected.flow.eraseCheck)
         val erasing = inspected.flow.erase()
         assertEquals(TagRequest.Erase(target), erasing.flow.pending!!.request)
-        val erased = erasing.tap(TagResult.Erased)
-        assertEquals(listOf(TagEffect.Buzz(Haptic.Success), TagEffect.EraseDone, TagEffect.Notify(TagNotice.Erased)), erased.effects.drop(1))
+        val erased = erasing.tap(TagResult.Erased(Rest.Cleared))
+        assertEquals(
+            listOf(TagEffect.Buzz(Haptic.Success), TagEffect.EraseDone, TagEffect.Notify(TagNotice.Erased(Rest.Cleared))),
+            erased.effects.drop(1),
+        )
         assertNull(erased.flow.eraseCheck)
         assertNull(erased.flow.lockTarget) // it held the backup Lock was for
         // Another tag's text keeps Lock's target; a tag that can't be erased offers nothing.
-        val other = TagFlow().opened("other").flow.scanToErase().tap(TagResult.Inspected(check)).flow.erase().tap(TagResult.Erased)
+        val other = TagFlow().opened("other").flow.scanToErase().tap(TagResult.Inspected(check)).flow.erase()
+            .tap(TagResult.Erased(Rest.NotPossible))
         assertEquals("other", other.flow.lockTarget)
         assertNull(TagFlow().scanToErase().tap(TagResult.Inspected(check.copy(target = null))).flow.erase().flow.pending)
     }

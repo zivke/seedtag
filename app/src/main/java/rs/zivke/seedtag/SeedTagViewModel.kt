@@ -708,10 +708,21 @@ class SeedTagViewModel : ViewModel() {
             "This tag was already read-only, so SeedTag didn't change it. It can't tell whether that's permanent: " +
                 "some tags are only marked read-only and can still be rewritten with other tools.",
         )
-        TagNotice.Erased -> Dialog.Info(
+        is TagNotice.Erased -> Dialog.Info(
             "Tag erased",
-            "The tag's whole data area was overwritten with zeros and read again, confirming the tag to be " +
-                "empty. It can take a new backup.\n\nErasing clears only this tag. If someone copied the backup from it " +
+            when (n.rest) {
+                Rest.Cleared ->
+                    "The tag's whole data area was overwritten with zeros and then read back page by page: nothing " +
+                        "it held is left in it. It can take a new backup."
+                Rest.NotPossible ->
+                    "The tag's data was overwritten with zeros and read again, and the tag is empty. It can take a new " +
+                        "backup. On this kind of tag, SeedTag can't also check its memory page by page."
+                Rest.Interrupted ->
+                    "The tag's data was overwritten with zeros and read again, and the tag is empty. It moved away " +
+                        "before SeedTag could also check its memory page by page: to be sure nothing is left, scan " +
+                        "it and erase it once more."
+            } +
+                "\n\nErasing clears only this tag. If someone copied the backup from it " +
                 "earlier (any phone can do that in a second), they still have their copy, and they can open it " +
                 "if they know or guess your password. So if you think the tag may have been copied and your " +
                 "password may be known or isn't strong, erasing doesn't protect you: move your funds to a new " +

@@ -178,7 +178,12 @@ report's tests N1–N12, A1–A3, H1).
   - [ ] CI on the newest Python (needs `actions/setup-python`, pinned by SHA; with B37).
 - [ ] **B11: the APK-to-tag binding is one person reading a run header.** Build-provenance attestation checked by
   `sign-release.sh`, or a host rebuild from a throwaway clone for `--expect`.
-- [ ] **B12: raw empty check and format guard skip non-NXP Type 2 tags** *(device: N4)*. Raw reads through `NfcA`.
+- [x] **B12: raw empty check and format guard skip non-NXP Type 2 tags** *(device: N4)*. Raw reads through `NfcA`.
+  Confirmed on 2026-11-23 with an "NTAG213-compatible" tag (UID from 1Dh, Android offers only NfcA and Ndef): a
+  12-word backup over a text record left 11 pages of the old text. All raw Type 2 access (empty check, format
+  guard, size probe, clearing after the backup) now goes through `NfcA` (`Type2Raw`); Erase ends with the same
+  zeroing and a raw check (`TagResult.Erased(rest)`); `Type2Memory.freePages` and the commands tested. Device rows
+  7.28-7.31.
 - [x] **B13: Erase over-promises.** "The tag's whole NDEF area was overwritten and read back"; erasing doesn't undo
   copies already read (move the funds if the password may be known); replace a backup by writing over it.
 - [ ] **B14: reproducibility not shown since the toolchain bump.** Run CI on `develop`, compare with `make build`,
