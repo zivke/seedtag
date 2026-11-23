@@ -75,6 +75,8 @@ data class VerifyResult(
     val passwordFix: PasswordFix = PasswordFix.None,
     val restored: Boolean = false,
     val tagDifferences: List<String> = emptyList(),
+    /** The tag's text (the Base64 blob, not secret): which tag this result is about. */
+    val tagText: String? = null,
 )
 
 /** A system Settings screen the app links to. */
@@ -297,7 +299,18 @@ class SeedTagViewModel : ViewModel() {
     var busy by mutableStateOf<String?>(null)
         private set
     val scanPrompt: ScanPrompt? get() = flow.prompt
-    var dialog by mutableStateOf<Dialog?>(null)
+    /** The dialog under [Dialog.StillThere]: comes back after Keep, and late results land here, not over it. */
+    private var below by mutableStateOf<Dialog?>(null)
+    /** *Still there?* is up, on top of [below]. */
+    private var idle by mutableStateOf(false)
+
+    /**
+     * The dialog shown: [Dialog.StillThere] while the idle timeout asks, on top of whatever was open.
+     * Setting [Dialog.StillThere] raises it; anything else replaces the dialog under it.
+     */
+    var dialog: Dialog?
+        get() = if (idle) Dialog.StillThere else below
+        set(value) { if (value == Dialog.StillThere) idle = true else below = value }
 
     private val _haptics = MutableSharedFlow<Haptic>(extraBufferCapacity = 8)
     /** Played by the UI; emitted on the main thread. */
@@ -328,7 +341,11 @@ class SeedTagViewModel : ViewModel() {
                     wipeBackup()
                     step = BackupStep.Done
                 }
-                TagEffect.EraseDone -> resetErase()
+                TagEffect.EraseDone -> clearEraseState()
+                is TagEffect.Emptied -> {
+                    if (effect.wasBackup && step == BackupStep.Done) step = BackupStep.Tag
+                    if (verifyResult?.tagText == effect.text) { verifyResult = null; restoredWords = null }
+                }
             }
         }
     }
@@ -642,11 +659,16 @@ class SeedTagViewModel : ViewModel() {
 
     /** Back to the start of Erase: nothing scanned, no password, and its scan canceled. */
     private fun resetErase() {
-        eraseSession++
         apply(flow.resetErase())
+        clearEraseState()
+    }
+
+    /** The Erase tab's own state, outside [TagFlow]: the password, the decrypted check, the confirmation. */
+    private fun clearEraseState() {
+        eraseSession++
         eraseVerified = null; eraseWithPassword = false
         clearPasswords(PwField.Erase)
-        if (dialog is Dialog.ConfirmErase) dialog = null
+        if (below is Dialog.ConfirmErase) below = null
     }
 
     fun hideRestored() { restoredWords = null }
@@ -692,6 +714,7 @@ class SeedTagViewModel : ViewModel() {
     /** The words for a dialog the tag flow asks for. */
     private fun dialogFor(n: TagNotice): Dialog = when (n) {
         is TagNotice.ConfirmOverwrite -> Dialog.ConfirmOverwrite(n.looksLikeSeedTag)
+        is TagNotice.LateFailure -> Dialog.Error(n.message)
         TagNotice.WrittenUnchecked -> Dialog.Info(
             "Written, not checked",
             "The backup was written to the blank tag, but the scan was canceled before it could be read back. " +
@@ -745,7 +768,7 @@ class SeedTagViewModel : ViewModel() {
         ) { (words, fp, fix) ->
             verifyResult = VerifyResult(
                 words.size, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix, restored = reveal,
-                tagDifferences = differences,
+                tagDifferences = differences, tagText = text,
             )
             apply(flow.opened(text))
             if (reveal) restoredWords = words
@@ -803,13 +826,13 @@ class SeedTagViewModel : ViewModel() {
         // A tag is being read or written right now: that isn't idle, and the scan mustn't be canceled.
         if (scanPrompt?.working != null) { touched(); return }
         cancelScan()
-        dialog = Dialog.StillThere
+        idle = true // over the dialog that's open, which comes back after Keep
         _haptics.tryEmit(Haptic.Found) // the longer buzz: felt even with the phone lying on the table
     }
 
     /** "Keep" in the still-there dialog. */
     fun stillThere() {
-        if (dialog == Dialog.StillThere) dialog = null
+        idle = false
         touched()
     }
 
@@ -837,12 +860,15 @@ class SeedTagViewModel : ViewModel() {
         apply(flow.wiped())
         if (step != BackupStep.Done && step != BackupStep.Tag) step = BackupStep.Length
         wipeBackup()
-        clearPasswords(PwField.Read, PwField.Erase); restoredWords = null
-        val d = dialog
+        clearPasswords(PwField.Read); restoredWords = null
+        clearEraseState() // its scan went with the flow's wipe
+        // Every question goes, so nobody picking up the phone later can answer one. Messages stay.
+        idle = false
+        val d = below
         if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
             d is Dialog.ConfirmBack || d is Dialog.ConfirmSettings || d is Dialog.ConfirmTab ||
-            d is Dialog.ConfirmClearWords || d == Dialog.StillThere
-        ) dialog = null
+            d is Dialog.ConfirmClearWords || d is Dialog.ConfirmErase || d == Dialog.ConfirmLock
+        ) below = null
     }
 
     private fun showError(msg: String) {

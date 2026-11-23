@@ -188,9 +188,12 @@ report's tests N1–N12, A1–A3, H1).
   copies already read (move the funds if the password may be known); replace a backup by writing over it.
 - [ ] **B14: reproducibility not shown since the toolchain bump.** Run CI on `develop`, compare with `make build`,
   record both hashes; repeat after every toolchain change.
-- [ ] **B15: tag results read live view-model fields.** Carry fingerprint, target and text in the request and
+- [x] **B15: tag results read live view-model fields.** Carry fingerprint, target and text in the request and
   result; `Failed` with `changedTag`, always shown; `resetErase()` and closing ConfirmErase / ConfirmLock in
-  `wipeAll()`; a dialog priority queue; clear stale Done / Verified after Erase.
+  `wipeAll()`; a dialog priority queue; clear stale Done / Verified after Erase. On `b16-tag-flow-tests`:
+  `Pending.fingerprint`, `TagRequest.Erase(target, text)`, `TagNotice.LateFailure`, `TagEffect.Emptied`, a late
+  `Erased` resets the tab if its scan is the one erased, `wiped()` drops the Erase scan; *Still there?* sits on
+  top of the dialog (`below` + `idle`) instead of a queue. A test per case in `TagFlowTest`; device rows 7.32-7.36.
 - [x] **B16: no automated tests for the tag flow.** Pure helpers into `core` with tests, then the `TagFlow` reducer
   (the TODO lines on the state machine say both "before" and "after" the branch merge: pick one). Before, decided
   2026-11-22, on branch `b16-tag-flow-tests`.

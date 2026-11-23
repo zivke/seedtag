@@ -16,8 +16,12 @@ sealed interface TagRequest {
     data class Lock(val expected: String) : TagRequest
     /** The Erase tab, first tap: what the tag holds and whether it can be erased. Writes nothing. */
     data object Inspect : TagRequest
-    /** Erase [target]: overwrite all of its NDEF data with zeros, then leave it empty. */
-    data class Erase(val target: OverwriteTarget) : TagRequest
+    /**
+     * Erase [target]: overwrite all of its NDEF data with zeros, then leave it empty. [text]: its first
+     * Text record when it was scanned (for a backup, the Base64 blob), so whatever describes that
+     * backup can be cleared once it's gone; tag I/O doesn't use it.
+     */
+    data class Erase(val target: OverwriteTarget, val text: String? = null) : TagRequest
     /** Finish [Rest.Interrupted]: clear the old data after the backup, if the tag holds exactly [expected]. */
     data class ClearRest(val expected: String) : TagRequest
 }
@@ -134,7 +138,11 @@ sealed interface TagResult {
      * of tag, or the tag moved away first.
      */
     data class Erased(val rest: Rest) : TagResult
-    data class Failed(val message: String) : TagResult
+    /**
+     * [changedTag]: the tag may already have been changed (a write or an erase was interrupted), so the
+     * message matters even when it arrives for a canceled scan.
+     */
+    data class Failed(val message: String, val changedTag: Boolean = false) : TagResult
 }
 
 /** The record Erase fills a tag's NDEF area with: TNF unknown, no type, no ID, a payload of zeros. */

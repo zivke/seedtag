@@ -107,6 +107,7 @@ object TagIo {
                 return TagResult.Failed(
                     "Couldn't format this blank tag. Hold it still and try again. If it keeps failing, the tag may be too " +
                         "small (this backup needs $needed bytes) or not writable.",
+                    changedTag = true,
                 )
             }
             // This Tag object only knows the techs it had when discovered, so Ndef.get()
@@ -139,6 +140,7 @@ object TagIo {
                 return TagResult.Failed(
                     "The tag moved away while it was being overwritten, so what it held before may already be gone. " +
                         "Hold the same tag still and tap again to write the new backup.",
+                    changedTag = true,
                 )
             }
             // Read back over the same connection; getNdefMessage() re-reads the tag. Not the
@@ -147,7 +149,7 @@ object TagIo {
             val back = it.ndefMessage ?: it.ndefMessage
                 ?: return TagResult.WrittenUnchecked(req.text) // couldn't read: check on the next tap
             // The whole message, not only the text: nothing else may have ended up on the tag.
-            if (!back.toByteArray().contentEquals(message.toByteArray())) return TagResult.Failed("What was read back doesn't match what was written. The tag may be faulty – don't use it.")
+            if (!back.toByteArray().contentEquals(message.toByteArray())) return TagResult.Failed("What was read back doesn't match what was written. The tag may be faulty – don't use it.", changedTag = true)
             report(TagStep(CLEARING, 4, WRITE_STEPS, writes = true))
             return TagResult.Written(req.text, clearRest(tag, it))
         }
@@ -243,6 +245,7 @@ object TagIo {
                 return TagResult.Failed(
                     "The tag moved away while it was being erased, so part of what it held may already be gone. Nothing " +
                         "here can tell how much: Cancel, scan the tag again and erase it again.",
+                    changedTag = true,
                 )
             }
             report(TagStep("Reading the zeros back", 3, ERASE_STEPS, writes = true))
@@ -250,6 +253,7 @@ object TagIo {
             if (back == null || !back.toByteArray().contentEquals(filler.toByteArray())) {
                 return TagResult.Failed(
                     "Couldn't confirm that the whole tag was overwritten. Hold the same tag still and tap again to finish.",
+                    changedTag = true,
                 )
             }
             report(TagStep("Emptying the tag", 4, ERASE_STEPS, writes = true))
@@ -260,12 +264,16 @@ object TagIo {
                     "The old backup was already overwritten: the zeros were written and read back. But the tag moved away before it " +
                         "was left empty. Hold the same tag still and tap again to finish. If the app then says it isn't " +
                         "the tag you scanned, Cancel, scan the tag again and erase it again.",
+                    changedTag = true,
                 )
             }
             report(TagStep("Checking that it's empty", 5, ERASE_STEPS, writes = true))
             val after = it.ndefMessage
             if (after != null && !isEmpty(after)) {
-                return TagResult.Failed("The tag was overwritten with zeros but isn't empty yet. Hold the same tag still and tap again to finish.")
+                return TagResult.Failed(
+                    "The tag was overwritten with zeros but isn't empty yet. Hold the same tag still and tap again to finish.",
+                    changedTag = true,
+                )
             }
             // On a Type 2 tag, the same as after a backup: zero what's left after the empty message
             // (the filler can leave a few bytes, see EraseFiller) and read the data area back raw.

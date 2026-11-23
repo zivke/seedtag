@@ -166,6 +166,22 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- Leaving the app, or the idle timeout, didn't close *Erase this tag?* or
+  *Make it read-only?*, and kept the Erase tab's scan: whoever picked up the
+  phone later could still confirm them. Clearing now closes every question
+  and forgets the scan.
+- A backup or an erase that finished after you left the app (a call, the
+  power button) was handled as if nothing had changed meanwhile: *Backup
+  written* came back without its fingerprint, a failure that may have
+  changed the tag ("part of what it held may already be gone") wasn't shown
+  at all, and the Erase tab kept the scan of a tag that was now empty.
+- After erasing the tag that holds the backup just written, Back up still
+  said *Backup written* and Verify *Same seed*: both now start afresh, and
+  Lock is no longer offered for it.
+- *Still there?* replaced whatever message was open, and a late tag result
+  could replace *Still there?* during its last minute, so everything was
+  cleared without a warning on screen. It now sits on top: **Keep** brings
+  back the message, and late results wait behind it.
 - Back up no longer leaves old data on the tag after the backup. Android
   writes only the backup itself, so the rest of the tag's memory kept
   whatever was there: the end of a longer, older backup, or anything

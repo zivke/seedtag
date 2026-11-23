@@ -13,8 +13,12 @@ enum class Haptic { Tick, Success, Failure, Found, Detected }
 /** What a scan is for: decides how its result is handled. */
 enum class Purpose { Check, BackupWrite, ClearRest, Verify, Restore, Lock, Inspect, Erase }
 
-/** A scan waiting for a tag. [id] tells a result for the current scan from one that arrives after Cancel or a new scan. */
-data class Pending(val request: TagRequest, val purpose: Purpose, val id: Long)
+/**
+ * A scan waiting for a tag. [id] tells a result for the current scan from one that arrives after Cancel
+ * or a new scan. [fingerprint]: the backup a write scan writes, carried with it, so a write that ends
+ * after the app wiped what was waiting still shows it.
+ */
+data class Pending(val request: TagRequest, val purpose: Purpose, val id: Long, val fingerprint: String? = null)
 
 /** [working]: a tag was found and is being read or written, null while waiting for one. */
 data class ScanPrompt(val title: String, val error: String? = null, val working: TagStep? = null)
@@ -26,6 +30,8 @@ sealed interface TagNotice {
     /** A blank tag was written, but the scan was canceled before it was read back. */
     data object WrittenUnchecked : TagNotice
     data object Locked : TagNotice
+    /** A scan that was canceled, or the app left, ended in a failure that may have changed the tag. */
+    data class LateFailure(val message: String) : TagNotice
     data object AlreadyReadOnly : TagNotice
     /** [rest]: whether the data area was then checked page by page. */
     data class Erased(val rest: Rest) : TagNotice
@@ -39,8 +45,13 @@ sealed interface TagEffect {
     data class Decrypt(val text: String, val reveal: Boolean, val differences: List<String>) : TagEffect
     /** The backup is on the tag: wipe the words and passwords, clear Verify and Restore, show Done. */
     data object BackupWritten : TagEffect
-    /** The tag was erased: the Erase tab starts afresh (its password and decrypted check too). */
+    /** The tag the Erase tab scanned was erased: it starts afresh (its password and decrypted check too). */
     data object EraseDone : TagEffect
+    /**
+     * The tag that held [text] was erased: a Verify or Restore result about it is out of date. If
+     * [wasBackup], it held the backup written in this session, so Back up starts afresh too.
+     */
+    data class Emptied(val text: String, val wasBackup: Boolean) : TagEffect
 }
 
 /** A backup sealed and checked, waiting for its tag: [text] to write, [fingerprint] to show once written. */
@@ -83,8 +94,9 @@ data class TagFlow(
 
     private fun next(vararg effects: TagEffect) = Next(this, effects.toList())
 
-    private fun arm(request: TagRequest, purpose: Purpose, title: String, vararg effects: TagEffect) =
-        copy(pending = Pending(request, purpose, scanId + 1), scanId = scanId + 1, prompt = ScanPrompt(title)).next(*effects)
+    private fun arm(request: TagRequest, purpose: Purpose, title: String, vararg effects: TagEffect, fingerprint: String? = null) =
+        copy(pending = Pending(request, purpose, scanId + 1, fingerprint), scanId = scanId + 1, prompt = ScanPrompt(title))
+            .next(*effects)
 
     // ---- what the user starts ---------------------------------------------------
 
@@ -94,14 +106,19 @@ data class TagFlow(
     fun checkAnotherTag() = copy(tagCheck = null).next()
 
     /** [sealed] was encrypted and checked: write it to the next tag. */
-    fun write(sealed: Sealed) = copy(toWrite = sealed)
-        .arm(TagRequest.Write(sealed.text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write the backup")
+    fun write(sealed: Sealed) = copy(toWrite = sealed).arm(
+        TagRequest.Write(sealed.text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write the backup",
+        fingerprint = sealed.fingerprint,
+    )
 
     /** "Overwrite" in [TagNotice.ConfirmOverwrite]: only the tag it asked about. */
     fun overwrite(): Next {
-        val text = toWrite?.text ?: return next()
+        val sealed = toWrite ?: return next()
         val target = overwriteTarget ?: return next()
-        return arm(TagRequest.Write(text, target), Purpose.BackupWrite, "Hold the same tag again to overwrite it")
+        return arm(
+            TagRequest.Write(sealed.text, target), Purpose.BackupWrite, "Hold the same tag again to overwrite it",
+            fingerprint = sealed.fingerprint,
+        )
     }
 
     /** Verify, or Restore if [reveal]. */
@@ -127,8 +144,9 @@ data class TagFlow(
 
     /** Erase the tag [eraseCheck] found; nothing if it can't be erased. */
     fun erase(): Next {
-        val target = eraseCheck?.target ?: return next()
-        return arm(TagRequest.Erase(target), Purpose.Erase, "Hold the same tag to erase it")
+        val check = eraseCheck ?: return next()
+        val target = check.target ?: return next()
+        return arm(TagRequest.Erase(target, check.text), Purpose.Erase, "Hold the same tag to erase it")
     }
 
     /** Back to the start of Erase: nothing scanned, and its scan canceled. */
@@ -143,8 +161,11 @@ data class TagFlow(
         backupRest = null, lockTarget = null,
     ).next()
 
-    /** The app wiped its secrets (left the foreground, or idle): the scan ends, and so does the backup waiting for it. */
-    fun wiped() = cancel().flow.copy(toWrite = null, overwriteTarget = null).next()
+    /**
+     * The app wiped its secrets (left the foreground, or idle): the scan ends, and so do the backup
+     * waiting for it and the Erase tab's scan (nobody picking up the phone later can erase from it).
+     */
+    fun wiped() = cancel().flow.copy(toWrite = null, overwriteTarget = null, eraseCheck = null).next()
 
     /** The tag's [text] was decrypted (Verify, Restore): Lock now applies to it. */
     fun opened(text: String) = copy(lockTarget = text).next()
@@ -181,7 +202,10 @@ data class TagFlow(
         return when (r) {
             is TagResult.Checked -> copy(prompt = null, tagCheck = r.check)
                 .next(buzz(if (r.check.usable && !r.check.classic) Haptic.Success else Haptic.Failure))
-            is TagResult.Failed -> tapAgain(r.message)
+            is TagResult.Failed ->
+                // A late failure that may have changed the tag is said, but doesn't arm a scan nobody waits for.
+                if (stale) closed.next(buzz(Haptic.Failure), notify(TagNotice.LateFailure(r.message)))
+                else tapAgain(r.message)
             is TagResult.NotEmpty -> copy(prompt = null, overwriteTarget = r.target).next(
                 buzz(Haptic.Failure),
                 notify(TagNotice.ConfirmOverwrite(SeedBox.kindOf(r.existing) != SeedBox.Kind.NotBackup)),
@@ -189,9 +213,13 @@ data class TagFlow(
             is TagResult.WrittenUnchecked ->
                 // Canceled: don't bring the scan prompt back by itself.
                 if (stale) closed.next(buzz(Haptic.Tick), notify(TagNotice.WrittenUnchecked))
-                else arm(TagRequest.CheckWritten(r.text), Purpose.BackupWrite, "Written. Hold the tag to the phone once more to check it", buzz(Haptic.Tick))
+                else arm(
+                    TagRequest.CheckWritten(r.text), Purpose.BackupWrite, "Written. Hold the tag to the phone once more to check it",
+                    buzz(Haptic.Tick), fingerprint = p.fingerprint,
+                )
+            // The fingerprint comes with the scan: the app may have wiped what was waiting meanwhile.
             is TagResult.Written -> closed.copy(
-                backupFingerprint = toWrite?.fingerprint, toWrite = null, overwriteTarget = null,
+                backupFingerprint = p.fingerprint, toWrite = null, overwriteTarget = null,
                 lockTarget = r.text, writtenText = r.text, backupRest = r.rest,
             ).next(buzz(Haptic.Success), TagEffect.BackupWritten)
             is TagResult.RestCleared ->
@@ -201,12 +229,25 @@ data class TagFlow(
             TagResult.AlreadyReadOnly -> copy(prompt = null).next(notify(TagNotice.AlreadyReadOnly))
             is TagResult.Inspected -> copy(prompt = null, eraseCheck = r.check).next()
             is TagResult.Erased -> {
-                // Lock must not be offered for a tag that no longer holds that backup.
-                val erasedText = eraseCheck?.text
-                val lock = if (erasedText != null && erasedText == lockTarget) null else lockTarget
-                if (stale) closed.copy(lockTarget = lock).next(buzz(Haptic.Success), notify(TagNotice.Erased(r.rest)))
-                else closed.copy(lockTarget = lock, eraseCheck = null)
-                    .next(buzz(Haptic.Success), TagEffect.EraseDone, notify(TagNotice.Erased(r.rest)))
+                // Taken whether or not the scan is current: the tag is empty either way.
+                val request = p.request as? TagRequest.Erase
+                val text = request?.text
+                val effects = mutableListOf<TagEffect>(buzz(Haptic.Success))
+                var f = closed
+                // The Erase tab's scan of this tag is done with; a newer scan of another is kept.
+                if (request != null && eraseCheck?.target === request.target) {
+                    f = f.copy(eraseCheck = null)
+                    effects += TagEffect.EraseDone
+                }
+                if (text != null) {
+                    // Nothing may describe the erased backup any more: Lock, Done, Verify.
+                    val wasBackup = text == writtenText
+                    if (text == lockTarget) f = f.copy(lockTarget = null)
+                    if (wasBackup) f = f.copy(writtenText = null, backupRest = null, backupFingerprint = null, tagCheck = null)
+                    effects += TagEffect.Emptied(text, wasBackup)
+                }
+                effects += notify(TagNotice.Erased(r.rest))
+                Next(f, effects)
             }
             is TagResult.Read -> copy(prompt = null).next(TagEffect.Decrypt(r.text, p.purpose == Purpose.Restore, r.differences))
         }
@@ -218,8 +259,9 @@ data class TagFlow(
         /** Results that only ask for more input: dropped when they arrive for a canceled or older scan. */
         val TagResult.onlyAsks: Boolean
             get() = when (this) {
-                is TagResult.Checked, is TagResult.Failed, is TagResult.NotEmpty, TagResult.AlreadyReadOnly,
-                is TagResult.Inspected, is TagResult.Read -> true
+                is TagResult.Checked, is TagResult.NotEmpty, TagResult.AlreadyReadOnly, is TagResult.Inspected,
+                is TagResult.Read -> true
+                is TagResult.Failed -> !changedTag
                 is TagResult.RestCleared -> rest == Rest.Interrupted
                 is TagResult.WrittenUnchecked, is TagResult.Written, TagResult.Locked, is TagResult.Erased -> false
             }

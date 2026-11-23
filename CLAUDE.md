@@ -124,7 +124,9 @@ Two Gradle modules plus the Python tool:
     stays armed so the user can just tap again. `holdsSecrets` is true while
     words, a password or restored words are in memory; `touched()` (every
     `ACTION_DOWN` in `MainActivity`) restarts the idle timer, and
-    `idleTimeout()` wipes after `IDLE_WARN_MS` + `IDLE_GRACE_MS`. `back()` and
+    `idleTimeout()` wipes after `IDLE_WARN_MS` + `IDLE_GRACE_MS`; *Still there?*
+    sits on top of the open dialog (`dialog` is that pair), and `wipeAll()` closes
+    every question, Erase and Lock included. `back()` and
     `backStaysInApp` decide what system Back does (`BackAction`) (`Dialog.ConfirmBack` before
     anything is lost). A successful write resets Verify and Restore
     (`readAnother()`).

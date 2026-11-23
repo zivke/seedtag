@@ -197,10 +197,13 @@ class TagFlowTest {
         val inspected = armed.tap(TagResult.Inspected(check))
         assertEquals(check, inspected.flow.eraseCheck)
         val erasing = inspected.flow.erase()
-        assertEquals(TagRequest.Erase(target), erasing.flow.pending!!.request)
+        assertEquals(TagRequest.Erase(target, text), erasing.flow.pending!!.request)
         val erased = erasing.tap(TagResult.Erased(Rest.Cleared))
         assertEquals(
-            listOf(TagEffect.Buzz(Haptic.Success), TagEffect.EraseDone, TagEffect.Notify(TagNotice.Erased(Rest.Cleared))),
+            listOf(
+                TagEffect.Buzz(Haptic.Success), TagEffect.EraseDone, TagEffect.Emptied(text, wasBackup = false),
+                TagEffect.Notify(TagNotice.Erased(Rest.Cleared)),
+            ),
             erased.effects.drop(1),
         )
         assertNull(erased.flow.eraseCheck)
@@ -252,5 +255,85 @@ class TagFlowTest {
         val done = TagFlow().write(sealed).tap(TagResult.Written(text, Rest.Cleared)).flow
         val fresh = done.startOver().flow
         assertEquals(TagFlow(scanId = fresh.scanId), fresh)
+    }
+
+    // ---- B15: results that arrive after Cancel, a new scan, or the app's wipe ----------------
+
+    private val check = EraseCheck(true, ndef = true, writable = true, TagContent.Backup, 137, text, target)
+
+    @Test
+    fun theFingerprintTravelsWithTheWrite() {
+        // (a) The power button mid-write wipes what was waiting; the late result still knows its backup.
+        val (p, busy) = TagFlow().write(sealed).claim()
+        assertEquals("297a46bd", busy.wiped().flow.handle(p, TagResult.Written(text, Rest.Cleared)).flow.backupFingerprint)
+        // The same through a blank tag's second tap, and through Overwrite.
+        val second = TagFlow().write(sealed).tap(TagResult.WrittenUnchecked(text))
+        val (q, busy2) = second.claim()
+        assertEquals("297a46bd", busy2.wiped().flow.handle(q, TagResult.Written(text, Rest.Cleared)).flow.backupFingerprint)
+        val again = TagFlow().write(sealed).tap(TagResult.NotEmpty(text, target)).flow.overwrite()
+        assertEquals("297a46bd", again.flow.pending!!.fingerprint)
+    }
+
+    @Test
+    fun aLateFailureThatMayHaveChangedTheTagIsShown() {
+        // (b) Said, with a failure buzz, but no scan armed for it, and a newer scan's prompt left alone.
+        val (p, busy) = TagFlow().scanToErase().tap(TagResult.Inspected(check)).flow.erase().claim()
+        val newer = busy.cancel().flow.scanToRead(reveal = false).flow
+        val late = newer.handle(p, TagResult.Failed("part of it may already be gone", changedTag = true))
+        assertEquals(listOf(TagNotice.LateFailure("part of it may already be gone")), late.notices)
+        assertEquals(listOf(Haptic.Failure), late.buzzes)
+        assertEquals(newer.pending, late.flow.pending)
+        assertEquals(newer.prompt, late.flow.prompt)
+        // On time, it's the usual: stay armed, the message in the prompt.
+        val now = TagFlow().scanToErase().tap(TagResult.Inspected(check)).flow.erase()
+            .tap(TagResult.Failed("part of it may already be gone", changedTag = true))
+        assertEquals(now.flow.pending!!.request, TagRequest.Erase(target, text))
+        assertEquals(emptyList<TagNotice>(), now.notices)
+    }
+
+    @Test
+    fun aLateEraseResetsTheEraseTab() {
+        // (c) Canceled during the erase: the tab doesn't keep a scan of a tag that's now empty.
+        val (p, busy) = TagFlow().scanToErase().tap(TagResult.Inspected(check)).flow.erase().claim()
+        val late = busy.cancel().flow.handle(p, TagResult.Erased(Rest.Cleared))
+        assertNull(late.flow.eraseCheck)
+        assertTrue(TagEffect.EraseDone in late.effects)
+        assertEquals(TagNotice.Erased(Rest.Cleared), late.notices.single())
+        // A newer scan of another tag is kept.
+        val other = EraseCheck(true, ndef = true, writable = true, TagContent.Other, 137, "https://example.com", OverwriteTarget(byteArrayOf(9), byteArrayOf(9)))
+        val rescanned = busy.cancel().flow.scanToErase().tap(TagResult.Inspected(other)).flow
+        val late2 = rescanned.handle(p, TagResult.Erased(Rest.Cleared))
+        assertEquals(other, late2.flow.eraseCheck)
+        assertTrue(TagEffect.EraseDone !in late2.effects)
+    }
+
+    @Test
+    fun erasingTheBackupClearsWhatDescribedIt() {
+        // (d) Back up's Done, Lock and Verify mustn't go on describing a tag that's now empty.
+        val done = TagFlow().scanToCheck().tap(TagResult.Checked(usable)).flow.write(sealed).tap(TagResult.Written(text, Rest.Cleared)).flow
+        val erased = done.scanToErase().tap(TagResult.Inspected(check)).flow.erase().tap(TagResult.Erased(Rest.Cleared))
+        assertTrue(TagEffect.Emptied(text, wasBackup = true) in erased.effects)
+        with(erased.flow) {
+            assertNull(writtenText)
+            assertNull(backupFingerprint)
+            assertNull(backupRest)
+            assertNull(lockTarget)
+            assertNull(tagCheck)
+        }
+        // Another tag's erase leaves the backup alone (and says which text went, for Verify).
+        val otherText = "https://example.com"
+        val other = done.scanToErase().tap(TagResult.Inspected(check.copy(text = otherText))).flow.erase().tap(TagResult.Erased(Rest.Cleared))
+        assertTrue(TagEffect.Emptied(otherText, wasBackup = false) in other.effects)
+        assertEquals("297a46bd", other.flow.backupFingerprint)
+        assertEquals(text, other.flow.lockTarget)
+    }
+
+    @Test
+    fun theWipeEndsTheEraseScan() {
+        // (e) Nobody picking up the phone later can erase from a scan made before the wipe.
+        val scanned = TagFlow().scanToErase().tap(TagResult.Inspected(check)).flow
+        val wiped = scanned.wiped().flow
+        assertNull(wiped.eraseCheck)
+        assertNull(wiped.erase().flow.pending)
     }
 }

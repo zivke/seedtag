@@ -433,7 +433,9 @@ Leaving or closing the app (home button, Recents, screen off) deletes everything
 ever saved on the phone. So that a screen timeout doesn't wipe a half-typed phrase, the screen stays on while
 words, a password or restored words are on the phone. Instead, SeedTag has its own timeout: after 3 minutes without a
 touch it asks *Still there?* (with a buzz), with the screen behind it blurred (covered before Android 12), and
-clears everything a minute later unless you tap **Keep**. The power
+clears everything a minute later unless you tap **Keep**, which brings back whatever message was open. Clearing
+also closes every question still open (*Erase this tag?*, *Make it read-only?*, …) and forgets the Erase tab's
+scan, so whoever picks up the phone later can't answer them. The power
 button still turns the screen off, and that clears everything. Back on the Words and Password steps does what their
 **Back** button does (going back from the password asks first, since it clears the password). Anywhere else, Back
 asks before leaving while something would be lost. So do the links to Settings (*Turn on NFC*, the accessibility
