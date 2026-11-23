@@ -545,12 +545,17 @@ NTAG216 NFC ring
 
 - Only buy a listing that names the chip, e.g. "Chip: NTAG216". "13.56 MHz IC card", "NFC compatible" or
   "S50" without a chip name is usually MIFARE Classic 1K.
-- Skip "UID changeable", "Gen1a", "CUID" or "magic card" (Classic clones), and "NTAG21x compatible" (unknown
-  clones whose memory and retention aren't documented).
+- Skip "UID changeable", "Gen1a", "CUID" or "magic card" (they exist for NTAG and Ultralight too, not only
+  Classic: their extra commands may mean that a lock isn't permanent), and "NTAG21x compatible" (unknown clones
+  whose memory and retention aren't documented).
 - For durability prefer PVC cards, epoxy tags or coin tags over paper stickers.
-- A cheap listing can carry a fake chip. NXP's free **NFC TagInfo** app shows the real chip and whether it's
-  genuine NXP silicon. Buy a few, test one with a throwaway phrase first, and prefer sellers who name the chip
-  maker.
+- A cheap listing can carry a chip from another maker, sold as the real one. Check every NTAG before it holds a
+  backup: in NFC Tools' READ tab, the tag type names the chip (*NXP - NTAG213*, not just *Mifare Ultralight*),
+  the serial number starts with `04` (NXP's code), and it says **Signature Valid** (NXP's signature over the
+  serial number, which another maker's chip can't carry). NXP's free **NFC TagInfo** app shows the same. A tag
+  that fails any of these still works with SeedTag, but nobody documents how long it keeps its data: use it for
+  practice, not for the backup. Buy a few, test one with a throwaway phrase first, and prefer sellers who name
+  the chip maker.
 
 **Idea: an NFC ring.** An epoxy or ceramic ring with an NTAG215/216 inside (search `NTAG216 NFC ring`) keeps
 the encrypted backup on you, and it looks like jewellery, not a seed backup. Things to know:
