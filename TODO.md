@@ -356,3 +356,14 @@ left is around the blob, where nothing checks it:
   - The app comes without any guarantees, and the developer is not responsible for any damage.
   - Users must make sure for themselves that no malware is already installed on their phone. The app
     can't cover every possible attack vector.
+- [ ] **Lock on a tag that can't be made read-only.** Show the message, but don't wait for another tag to be
+  scanned: that doesn't make sense. (Today the scan stays armed with *This tag can't be made read-only from this
+  phone…*, `TagIo.lock`.)
+- [ ] ***Erase this backup?* wording.** Say "Make sure you have the seed saved somewhere else", and drop the
+  closing "Then hold the same tag to the phone." (`Ui.kt`, `Dialog.ConfirmErase`).
+- [ ] ***Safest on a spare phone* item.** Change its last paragraph to: "If you don't have a spare phone, you can
+  use your everyday phone after making sure it's offline, but be aware that it is a less safe option. For more
+  details, read the "Go offline first"" (`SPARE_PHONE_DETAILS` in `Ui.kt`).
+- [ ] **Words survive switching tabs.** In Back up, type all the words and the password, then cancel the write and
+  go back twice: you can now switch between Back up, Verify, Restore and Erase without the words on the Back up
+  tab ever being cleared.
