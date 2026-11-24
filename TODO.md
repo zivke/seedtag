@@ -150,9 +150,11 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B3: an interrupted Lock leaves the tag half-locked and both messages are false** *(device: N3)*. Same
   read-back; finish the lock with raw WRITEs; reword "unchanged" and "SeedTag didn't change it". Do the read-back
   now, not after `tag-write-password` (it needs only READs).
-- [ ] **B4: the process outlives the wipe.** Correct README:592 ("Everything is dropped") now and advise a
-  force-stop or restart. Decide whether to end the process in `onStop`, only when no tag I/O is pending, and what
-  Done and Verify show afterwards.
+- [ ] **B4: the process outlives the wipe.**
+  - [x] Correct the README ("deletes everything", now around line 432 and in the About paragraph) and advise a
+    force-stop or restart. *Security notes* already said so.
+  - [ ] Decide whether to end the process in `onStop`, only when no tag I/O is pending, and what Done and Verify
+    show afterwards.
 - [ ] **B5: salt and nonce are a 28-byte covert channel `verify` can't detect.**
   - [x] Reword README step 5 (it rules out a weak key, not a hidden channel).
   - [ ] Derive salt and nonce from the secrets so `seedtag.py verify` can check them: options, trade-offs and what
@@ -257,7 +259,9 @@ report's tests N1–N12, A1–A3, H1).
 - [x] **B42: unexpected exceptions in the Argon2 paths crash the app** (one `runKdf` helper; map
   `GeneralSecurityException`).
 - [ ] **B43: dialog guards applied late and to the root view only.**
-- [ ] **B44: branch hygiene.** Delete `toolchain-update` and `dependency-trim`; merge `main` into `develop`.
+- [x] **B44: branch hygiene.** Delete `toolchain-update` and `dependency-trim`; merge `main` into `develop`. Done:
+  both deleted (fully merged); `main` merged with `develop`'s text kept (its only commit was already here as
+  `6391600`).
 - [x] **B45: "Wrong password, or the tag data is corrupted" is a dead end** (hints). `Dialog.WrongPassword` with
   the steps to check, non-BIP39 word positions (`Passphrase.nonWordPositions`, tested), Erase's own variant; the
   password keyboard runs into the gutters (`intoGutter`).

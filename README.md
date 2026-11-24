@@ -429,8 +429,10 @@ to be seen again.
 When a screen goes on below what's visible, for example above the word keypad or the password keyboard, its bottom
 edge fades out and a small round **↓** button scrolls further; the top edge fades when there's more above.
 
-Leaving or closing the app (home button, Recents, screen off) deletes everything typed or decrypted; nothing is
-ever saved on the phone. So that a screen timeout doesn't wipe a half-typed phrase, the screen stays on while
+Leaving or closing the app (home button, Recents, screen off) clears everything typed or decrypted from the app;
+nothing is ever saved on the phone. Some copies stay in the phone's memory until Android ends SeedTag's process,
+which can take days ([Security notes](#security-notes), *What's wiped from memory*): restart the phone when you're
+done, or at least force-stop SeedTag. So that a screen timeout doesn't wipe a half-typed phrase, the screen stays on while
 words, a password or restored words are on the phone. Instead, SeedTag has its own timeout: after 3 minutes without a
 touch it asks *Still there?* (with a buzz), with the screen behind it blurred (covered before Android 12), and
 clears everything a minute later unless you tap **Keep**, which brings back whatever message was open. Clearing
@@ -446,7 +448,7 @@ encrypting, for example), the screen is blurred as well (covered before Android 
 
 **ⓘ** (About) in the top bar shows the version, what the app does with your data (nothing leaves the phone), the
 encryption used and the license, with links to the source code and to donate. Links open in the browser, and only
-when tapped; leaving SeedTag deletes everything typed in it.
+when tapped; leaving SeedTag clears everything typed in it.
 
 ## Choosing a tag
 

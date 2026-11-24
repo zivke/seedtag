@@ -57,6 +57,10 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- README: leaving the app clears what was typed or decrypted from it, rather
+  than "deletes everything": some copies stay in memory until Android ends
+  the process, so restart the phone afterwards, or at least force-stop
+  SeedTag.
 - `seedtag.py check` warns about a tag whose serial number doesn't start
   with 04, NXP's maker code: another maker's chip with an NTAG's layout may
   hold more than the pages a dump shows.
