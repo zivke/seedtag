@@ -231,12 +231,26 @@ report's tests N1–N12, A1–A3, H1).
     `tag-key-vectors.tsv` (+ `.license`), `seedtag.py tag-key` and its tests (Python 3.8 syntax), `FORMAT.md`
     section 6 (the derivation only).
   - [ ] Chip identification and protection state from READs (and GET_VERSION once the size says NTAG), through
-    `Type2Raw`; Protect / Remove protection as `TagFlow` requests with tests; NXP only (version and maker code 04).
+    `Type2Raw`; Protect / Remove protection as `TagFlow` requests with tests. **NTAG213/215/216 only for now**
+    (owner, 2026-11-24), the Ultralight C later (below).
+  - [ ] **Chips that aren't genuine NXP** (owner, 2026-11-24): supported too, but a warning dialog first, before
+    the password is set. A chip counts as genuine NXP only if its GET_VERSION reply is an NTAG21x's and its serial
+    number starts with 04. The warning says what's different: another maker's chip, whose memory layout and
+    password handling nobody documents; SeedTag sets the password only where it can check it works, but such a
+    chip may ignore it, or handle it differently; use it for practice, not for the backup (as the README's buying
+    advice says). Its settings pages come from the chip's own layout (CC size, page count), never assumed: e.g.
+    the 46-page clones (UID 1D) have CFG0 at 29h like an NTAG213 but CFG1 `00 00 00 00` and one page more. Never
+    write AUTH0 before a PWD_AUTH with the new password has worked in a fresh session, and say plainly when the
+    chip doesn't enforce the password (the fresh-tap write check is refused or not).
   - [ ] The design gaps: the fresh-tap check before "Protected" (a read without the key and a refused write), all
     of CFG0/CFG1 compared, a NAK after AUTH shown as "wrong password", a torn CFG0 write (mirror bits) caught and
     repaired, Erase and Make read-only aware of protection.
   - [ ] Docs: README (what it protects and not; the NTAG password and the Ultralight C key go over the air in the
     clear when set; `tag-key`), `FORMAT.md` section 6's chip settings, changelog, device rows (N11).
+  - [ ] **Later: MIFARE Ultralight C** (owner, 2026-11-24). The derivation (`TagKey.ultralightCKey`) and the 3DES
+    handshake (`UltralightCAuth`) are in and tested; the app part waits for a real Ultralight C to test on (none
+    yet: the tested tag was an NTAG213). Key pages 2Ch-2Fh, AUTH0 (2Ah) and AUTH1 (2Bh, 01h = writes only); the
+    key goes over the air in the clear when it's set; old branch `c235d3c` has a first version.
 - [ ] **B18: no key-loss, rotation or succession plan.** Write it (backups, spare certificate, `apksigner rotate`
   and minSdk); explicit signature-scheme flags; "If SeedTag is abandoned"; SECURITY.md, CONTRIBUTING.md.
 - [ ] **B19: third-party licence texts not shipped.** `LICENSES/` (REUSE), an "Open-source licences" section in
