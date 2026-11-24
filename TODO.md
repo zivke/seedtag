@@ -141,6 +141,28 @@ report's tests N1–N12, A1–A3, H1).
   `release-cert.sha256` hang on it too. Check what the container's credential can do; add a `v*` tag ruleset and
   immutable releases; publish the certificate digest somewhere the account can't edit (F-Droid reproducible build,
   or a personal site).
+- [ ] **B4: the process outlives the wipe.** **High priority** (owner, 2026-11-24; moved up from Medium).
+  - [x] Correct the README ("deletes everything", now around line 432 and in the About paragraph) and advise a
+    force-stop or restart. *Security notes* already said so.
+  - [x] Decide whether to end the process in `onStop`. Decided (2026-11-24): **no automatic end** (it would cut off
+    a tag write, erase or lock in progress, or, once deferred until the tag is done, lose its result: *Backup
+    written* and its fingerprint, the Verify result, Make read-only after a write; and every short trip out of the
+    app would start over). Instead, option C below.
+  - [ ] **Option C: an explicit Close SeedTag**, ending the task and the process when the user chooses.
+    - Where: on Done, on the Verify and Restore results, and in the top bar (always reachable).
+    - A confirmation dialog first (**Close SeedTag** / **Stay**) that says exactly what happens: everything
+      typed or decrypted is cleared, and SeedTag's process ends, so the copies the wipe can't zero (the
+      password as text while Show is on, text already drawn, the Argon2id memory, copies of the AES key) go
+      with it; what's on screen now is gone (say which: the fingerprint on Done, the Verify result), so note
+      the fingerprint first; what it can't clear (copies outside SeedTag, such as the screen's graphics
+      memory, and freed memory until it's reused), so restart the phone before it goes online.
+    - Not while a tag is being read or written: the button is disabled, or the dialog says to wait.
+    - Close the task first (`finishAndRemoveTask()`), then end the process, so Recents doesn't bring back an
+      empty screen; nothing is saved for a restart.
+    - Detailed explanations: an item in the checklist (*Learn more*), the About page, and the README (Using it
+      safely, Recommended procedure: "tap Close SeedTag, then restart the phone"; Security notes, *What's wiped
+      from memory*). Changelog entry, device rows (each place, the dialog's Stay and Close, Recents afterwards,
+      disabled during tag I/O).
 
 ### Medium
 
@@ -150,11 +172,6 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B3: an interrupted Lock leaves the tag half-locked and both messages are false** *(device: N3)*. Same
   read-back; finish the lock with raw WRITEs; reword "unchanged" and "SeedTag didn't change it". Do the read-back
   now, not after `tag-write-password` (it needs only READs).
-- [ ] **B4: the process outlives the wipe.**
-  - [x] Correct the README ("deletes everything", now around line 432 and in the About paragraph) and advise a
-    force-stop or restart. *Security notes* already said so.
-  - [ ] Decide whether to end the process in `onStop`, only when no tag I/O is pending, and what Done and Verify
-    show afterwards.
 - [ ] **B5: salt and nonce are a 28-byte covert channel `verify` can't detect.**
   - [x] Reword README step 5 (it rules out a weak key, not a hidden channel).
   - [ ] Derive salt and nonce from the secrets so `seedtag.py verify` can check them: options, trade-offs and what
