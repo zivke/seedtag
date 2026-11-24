@@ -1056,8 +1056,9 @@ private const val SPARE_PHONE_DETAILS =
         "SeedTag over by USB or an SD card instead of downloading it on the phone, and leave Developer options off. " +
         "From then on it never goes online. Keep it in a drawer for the yearly Verify, and factory-reset it before it " +
         "ever goes online again or is given away.\n\n" +
-        "If you don't have a spare phone, you can use your everyday phone offline. That's less safe: Go offline first, " +
-        "in the checklist on Back up, Verify and Restore, says how and what it can't protect against."
+        "If you don't have a spare phone, you can use your everyday phone after making sure it's offline, but be " +
+        "aware that it is a less safe option. For more details, read Go offline first, in the checklist on Back up, " +
+        "Verify and Restore."
 
 private const val DISCLAIMER =
     "SeedTag comes without any warranty, and its developer isn't responsible for any loss or damage resulting from " +

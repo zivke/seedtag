@@ -53,6 +53,9 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- *Safest on a spare phone* ends more plainly: an everyday phone can be
+  used after making sure it's offline, but it's less safe, and *Go offline
+  first* has the details.
 - *Erase this backup?* says "Make sure you have the seed saved somewhere
   else", and no longer ends with "Then hold the same tag to the phone": the
   scan prompt after **Erase** says that.
