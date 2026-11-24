@@ -53,6 +53,9 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- *Erase this backup?* says "Make sure you have the seed saved somewhere
+  else", and no longer ends with "Then hold the same tag to the phone": the
+  scan prompt after **Erase** says that.
 - README, *Buying one*: how to check that an NTAG is genuine NXP before it
   holds a backup (NFC Tools: the chip named, a serial number starting with
   04, *Signature Valid*), and that "magic" UID-changeable tags exist for

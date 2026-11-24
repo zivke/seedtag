@@ -2506,15 +2506,15 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Sett
                 Text(
                     when {
                         d.checked -> "This destroys the backup you just checked (fingerprint ${d.fingerprint}) for good. " +
-                            "Make sure you have the seed somewhere else. If someone copied the backup from the tag earlier, " +
+                            "Make sure you have the seed saved somewhere else. If someone copied the backup from the tag earlier, " +
                             "their copy isn't touched."
                         d.content == TagContent.Backup || d.content == TagContent.NewerBackup ->
                             "This tag holds a SeedTag backup, and its password wasn't checked, so it may not be the one you " +
-                                "think. Erasing destroys it for good. Make sure it isn't your only copy of the seed. If someone " +
+                                "think. Erasing destroys it for good. Make sure you have the seed saved somewhere else. If someone " +
                                 "copied the backup from the tag earlier, their copy isn't touched."
                         d.content == TagContent.Other -> "Everything the tag holds is overwritten and can't be recovered."
                         else -> "Any leftovers of earlier data in the tag's memory are overwritten."
-                    } + " Then hold the same tag to the phone.",
+                    },
                 )
             },
             confirmButton = { TextButton(onClick = vm::confirmErase) { DangerText("Erase") } },

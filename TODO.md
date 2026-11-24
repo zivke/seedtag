@@ -360,8 +360,8 @@ left is around the blob, where nothing checks it:
   scanned: that doesn't make sense. (Today the scan stays armed with *This tag can't be made read-only from this
   phone…*, `TagIo.lock`.) Now `TagResult.CantMakeReadOnly`: a message (*Can't be made read-only*), the scan ends;
   tested in `TagFlowTest`, device row 7.38.
-- [ ] ***Erase this backup?* wording.** Say "Make sure you have the seed saved somewhere else", and drop the
-  closing "Then hold the same tag to the phone." (`Ui.kt`, `Dialog.ConfirmErase`).
+- [x] ***Erase this backup?* wording.** Say "Make sure you have the seed saved somewhere else", and drop the
+  closing "Then hold the same tag to the phone." (`Ui.kt`, `Dialog.ConfirmErase`). Both backup variants; device row 7.39.
 - [ ] ***Safest on a spare phone* item.** Change its last paragraph to: "If you don't have a spare phone, you can
   use your everyday phone after making sure it's offline, but be aware that it is a less safe option. For more
   details, read the "Go offline first"" (`SPARE_PHONE_DETAILS` in `Ui.kt`).
