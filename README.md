@@ -258,8 +258,10 @@ seed. From safest down:
 4. **No debugging on that phone.** Turn off USB debugging and wireless debugging (*Settings › System › Developer
    options*, the path varies by phone), and tap *Revoke USB debugging authorizations*. Anything with adb access to
    the phone, such as a computer or dev container it was ever paired with, can silently swap SeedTag for a
-   look-alike (SeedTag keeps no data, so you wouldn't notice) or turn on an accessibility service. Don't enter a
-   real seed on a phone you develop or test apps with.
+   look-alike (SeedTag keeps no data, so you wouldn't notice) or turn on an accessibility service. On Android 11
+   and older it can also mirror the screen, SeedTag's included: what stops screenshots doesn't stop a mirror
+   made with adb's permissions there (the mirroring tool scrcpy does it that way). Don't enter a real seed on a
+   phone you develop or test apps with.
 5. **Check a new tag on another computer.** Any library inside SeedTag could, if it were poisoned, weaken the
    encryption so that the tag looks fine but opens for anyone. To rule that out, verify the tag with `seedtag.py`'s
    own code on another, offline computer: `python3 -I -S seedtag.py verify <BASE64>` (`-I -S` keeps installed

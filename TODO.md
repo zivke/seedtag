@@ -231,7 +231,10 @@ report's tests N1–N12, A1–A3, H1).
   wrong: 45 is the overhead, the smallest blob is 61.
 - [ ] **B23: system screen readers and accessibility overlays are outside every warning.** Neutral notice when any
   service or touch exploration is on; README line on accessibility overlays.
-- [ ] **B24: adb can probably mirror secure windows on Android ≤ 11.** Say so in the debugging notice and README.
+- [x] **B24: adb can probably mirror secure windows on Android ≤ 11.** Say so in the debugging notice and README. Done: scrcpy's
+  `ScreenCapture.createDisplay()` creates a *secure* display with shell permissions below API 31 ("Since Android 12
+  (preview), secure displays could not be created with shell permissions anymore"); the notice adds it only there.
+  Device row 7.41.
 - [ ] **B25: Android 16 ignores the portrait lock on large screens** *(device: A2)*. `field` into the view model;
   veil on `onPause` without focus.
 - [ ] **B26: seed words may be clipped at large font sizes** *(device: H1)*. Two columns when needed.

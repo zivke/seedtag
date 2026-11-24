@@ -945,7 +945,10 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
                     Tone.Caution,
                     "USB or wireless debugging is on",
                     "A computer this phone was ever allowed to debug can silently replace SeedTag with a look-alike or " +
-                        "turn on an accessibility service. Don't use this phone for a real seed while debugging is on.",
+                        "turn on an accessibility service" +
+                        (if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.R) ", and on this Android version it can also " +
+                            "mirror the screen, SeedTag's included" else "") +
+                        ". Don't use this phone for a real seed while debugging is on.",
                     "In Developer options, turn off USB debugging and wireless debugging, and tap Revoke USB " +
                         "debugging authorizations.",
                     "Open Developer options" to LocalOpenDeveloperSettings.current,

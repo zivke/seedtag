@@ -57,6 +57,9 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- *USB or wireless debugging is on* says, on Android 11 and older, that a
+  computer with debugging access can also mirror the screen, SeedTag's
+  included (README too).
 - README: leaving the app clears what was typed or decrypted from it, rather
   than "deletes everything": some copies stay in memory until Android ends
   the process, so restart the phone afterwards, or at least force-stop
