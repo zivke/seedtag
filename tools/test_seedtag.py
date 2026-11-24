@@ -476,6 +476,32 @@ def ntag213_pages(message: bytes, rest: bytes = b"", cfg0="04 00 00 FF", cfg1="0
     return pages
 
 
+class TagKey(unittest.TestCase):
+    """Same file TagKeyTest.kt reads: both must derive the same write password for a tag."""
+
+    def test_tag_keys_match_vectors(self):
+        vecs = rows("tag-key-vectors.tsv")
+        self.assertGreaterEqual(len(vecs), 5)
+        for pw, b64, ulc_key, ulc_pages, pwd, pack in vecs:
+            _, fix, key = seedtag._open_forgiving_key(base64.b64decode(b64), bytes.fromhex(pw).decode("utf-8"))
+            self.assertIsNone(fix)
+            k = seedtag.tag_keys(seedtag.tag_secret(key))
+            self.assertEqual([ulc_key, ulc_pages, pwd, pack],
+                             [k[n].hex() for n in ("ulc_key", "ulc_pages", "ntag_pwd", "ntag_pack")])
+
+    def test_ultralight_c_page_order(self):
+        # MF0ICU2 datasheet, section 7.5.7: Key1 00..07 and Key2 08..0F as stored in pages 2Ch..2Fh.
+        k = seedtag.tag_keys(bytes.fromhex("000102030405060708090a0b0c0d0e0f") + bytes(16))
+        self.assertEqual("07060504" "03020100" "0f0e0d0c" "0b0a0908", k["ulc_pages"].hex())
+
+    def test_cli_prints_the_password_for_the_backup(self):
+        pw, b64, _, _, pwd, pack = rows("tag-key-vectors.tsv")[0]
+        with mock.patch("getpass.getpass", return_value=bytes.fromhex(pw).decode("utf-8")), \
+                contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(0, seedtag.main(["tag-key", b64]))
+        self.assertIn(f"PWD: {pwd}  PACK: {pack}", out.getvalue())
+
+
 def make_dump(message: bytes, rest: bytes = b"", drop=None, **kw) -> str:
     """A Flipper .nfc dump of ntag213_pages(message, rest, ...)."""
     pages = ntag213_pages(message, rest, **kw)

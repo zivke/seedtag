@@ -121,8 +121,29 @@ them.
   for whether the text is exactly what SeedTag writes (`-` for errors).
 - **`password-variants.tsv`**: the typed password (hex), then the variants tried, in order, as pairs of the
   variant's name and the password (hex). A row with only a password has no variants.
+- **`tag-key-vectors.tsv`**: password (hex), the tag's text, then the write password derived from them
+  (section 6): the Ultralight C 3DES key, the same as stored in its pages 2Ch-2Fh, the NTAG PWD and PACK, all hex.
 - `bip39-vectors.tsv` (entropy, words) is Trezor's BIP39 reference set, from python-mnemonic (MIT), not part of
   this license.
+
+## 6. The tag's write password
+
+SeedTag can give a tag a write password of its own, so a stranger can't change, erase or lock it: reading stays
+open. The password isn't stored anywhere and isn't part of the blob, which it leaves unchanged: it comes from the
+blob's AES key (section 2), so the backup's password is all anyone needs to remove it again, and knowing it reveals
+nothing about that key, the password or the seed.
+
+```
+secret          = HMAC-SHA256(key = the blob's AES key, message = ASCII "seedtag tag key v1")   (32 bytes)
+NTAG213/215/216 = PWD  = secret[16..20)   (the 4 bytes PWD_AUTH sends, in that order)
+                  PACK = secret[20..22)
+Ultralight C    = 2-key 3DES key K1 | K2 = secret[0..16), as AUTHENTICATE uses it;
+                  stored in pages 2Ch-2Fh with each 8-byte half reversed (MF0ICU2, section 7.5.7)
+```
+
+Tags protected in the field depend on this: a change is a new label, with the old one still recognised.
+`seedtag.py tag-key` prints both for a backup and its password. Which chip settings SeedTag writes to switch the
+password on and off is described here once the app does it.
 
 ## License
 
@@ -135,5 +156,5 @@ DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING F
 WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE
 USE OR PERFORMANCE OF THIS SOFTWARE.
 
-This covers this file and `seedtag-v1-vectors.tsv`, `blob-text.tsv` and `password-variants.tsv`; each of those has
-a `.license` file next to it saying so.
+This covers this file and `seedtag-v1-vectors.tsv`, `blob-text.tsv`, `password-variants.tsv` and
+`tag-key-vectors.tsv`; each of those has a `.license` file next to it saying so.

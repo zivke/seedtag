@@ -84,7 +84,13 @@ Two Gradle modules plus the Python tool:
     `openForgiving` retries a wrong password with spaces collapsed, then
     lower-cased (`passwordVariants`); `seedtag.py` has the same rules, checked
     against `password-variants.tsv`. Only the typed password changes, never
-    the format.
+    the format. `openForgiving(…, withTagSecret = true)` also returns the
+    tag's write-password secret, from the key that matched.
+  - `TagKey.kt`: the tag's write password, HMAC-SHA256 of the blob's AES key
+    (`FORMAT.md` section 6): NTAG PWD / PACK and the Ultralight C 3DES key;
+    `seedtag.py tag-key` derives the same, checked against `tag-key-vectors.tsv`.
+    Never change it in place. `UltralightCAuth.kt`: the reader's side of the
+    Ultralight C 3DES handshake, no I/O, tested against the MF0ICU2 example.
   - `Passphrase.kt`: 7-word generator from the BIP39 list, rough strength estimate.
   - `SecretChars.kt`: zeroable, in-place password buffer.
   - `NdefText.kt`: Text-record payload decode (encode is `NdefRecord.createTextRecord`), and how a

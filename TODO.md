@@ -225,7 +225,18 @@ report's tests N1–N12, A1–A3, H1).
     Compose on every touch; a clock-driven copy would be new code to get wrong, for little to test.
 - [ ] **B17: `tag-write-password` drift and design gaps.** Drop `7e99a92`, re-apply `c235d3c`, land the pure
   additions first; fresh-tap check before "Protected"; compare all of CFG0/CFG1; map a NAK after AUTH to "wrong
-  key"; Erase aware of protection; README: the NTAG password goes over the air in the clear.
+  key"; Erase aware of protection; README: the NTAG password goes over the air in the clear. Rebuilt on
+  `b17-tag-write-password` from `develop` (the old branch stays as a reference until this merges):
+  - [x] The pure additions: `TagKey`, `UltralightCAuth`, `openForgiving(withTagSecret)`, `TagKeyTest`,
+    `tag-key-vectors.tsv` (+ `.license`), `seedtag.py tag-key` and its tests (Python 3.8 syntax), `FORMAT.md`
+    section 6 (the derivation only).
+  - [ ] Chip identification and protection state from READs (and GET_VERSION once the size says NTAG), through
+    `Type2Raw`; Protect / Remove protection as `TagFlow` requests with tests; NXP only (version and maker code 04).
+  - [ ] The design gaps: the fresh-tap check before "Protected" (a read without the key and a refused write), all
+    of CFG0/CFG1 compared, a NAK after AUTH shown as "wrong password", a torn CFG0 write (mirror bits) caught and
+    repaired, Erase and Make read-only aware of protection.
+  - [ ] Docs: README (what it protects and not; the NTAG password and the Ultralight C key go over the air in the
+    clear when set; `tag-key`), `FORMAT.md` section 6's chip settings, changelog, device rows (N11).
 - [ ] **B18: no key-loss, rotation or succession plan.** Write it (backups, spare certificate, `apksigner rotate`
   and minSdk); explicit signature-scheme flags; "If SeedTag is abandoned"; SECURITY.md, CONTRIBUTING.md.
 - [ ] **B19: third-party licence texts not shipped.** `LICENSES/` (REUSE), an "Open-source licences" section in

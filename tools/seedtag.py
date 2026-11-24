@@ -36,6 +36,8 @@ Run it on an offline machine.
     python3 seedtag.py verify  [BLOB]   # like decrypt, but only prints OK / FAIL
                                         # plus a short fingerprint, not the words
     python3 seedtag.py check   DUMP     # is anything on the tag besides the backup?
+    python3 seedtag.py tag-key [BLOB]   # the tag's write password, for other NFC
+                                        # tools, if the app isn't there to remove it
 
 BLOB is the tag's text, or a file that holds it; without it, you're asked
 for it. Spaces and line breaks in it, missing = at the end, and the "en"
@@ -474,6 +476,11 @@ def text_changes(text: str) -> "list[str]":
 
 
 def open_blob(blob: bytes, password: str) -> bytes:
+    return _open_with_key(blob, password)[0]
+
+
+def _open_with_key(blob: bytes, password: str) -> "tuple[bytes, bytes]":
+    """open_blob, plus the AES key that opened it: (entropy, key)."""
     if not blob or blob[0] != VERSION:
         if blob and VERSION < blob[0] <= MAX_FUTURE_VERSION:
             raise ValueError(f"this tag was written by a newer version of SeedTag (format {blob[0]}): "
@@ -492,7 +499,7 @@ def open_blob(blob: bytes, password: str) -> bytes:
     aesgcm, InvalidTag = _aesgcm(decrypt_only=True)
     key = derive_key(password, salt)
     try:
-        return aesgcm(key).decrypt(nonce, ct, blob[:1])
+        return aesgcm(key).decrypt(nonce, ct, blob[:1]), key
     except InvalidTag:
         raise WrongPassword("wrong password or corrupted blob") from None
     except Exception as e:
@@ -502,7 +509,7 @@ def open_blob(blob: bytes, password: str) -> bytes:
         _broken.add("cryptography")
         _note(f"cryptography's AES-GCM failed ({type(e).__name__}): using the built-in one")
     try:
-        return AesGcmBuiltin(key).decrypt(nonce, ct, blob[:1])
+        return AesGcmBuiltin(key).decrypt(nonce, ct, blob[:1]), key
     except InvalidTagBuiltin:
         raise WrongPassword("wrong password or corrupted blob") from None
 
@@ -549,16 +556,45 @@ def has_stray_spaces(password: str) -> bool:
 def open_forgiving(blob: bytes, password: str) -> "tuple[bytes, str | None]":
     """Like open_blob, but a wrong password is also tried without extra spaces, then lower-cased.
     Returns (entropy, fix), fix being None or a key of FIXES."""
+    entropy, fix, _ = _open_forgiving_key(blob, password)
+    return entropy, fix
+
+
+def _open_forgiving_key(blob: bytes, password: str) -> "tuple[bytes, str | None, bytes]":
+    """open_forgiving, plus the AES key that matched."""
     try:
-        return open_blob(blob, password), None
+        entropy, key = _open_with_key(blob, password)
+        return entropy, None, key
     except WrongPassword as first:
         wrong = first
     for fix, candidate in password_variants(password):
         try:
-            return open_blob(blob, candidate), fix
+            entropy, key = _open_with_key(blob, candidate)
+            return entropy, fix, key
         except WrongPassword:
             pass
     raise wrong
+
+
+# The tag's write password (the app's protection; not part of the blob, which it leaves unchanged).
+# Same as TagKey in the app, and FORMAT.md section 6. Tags protected in the field depend on it.
+TAG_KEY_LABEL = b"seedtag tag key v1"
+
+
+def tag_secret(key: bytes) -> bytes:
+    """The tag's 32-byte write-password secret for a blob's AES key."""
+    return hmac.new(key, TAG_KEY_LABEL, hashlib.sha256).digest()
+
+
+def tag_keys(secret: bytes) -> "dict[str, bytes]":
+    """Ultralight C 3DES key (K1|K2), the same as stored in pages 2Ch-2Fh, NTAG PWD and PACK."""
+    ulc = secret[:16]
+    return {
+        "ulc_key": ulc,
+        "ulc_pages": ulc[7::-1] + ulc[:7:-1],
+        "ntag_pwd": secret[16:20],
+        "ntag_pack": secret[20:22],
+    }
 
 
 def fingerprint(entropy: bytes) -> str:
@@ -1102,7 +1138,7 @@ def main(argv):
     global kdf_used, builtin_only
     kdf_used = None
     _broken.clear()
-    if not argv or argv[0] not in ("encrypt", "decrypt", "verify", "check"):
+    if not argv or argv[0] not in ("encrypt", "decrypt", "verify", "check", "tag-key"):
         print(__doc__)
         return 2
     cmd, rest = argv[0], [a for a in argv[1:] if a != "--builtin"]
@@ -1136,7 +1172,11 @@ def main(argv):
             blob = blob_from_text(text)
             if blob[:1] == bytes([VERSION]) and len(blob) - _OVERHEAD in (16, 20, 24, 28, 32):
                 _say_if_exact(text)  # before the password: it's about the text only
-            entropy, fix = open_forgiving(blob, getpass.getpass("Password: "))
+            password = getpass.getpass("Password: ")
+            if cmd == "tag-key":
+                entropy, fix, key = _open_forgiving_key(blob, password)
+            else:
+                entropy, fix = open_forgiving(blob, password)
             if fix:
                 print(f"note: the password only matched with {FIXES[fix]} ignored; "
                       "check your written copy.", file=sys.stderr)
@@ -1146,6 +1186,16 @@ def main(argv):
                       "(a \"25th word\"), it isn't stored here, and without it the wallet opens empty. A wallet "
                       "can also look empty when the funds are under another account or address type: check "
                       "its settings before you assume anything is lost.", file=sys.stderr)
+            elif cmd == "tag-key":
+                k = tag_keys(tag_secret(key))
+                pages = " ".join(k["ulc_pages"][i:i + 4].hex() for i in range(0, 16, 4))
+                print("The write password SeedTag gives a tag it protects, for this backup and its password.")
+                print("It only guards the tag against writes: it reveals nothing about the seed or the password.")
+                print(f"NTAG213/215/216  PWD: {k['ntag_pwd'].hex()}  PACK: {k['ntag_pack'].hex()}")
+                print("  to remove it: PWD_AUTH with PWD, then set AUTH0 (byte 3 of page 29h, 83h or E3h) to FF")
+                print(f"MIFARE Ultralight C  3DES key: {k['ulc_key'].hex()}")
+                print(f"  as stored in pages 2Ch-2Fh: {pages}")
+                print("  to remove it: authenticate with the key, then write 30 00 00 00 to page 2Ah")
             else:
                 print(f"OK  {len(entropy) * 3 // 4} words  fingerprint: {fingerprint(entropy)}")
                 print("(SeedTag's own fingerprint, not the one a wallet shows)", file=sys.stderr)
