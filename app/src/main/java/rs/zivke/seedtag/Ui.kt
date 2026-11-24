@@ -910,8 +910,8 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
             Tone.Caution,
             "Go offline first",
             "SeedTag can't go online, but other apps on this phone can – and malware could send out whatever you type or see here.",
-            "On a spare phone that's never online, nothing can be sent out anyway. On your everyday phone, this " +
-                "reduces the risk but can't remove it: restart the phone, turn on airplane mode and check that Wi-Fi " +
+            "On a spare phone that's never online, nothing can be sent out anyway. On your everyday phone, the " +
+                "following reduces the risk but can't remove it completely: restart the phone, turn on airplane mode and check that Wi-Fi " +
                 "and Bluetooth are off (NFC normally stays on). When you're done, $restart That stops malware that " +
                 "sends data out right away, but not malware that survives the restart and sends what it caught later: " +
                 "only a phone that's never online protects against that.",
@@ -1049,9 +1049,9 @@ private const val SPARE_PHONE_DETAILS =
         "capture the words you type in Back up, see them on the Restore screen, or catch the password you type in " +
         "Verify – and the password plus the tag is the seed. An everyday phone has many apps and accounts and is " +
         "online almost all the time, so that risk can't be ruled out there.\n\n" +
-        "A spare phone that's never online removes it: whatever might be on it has no way to send anything out. Any " +
+        "A spare phone that's never online removes that risk: whatever might be on it has no way to send anything out. Any " +
         "old Android phone will do, though Android 12 and later hide other apps' overlays and Android 14 and later " +
-        "also shut out accessibility services. To prepare it, while it may still go online: install all system " +
+        "also shut out accessibility services. To prepare it, while it can still go online: install all system " +
         "updates, then factory-reset it. In setup, skip Wi-Fi and don't add an account, and take the SIM out. Copy " +
         "SeedTag over by USB or an SD card instead of downloading it on the phone, and leave Developer options off. " +
         "From then on it never goes online. Keep it in a drawer for the yearly Verify, and factory-reset it before it " +
@@ -1061,7 +1061,7 @@ private const val SPARE_PHONE_DETAILS =
         "Verify and Restore."
 
 private const val DISCLAIMER =
-    "SeedTag comes without any warranty, and its developer isn't responsible for any loss or damage resulting from " +
+    "SeedTag comes without any warranty, and its developer is not responsible for any loss or damage resulting from " +
         "its use, including a lost seed or lost funds. You use it at your own risk.\n\n" +
         "SeedTag is beta software, still in development. It has only been tested with NXP NTAG213 tags: other " +
         "tag brands and types may not work as described. Before relying on a tag, back up to it, then Verify and " +

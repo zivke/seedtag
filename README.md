@@ -289,7 +289,7 @@ come back to it.
 
 The safest way to use SeedTag, from start to finish:
 
-1. **Prepare a spare phone while it may still go online.** Install all system updates, then factory-reset it. In
+1. **Prepare a spare phone while it can still go online.** Install all system updates, then factory-reset it. In
    setup, skip Wi-Fi and don't add a Google account (if the setup wizard insists on Wi-Fi, do the updates before
    the reset instead). Take the SIM out. From now on it never goes online.
 2. **Install SeedTag without adb.** On a computer, check the APK: its SHA-256 against the release notes, and its
@@ -768,7 +768,7 @@ throwaway mnemonic.
 
 ## Disclaimer
 
-SeedTag comes **without any warranty**, and its developer isn't responsible for any loss or damage from using it,
+SeedTag comes **without any warranty**, and its developer is not responsible for any loss or damage from using it,
 including a lost seed or lost funds. You use it at your own risk (see also the [licenses](#license)).
 
 SeedTag is **beta** software, still in development, and has only been tested with NXP NTAG213 tags. Other tag
