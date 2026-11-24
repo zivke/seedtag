@@ -463,20 +463,35 @@ class BlobText(unittest.TestCase):
 
 
 
-def make_dump(message: bytes, rest: bytes = b"", cfg0="04 00 00 FF", cfg1="00 05 00 00", lock="00 00",
-              drop=None) -> str:
-    """A Flipper .nfc dump of an NTAG213 (made-up serial number) holding [message], then [rest]."""
-    uid = bytes.fromhex("04 11 22 33 44 55 66")
+def ntag213_pages(message: bytes, rest: bytes = b"", cfg0="04 00 00 FF", cfg1="00 05 00 00", lock="00 00",
+                   uid="04 11 22 33 44 55 66") -> "list[bytes]":
+    """The 45 pages of an NTAG213 (made-up serial number) holding [message], then [rest]."""
+    uid = bytes.fromhex(uid)
     pages = [uid[:3] + bytes([0x88 ^ uid[0] ^ uid[1] ^ uid[2]]), uid[3:7],
              bytes([uid[3] ^ uid[4] ^ uid[5] ^ uid[6], 0x48]) + bytes.fromhex(lock), bytes.fromhex("E1 10 12 00")]
     data = bytes.fromhex("01 03 A0 0C 34") + bytes([0x03, len(message)]) + message + b"\xfe" + rest
     data += bytes(144 - len(data))
     pages += [data[i:i + 4] for i in range(0, 144, 4)]
     pages += [bytes.fromhex("00 00 00 BD"), bytes.fromhex(cfg0), bytes.fromhex(cfg1), bytes(4), bytes(4)]
+    return pages
+
+
+def make_dump(message: bytes, rest: bytes = b"", drop=None, **kw) -> str:
+    """A Flipper .nfc dump of ntag213_pages(message, rest, ...)."""
+    pages = ntag213_pages(message, rest, **kw)
     lines = ["Filetype: Flipper NFC device", "Version: 4", "Device type: NTAG/Ultralight",
              "NTAG/Ultralight type: NTAG213", "Mifare version: 00 04 04 02 01 00 0F 03",
              "Pages total: 45", f"Pages read: {45 - (drop is not None)}"]
     lines += [f"Page {n}: {p.hex(' ').upper()}" for n, p in enumerate(pages) if n != drop]
+    return "\n".join(lines) + "\n"
+
+
+def make_text_dump(message: bytes, rest: bytes = b"", unread=None, **kw) -> str:
+    """The same pages as NFC Tools' text export of Read memory; page [unread] as one it couldn't read."""
+    lines = []
+    for n, p in enumerate(ntag213_pages(message, rest, **kw)):
+        label = "DATA" if n != unread else "READ ERROR"
+        lines.append(f"[ {p.hex(':').upper()} ] Addr. {n:02X} : {label}")
     return "\n".join(lines) + "\n"
 
 
@@ -526,7 +541,7 @@ class TagDump(unittest.TestCase):
     def test_only_ntag21x(self):
         with self.assertRaisesRegex(ValueError, "only NTAG213, NTAG215 and NTAG216"):
             seedtag.check_dump(make_dump(self.message).replace("Pages total: 45", "Pages total: 48"))
-        with self.assertRaisesRegex(ValueError, "isn't a Flipper .nfc dump"):
+        with self.assertRaisesRegex(ValueError, "isn't a memory dump"):
             seedtag.check_dump(self.text)
 
     def test_cli_and_verify_read_the_dump(self):
@@ -540,6 +555,42 @@ class TagDump(unittest.TestCase):
             self.assertIn("Clean:", out.getvalue())
             self.assertIn("NOT CLEAN", out.getvalue())
             self.assertEqual(self.text, seedtag._read_text([str(clean)]))
+
+    def test_nfc_tools_text_export(self):
+        # The same checks as for a .nfc dump, from the pages alone.
+        levels, lines, backup = self.levels(make_text_dump(self.message))
+        self.assertNotIn("FAIL", levels)
+        self.assertEqual(self.text, backup)
+        said = " ".join(m for _, m in lines)
+        self.assertIn("exactly a SeedTag backup (24 words)", said)
+        self.assertIn("can't show whether this is a genuine NXP NTAG213", said)
+
+        def fails(dump, words):
+            _, lines, _ = self.levels(dump)
+            found = [m for level, m in lines if level == "FAIL"]
+            self.assertTrue(any(words in m for m in found), (words, found))
+        fails(make_text_dump(self.message, rest=b"\x00old text"), "bytes after the message aren't zero")
+        fails(make_text_dump(self.message, cfg0="04 00 00 10"), "behind a password")
+        fails(make_text_dump(self.message, unread=20), "pages weren't read")
+        self.assertTrue(seedtag.is_dump(make_text_dump(self.message)))
+        self.assertFalse(seedtag.is_dump(self.text))
+        with self.assertRaisesRegex(ValueError, "isn't one of NFC Tools' memory lines"):
+            seedtag.check_dump(make_text_dump(self.message) + "something else\n")
+        with tempfile.TemporaryDirectory() as d:
+            f = pathlib.Path(d) / "dump.txt"
+            f.write_text(make_text_dump(self.message), encoding="utf-8")
+            self.assertEqual(self.text, seedtag._read_text([str(f)]))
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                self.assertEqual(0, seedtag.main(["check", str(f)]))
+            self.assertIn("Clean:", out.getvalue())
+
+    def test_another_makers_chip(self):
+        # NXP's serial numbers start with 04; another maker's chip with the same layout is a warning, in both formats.
+        for dump in (make_dump(self.message, uid="53 11 22 33 44 55 66"),
+                     make_text_dump(self.message, uid="53 11 22 33 44 55 66")):
+            levels, lines, _ = self.levels(dump)
+            self.assertTrue(any(level == "WARN" and "not 04 (NXP's maker code)" in m for level, m in lines))
+            self.assertNotIn("FAIL", levels)
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

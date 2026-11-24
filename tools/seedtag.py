@@ -44,8 +44,9 @@ whether the text is exactly what SeedTag writes: if you copied it unchanged
 from the tag and it isn't, the tag holds something SeedTag doesn't write.
 On Windows, type py instead of python3.
 
-DUMP is a full memory dump of the tag as a Flipper Zero .nfc file (NFC Tools
-exports one). check needs no password: it checks every page of an NTAG213,
+DUMP is a full memory dump of the tag: a Flipper Zero .nfc file (NFC Tools
+exports one), or the text NFC Tools saves from Read memory (lines like
+"[ 04:8D:B4:B5 ] Addr. 00 : DATA"). check needs no password: it checks every page of an NTAG213,
 215 or 216 for anything SeedTag doesn't write (data after the backup, other
 records, a password-protected area, changed settings) and exits 1 if it finds
 any. decrypt and verify also take such a dump in place of BLOB.
@@ -72,6 +73,7 @@ import getpass
 import hashlib
 import hmac
 import os
+import re
 import struct
 import sys
 import unicodedata
@@ -775,7 +777,8 @@ class AesGcmBuiltin:
 # `check` reads a full memory dump of the tag and says whether anything is on it besides the backup:
 # a hidden copy of the seed could be anywhere a normal NFC app doesn't show (after the message, in the
 # lock and settings pages). The dump is the Flipper Zero ".nfc" text file, which NFC Tools and the
-# Flipper export. Only NXP NTAG213/215/216 so far: their memory layout is documented and checked here
+# Flipper export, or NFC Tools' plain-text export of Read memory (pages only: no chip version,
+# signature or counters). Only NXP NTAG213/215/216 so far: their memory layout is documented and checked here
 # page by page.
 
 # Pages in the dump -> chip, its GET_VERSION reply, the capability container's size byte.
@@ -786,9 +789,42 @@ _NTAG = {
 }
 
 
+# NFC Tools' text export: "[ 04:8D:B4:B5 ] Addr. 00 : DATA", the page number in hex.
+_NFC_TOOLS_LINE = re.compile(r"^\[ (.*?) \] Addr\. ([0-9A-Fa-f]+) : (.*)$")
+
+
+def is_dump(text: str) -> bool:
+    """Whether [text] looks like a memory dump parse_dump reads, not the tag's text."""
+    first = text.lstrip().split("\n", 1)[0].strip()
+    return first.startswith("Filetype: Flipper NFC device") or bool(_NFC_TOOLS_LINE.match(first))
+
+
+def _parse_nfc_tools(text: str) -> "tuple[dict, dict]":
+    """NFC Tools' text export. A page whose label isn't DATA, or whose bytes aren't 4 bytes of hex, counts
+    as not read: nothing here guesses what it held."""
+    pages, last = {}, -1
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        m = _NFC_TOOLS_LINE.match(line.strip())
+        if not m:
+            raise ValueError(f"this line isn't one of NFC Tools' memory lines: {line.strip()!r}")
+        n = int(m.group(2), 16)
+        last = max(last, n)
+        try:
+            page = bytes.fromhex(m.group(1).replace(":", " "))
+        except ValueError:
+            continue
+        if len(page) == 4 and m.group(3).strip() == "DATA":
+            pages[n] = page
+    return {"Pages total": str(last + 1), "Format": "NFC Tools text"}, pages
+
+
 def parse_dump(text: str) -> "tuple[dict, dict]":
-    """The header fields and the pages ({number: 4 bytes}) of a Flipper .nfc dump. Raises ValueError
-    if it isn't one."""
+    """The header fields and the pages ({number: 4 bytes}) of a Flipper .nfc dump, or of NFC Tools' text
+    export (no header there: only the page count). Raises ValueError if it's neither."""
+    if not text.lstrip().startswith("Filetype:") and is_dump(text):
+        return _parse_nfc_tools(text)
     fields, pages = {}, {}
     for line in text.splitlines():
         key, sep, value = line.partition(":")
@@ -806,7 +842,8 @@ def parse_dump(text: str) -> "tuple[dict, dict]":
         else:
             fields[key] = value
     if fields.get("Filetype") != "Flipper NFC device" or not pages:
-        raise ValueError("this isn't a Flipper .nfc dump (the file NFC Tools and the Flipper Zero export).")
+        raise ValueError("this isn't a memory dump: a Flipper .nfc file (NFC Tools and the Flipper Zero export "
+                         "one), or the text NFC Tools saves from Read memory.")
     return fields, pages
 
 
@@ -868,6 +905,9 @@ def check_dump(text: str) -> "tuple[list[tuple[str, str]], str | None]":
              "be behind a password: hold the tag still and dump it again.")
         return out, None
     ok(f"{chip}: all {total} pages read.")
+    if fields.get("Format") == "NFC Tools text":
+        note(f"This dump holds only the pages, not the chip's version, signature or counters: it can't show "
+             f"whether this is a genuine NXP {chip}. NFC Tools' Export .nfc includes them.")
     if fields.get("NTAG/Ultralight type", chip) != chip:
         warn(f"The dump calls the chip {fields['NTAG/Ultralight type']}, but its page count is an {chip}'s.")
     got_version = fields.get("Mifare version", "").replace(" ", "").lower()
@@ -876,6 +916,10 @@ def check_dump(text: str) -> "tuple[list[tuple[str, str]], str | None]":
              "memory can hold more than the pages shown.")
 
     p0, p1, p2, p3 = (pages[n] for n in range(4))
+    if p0[0] != 0x04:
+        warn(f"The serial number starts with {p0[0]:02X}, not 04 (NXP's maker code): the chip isn't an NXP "
+             f"{chip}. Its memory may hold more than the pages shown, and nobody documents how long it keeps "
+             "its data: use it for practice, not for the backup.")
     if p0[3] != 0x88 ^ p0[0] ^ p0[1] ^ p0[2] or p2[0] != p1[0] ^ p1[1] ^ p1[2] ^ p1[3]:
         fail("The serial number's check bytes (pages 0-2) don't match: not what an NXP chip reports.")
     elif not got_version or got_version == version:
@@ -1012,7 +1056,7 @@ def _read_text(argv) -> str:
     if s.strip() and os.path.isfile(s.strip()):
         with open(s.strip(), encoding="utf-8", errors="replace", newline="") as fh:
             s = fh.read()
-        if s.startswith("Filetype: Flipper NFC device"):
+        if is_dump(s):
             return dump_text(s)  # a memory dump: the backup's text, as the tag holds it
         s = s[:-2] if s.endswith("\r\n") else s[:-1] if s.endswith("\n") else s
     return s
@@ -1035,7 +1079,7 @@ def _say_if_exact(text: str) -> None:
 
 def _check(argv) -> int:
     if len(argv) != 1 or not os.path.isfile(argv[0]):
-        print("check needs a dump file: python3 seedtag.py check <FILE.nfc>", file=sys.stderr)
+        print("check needs a dump file: python3 seedtag.py check <FILE.nfc or FILE.txt>", file=sys.stderr)
         return 2
     try:
         with open(argv[0], encoding="utf-8", errors="replace") as fh:

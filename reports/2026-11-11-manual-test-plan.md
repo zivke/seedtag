@@ -211,6 +211,7 @@ check the lock read-back after it.
 | 5.13 | First CI run after `-W error` was added to the Python tests (board B10) | Green. | ✅ |
 | 5.14 | `seedtag.py check` (H4): dump the NTAG213 with NFC Tools (OTHER, Read memory, ⋮ Export .nfc, as in the README) after a Back up with this version, then after writing a long text with NFC Tools and a SeedTag backup from before H3 (or just the text), and an empty tag after Erase | After this version's Back up and after Erase: *Clean*, exit 0. With old data after the backup: *NOT CLEAN*, the FAIL line names the pages, exit 1. | ⬜ |
 | 5.15 | `python3 -I -S seedtag.py verify <DUMP>` with the dump from 5.14 (H4) | Asks for the password and prints the same fingerprint as the app; says the text is exactly what SeedTag writes. | ⬜ |
+| 5.16 | `seedtag.py check` and `verify` on an NFC Tools text dump (*Read memory* saved as `.txt`) of the NXP NTAG213 holding a backup; then `check` on one of a non-NXP tag (serial number not starting with 04, e.g. tag 133 or tag 6) | NXP: the same lines as for its `.nfc` dump, plus a NOTE that the dump can't show whether it's a genuine NXP NTAG213; *Clean*. `verify` asks for the password and shows ✓. Non-NXP: a WARN that the serial number starts with 53, not 04; otherwise as for its backup (*Clean* if nothing else is wrong). | ⬜ |
 
 ## 6. Android 8 to 11
 

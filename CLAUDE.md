@@ -147,7 +147,8 @@ Two Gradle modules plus the Python tool:
   Argon2id from ≥ 44), with `argon2-cffi` as the Argon2id fallback. Without
   them, decrypt falls back to its built-in plain-Python Argon2id and AES-GCM
   decryption (slow, standard library only); encrypt needs `cryptography`.
-  `check` reads a full memory dump (Flipper `.nfc`, as NFC Tools exports it) and
+  `check` reads a full memory dump (Flipper `.nfc`, as NFC Tools exports it, or NFC Tools'
+  plain-text *Read memory* export, pages only) and
   checks every page of an NTAG213/215/216 for anything besides the backup; no
   crypto, no password.
 

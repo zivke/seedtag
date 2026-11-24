@@ -647,16 +647,20 @@ it, and may have hidden data in it ([Using it safely](#using-it-safely), point 5
 doesn't count.
 
 `check` goes further: it reads a dump of the tag's whole memory and says whether anything is on it besides the
-backup. Take the dump with NFC Tools, as a Flipper Zero `.nfc` file:
+backup. Take the dump with NFC Tools, best as a Flipper Zero `.nfc` file:
 
 1. Open NFC Tools and go to the **OTHER** tab.
 2. Tap **Read memory**, then hold the tag to the phone's NFC spot.
 3. Open the three-dots menu at the top right and choose **Export .nfc**.
 4. Choose the file name and location, and tap **SAVE**.
 
-Move the file to the computer and run `python3 -I -S seedtag.py check <FILE.nfc>`. It needs no password and takes
+`check` also reads the memory as NFC Tools saves it in text form, a `.txt` file whose lines look like
+`[ 04:8D:B4:B5 ] Addr. 00 : DATA`. That holds only the pages, not the chip's version, so `check` then can't tell a
+genuine NXP chip from another maker's with the same layout: it says so, and the `.nfc` file is better.
+
+Move the file to the computer and run `python3 -I -S seedtag.py check <FILE>`. It needs no password and takes
 no time. For an NXP NTAG213, 215 or 216 it checks every page:
-the chip's version and serial number, the lock bits, the settings (no page behind a password, nothing changed from
+the chip's version and serial number (an NXP serial number starts with `04`), the lock bits, the settings (no page behind a password, nothing changed from
 the factory), that the message is exactly a SeedTag backup and nothing else, and that every byte after it is zero.
 It prints a line for each, and *Clean* or *NOT CLEAN* (exit code 1). Lock bits set by **Make tag read-only** are
 only a warning. What no dump can show: the chip's own password and its reply always read as zero (6 bytes), and a

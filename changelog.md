@@ -7,6 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- `seedtag.py check` (and `decrypt` / `verify`) also read NFC Tools' text
+  export of *Read memory* (lines like `[ 04:8D:B4:B5 ] Addr. 00 : DATA`),
+  with the same page-by-page checks. It holds no chip version, so `check`
+  says it can't tell a genuine NXP chip from another maker's.
 - `FORMAT.md`: the tag format in full, enough to write an independent
   decoder, with the envelope that versions from 0.4.2 on use to recognise a
   backup in a newer format, and what a v2 must keep. It and the test vector
@@ -53,6 +57,9 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- `seedtag.py check` warns about a tag whose serial number doesn't start
+  with 04, NXP's maker code: another maker's chip with an NTAG's layout may
+  hold more than the pages a dump shows.
 - *Safest on a spare phone* reads more plainly: a spare phone "removes that
   risk", and an everyday phone can be used after making sure it's offline,
   but it's less safe, and *Go offline first* has the details. *Go offline
