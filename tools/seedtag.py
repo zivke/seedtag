@@ -36,6 +36,8 @@ Run it on an offline machine.
     python3 seedtag.py verify  [BLOB]   # like decrypt, but only prints OK / FAIL
                                         # plus a short fingerprint, not the words
     python3 seedtag.py check   DUMP     # is anything on the tag besides the backup?
+    python3 seedtag.py tag-key [BLOB]   # the tag's write password, for other NFC
+                                        # tools, if the app isn't there to remove it
 
 BLOB is the tag's text, or a file that holds it; without it, you're asked
 for it. Spaces and line breaks in it, missing = at the end, and the "en"
@@ -474,6 +476,11 @@ def text_changes(text: str) -> "list[str]":
 
 
 def open_blob(blob: bytes, password: str) -> bytes:
+    return _open_with_key(blob, password)[0]
+
+
+def _open_with_key(blob: bytes, password: str) -> "tuple[bytes, bytes]":
+    """open_blob, plus the AES key that opened it: (entropy, key)."""
     if not blob or blob[0] != VERSION:
         if blob and VERSION < blob[0] <= MAX_FUTURE_VERSION:
             raise ValueError(f"this tag was written by a newer version of SeedTag (format {blob[0]}): "
@@ -492,7 +499,7 @@ def open_blob(blob: bytes, password: str) -> bytes:
     aesgcm, InvalidTag = _aesgcm(decrypt_only=True)
     key = derive_key(password, salt)
     try:
-        return aesgcm(key).decrypt(nonce, ct, blob[:1])
+        return aesgcm(key).decrypt(nonce, ct, blob[:1]), key
     except InvalidTag:
         raise WrongPassword("wrong password or corrupted blob") from None
     except Exception as e:
@@ -502,7 +509,7 @@ def open_blob(blob: bytes, password: str) -> bytes:
         _broken.add("cryptography")
         _note(f"cryptography's AES-GCM failed ({type(e).__name__}): using the built-in one")
     try:
-        return AesGcmBuiltin(key).decrypt(nonce, ct, blob[:1])
+        return AesGcmBuiltin(key).decrypt(nonce, ct, blob[:1]), key
     except InvalidTagBuiltin:
         raise WrongPassword("wrong password or corrupted blob") from None
 
@@ -549,16 +556,45 @@ def has_stray_spaces(password: str) -> bool:
 def open_forgiving(blob: bytes, password: str) -> "tuple[bytes, str | None]":
     """Like open_blob, but a wrong password is also tried without extra spaces, then lower-cased.
     Returns (entropy, fix), fix being None or a key of FIXES."""
+    entropy, fix, _ = _open_forgiving_key(blob, password)
+    return entropy, fix
+
+
+def _open_forgiving_key(blob: bytes, password: str) -> "tuple[bytes, str | None, bytes]":
+    """open_forgiving, plus the AES key that matched."""
     try:
-        return open_blob(blob, password), None
+        entropy, key = _open_with_key(blob, password)
+        return entropy, None, key
     except WrongPassword as first:
         wrong = first
     for fix, candidate in password_variants(password):
         try:
-            return open_blob(blob, candidate), fix
+            entropy, key = _open_with_key(blob, candidate)
+            return entropy, fix, key
         except WrongPassword:
             pass
     raise wrong
+
+
+# The tag's write password (the app's protection; not part of the blob, which it leaves unchanged).
+# Same as TagKey in the app, and FORMAT.md section 6. Tags protected in the field depend on it.
+TAG_KEY_LABEL = b"seedtag tag key v1"
+
+
+def tag_secret(key: bytes) -> bytes:
+    """The tag's 32-byte write-password secret for a blob's AES key."""
+    return hmac.new(key, TAG_KEY_LABEL, hashlib.sha256).digest()
+
+
+def tag_keys(secret: bytes) -> "dict[str, bytes]":
+    """Ultralight C 3DES key (K1|K2), the same as stored in pages 2Ch-2Fh, NTAG PWD and PACK."""
+    ulc = secret[:16]
+    return {
+        "ulc_key": ulc,
+        "ulc_pages": ulc[7::-1] + ulc[:7:-1],
+        "ntag_pwd": secret[16:20],
+        "ntag_pack": secret[20:22],
+    }
 
 
 def fingerprint(entropy: bytes) -> str:
@@ -778,15 +814,19 @@ class AesGcmBuiltin:
 # a hidden copy of the seed could be anywhere a normal NFC app doesn't show (after the message, in the
 # lock and settings pages). The dump is the Flipper Zero ".nfc" text file, which NFC Tools and the
 # Flipper export, or NFC Tools' plain-text export of Read memory (pages only: no chip version,
-# signature or counters). Only NXP NTAG213/215/216 so far: their memory layout is documented and checked here
-# page by page.
+# signature or counters). NXP NTAG213/215/216 and lookalikes from other makers with their layout: it's
+# documented and checked here page by page.
 
-# Pages in the dump -> chip, its GET_VERSION reply, the capability container's size byte.
+# An NXP chip's pages -> chip, its GET_VERSION reply, the capability container's size byte, the first
+# settings page (CFG0; then CFG1, the password, PACK). A lookalike may have one page more (the one
+# tested, a Shanghai Fudan FM11NT021, keeps a read counter there), and leave the settings bytes an NTAG21x
+# uses for other things at 00.
 _NTAG = {
-    45: ("NTAG213", "0004040201000f03", 0x12),
-    135: ("NTAG215", "0004040201001103", 0x3E),
-    231: ("NTAG216", "0004040201001303", 0x6D),
+    45: ("NTAG213", "0004040201000f03", 0x12, 0x29),
+    135: ("NTAG215", "0004040201001103", 0x3E, 0x83),
+    231: ("NTAG216", "0004040201001303", 0x6D, 0xE3),
 }
+_NXP_CFG0, _NXP_CFG1 = bytes.fromhex("04 00 00 FF"), bytes.fromhex("00 05 00 00")  # factory settings
 
 
 # NFC Tools' text export: "[ 04:8D:B4:B5 ] Addr. 00 : DATA", the page number in hex.
@@ -887,11 +927,17 @@ def check_dump(text: str) -> "tuple[list[tuple[str, str]], str | None]":
     the backup's text if the tag holds one. Raises ValueError if the dump can't be checked at all."""
     fields, pages = parse_dump(text)
     total = int(fields.get("Pages total", "0") or 0)
-    if total not in _NTAG:
+    extra = total not in _NTAG and total - 1 in _NTAG  # one page more than an NXP chip: a lookalike's
+    if total not in _NTAG and not extra:
         raise ValueError(f"this dump is of a {fields.get('NTAG/Ultralight type') or fields.get('Device type') or 'tag'} "
-                         f"with {total or 'an unknown number of'} pages: only NTAG213, NTAG215 and NTAG216 can be "
-                         "checked so far.")
-    chip, version, cc_size = _NTAG[total]
+                         f"with {total or 'an unknown number of'} pages: only NTAG213, NTAG215 and NTAG216, and "
+                         "lookalikes with their layout, can be checked so far.")
+    chip, version, cc_size, cfg = _NTAG[total - extra]
+    got_version = fields.get("Mifare version", "").replace(" ", "").lower()
+    version_lookalike = len(got_version) == 16 and got_version != version and \
+        got_version[:2] + got_version[4:] == version[:2] + version[4:]
+    first = pages.get(0, b"\x04")
+    lookalike = extra or first[0] != 0x04 or version_lookalike
     out = []
 
     def ok(m): out.append(("OK", m))
@@ -904,28 +950,35 @@ def check_dump(text: str) -> "tuple[list[tuple[str, str]], str | None]":
         fail(f"{len(missing)} of {total} pages weren't read (from page {missing[0]}). A page that won't read can "
              "be behind a password: hold the tag still and dump it again.")
         return out, None
-    ok(f"{chip}: all {total} pages read.")
-    if fields.get("Format") == "NFC Tools text":
+    ok(f"{chip}{' lookalike' if lookalike else ''}: all {total} pages read.")
+    if fields.get("Format") == "NFC Tools text" and not lookalike:
         note(f"This dump holds only the pages, not the chip's version, signature or counters: it can't show "
              f"whether this is a genuine NXP {chip}. NFC Tools' Export .nfc includes them.")
-    if fields.get("NTAG/Ultralight type", chip) != chip:
+    if fields.get("NTAG/Ultralight type", chip) != chip and not extra:
         warn(f"The dump calls the chip {fields['NTAG/Ultralight type']}, but its page count is an {chip}'s.")
-    got_version = fields.get("Mifare version", "").replace(" ", "").lower()
-    if got_version and got_version != version:
-        fail(f"The chip's version ({fields['Mifare version']}) isn't an NXP {chip}'s: it may be a clone, whose "
+    if got_version and got_version != version and not version_lookalike:
+        fail(f"The chip's version ({fields['Mifare version']}) isn't an {chip}'s: an unknown chip, whose "
              "memory can hold more than the pages shown.")
 
     p0, p1, p2, p3 = (pages[n] for n in range(4))
-    if p0[0] != 0x04:
-        warn(f"The serial number starts with {p0[0]:02X}, not 04 (NXP's maker code): the chip isn't an NXP "
-             f"{chip}. Its memory may hold more than the pages shown, and nobody documents how long it keeps "
+    if lookalike:
+        why = []
+        if p0[0] != 0x04:
+            why.append(f"the serial number starts with {p0[0]:02X}, not 04 (NXP's maker code)")
+        if version_lookalike:
+            why.append(f"its version ({fields['Mifare version']}) has maker code {got_version[2:4].upper()}, not "
+                       "NXP's 04")
+        if extra:
+            why.append(f"it has one page more than an NXP {chip}")
+        warn(f"Not an NXP {chip}: {'; '.join(why)}. An NTAG21x lookalike, which SeedTag doesn't officially "
+             "support. Its memory may hold more than the pages shown, and nobody documents how long it keeps "
              "its data: use it for practice, not for the backup.")
     if p0[3] != 0x88 ^ p0[0] ^ p0[1] ^ p0[2] or p2[0] != p1[0] ^ p1[1] ^ p1[2] ^ p1[3]:
-        fail("The serial number's check bytes (pages 0-2) don't match: not what an NXP chip reports.")
+        fail("The serial number's check bytes (pages 0-2) don't match: not what a genuine chip reports.")
     elif not got_version or got_version == version:
         ok("The serial number's check bytes match" + (f", and the chip says it's an NXP {chip}." if got_version else "."))
 
-    dyn, cfg0, cfg1, pwd, pack = (pages[total - k] for k in (5, 4, 3, 2, 1))
+    dyn, cfg0, cfg1, pwd, pack = (pages[cfg + k] for k in (-1, 0, 1, 2, 3))
     static_lock, dyn_lock = p2[2:4], dyn[0:3]
     if p3[0:3] != bytes([0xE1, 0x10, cc_size]) or p3[3] not in (0x00, 0x0F):
         fail(f"The capability container (page 3) is {p3.hex(' ')}, not E1 10 {cc_size:02X} 00 (or 0F when "
@@ -934,36 +987,63 @@ def check_dump(text: str) -> "tuple[list[tuple[str, str]], str | None]":
     if not locked:
         ok("Not read-only: no lock bit is set.")
     else:
-        warn(f"Lock bits are set (page 2: {static_lock.hex(' ')}, page {total - 5}: {dyn_lock.hex(' ')}, "
+        warn(f"Lock bits are set (page 2: {static_lock.hex(' ')}, page {cfg - 1}: {dyn_lock.hex(' ')}, "
              f"capability container {p3[3]:02X}). Expected after Make read-only. If nobody made this tag "
              "read-only, something else set them, and lock bits can carry a few bits of data.")
     if dyn[3] != 0xBD:
-        fail(f"Page {total - 5}, byte 3 is {dyn[3]:02X}, not the chip's fixed BD.")
-    if cfg0 == bytes([0x04, 0x00, 0x00, 0xFF]) and cfg1 == bytes([0x00, 0x05, 0x00, 0x00]):
+        fail(f"Page {cfg - 1}, byte 3 is {dyn[3]:02X}, not the chip's fixed BD.")
+    # The bytes besides AUTH0 and ACCESS as at the factory: NXP's values, or on a lookalike 00 (unused).
+    rest_ok = (cfg0[:3] == _NXP_CFG0[:3] or (lookalike and not any(cfg0[:3]))) and \
+        (cfg1[1:] == _NXP_CFG1[1:] or (lookalike and not any(cfg1[1:])))
+    write_password = rest_ok and cfg0[3] == 0x03 and cfg1[0] == 0x00
+    if rest_ok and cfg0[3] == 0xFF and cfg1[0] == 0x00:
         ok("Settings at the factory defaults: no page is behind a password (AUTH0 FF), and the settings "
            "aren't locked.")
+    elif write_password:
+        ok("A write password is on, as SeedTag's Protect from writes sets it: from page 3 on, writing needs "
+           "it (AUTH0 03), reading doesn't (PROT 0), and wrong tries never lock the tag (AUTHLIM 0). So "
+           "this dump shows all of the tag.")
     else:
-        if cfg0[3] != 0xFF:
-            fail(f"From page {cfg0[3]} on, the tag is behind a password (AUTH0 {cfg0[3]:02X}): pages there can "
-                 "hold data nobody can read without it. SeedTag never sets one.")
-        if cfg0[:3] != bytes([0x04, 0x00, 0x00]) or cfg1 != bytes([0x00, 0x05, 0x00, 0x00]):
-            fail(f"The settings (pages {total - 4}-{total - 3}: {cfg0.hex(' ')} / {cfg1.hex(' ')}) aren't the "
-                 "factory defaults (04 00 00 FF / 00 05 00 00). SeedTag never changes them.")
-    if any(pwd) or any(pack[:2]):
-        fail(f"Pages {total - 2}-{total - 1} (password and its reply) don't read as zero, which a real chip "
+        if cfg0[3] != 0xFF and cfg1[0] & 0x80:
+            fail(f"From page {cfg0[3]} on, the tag is behind a password for reading and writing (AUTH0 "
+                 f"{cfg0[3]:02X}, PROT 1): pages there can hold data nobody can read without it. SeedTag "
+                 "never sets that.")
+        elif cfg0[3] != 0xFF:
+            fail(f"From page {cfg0[3]} on, the tag is behind a password for writing (AUTH0 {cfg0[3]:02X}). "
+                 "SeedTag's own write password starts at page 3, so something else set this one.")
+        if not rest_ok or cfg1[0] != 0x00:
+            fail(f"The settings (pages {cfg}-{cfg + 1}: {cfg0.hex(' ')} / {cfg1.hex(' ')}) aren't the "
+                 "factory defaults (04 00 00 FF / 00 05 00 00" + (", or 00 in place of 04 and 05 on a lookalike"
+                                                                  if lookalike else "") +
+                 "), nor what SeedTag's write password sets (the same with AUTH0 03 in place of FF).")
+    if any(pwd) or (any(pack[:2]) and not lookalike):
+        fail(f"Pages {cfg + 2}-{cfg + 3} (password and its reply) don't read as zero, which a real chip "
              "always returns for them.")
+    elif any(pack[:2]):
+        note(f"Page {cfg + 3} shows the reply to the tag's password (PACK {pack[:2].hex(' ').upper()}). SeedTag's "
+             "Protect from writes stores it there, and this chip, unlike NXP's, lets anyone read it back. It isn't "
+             f"the password (page {cfg + 2} reads as zero, as it should) and reveals nothing about the backup: "
+             "seedtag.py tag-key shows the PACK this backup's password gives. " +
+             ("SeedTag's Remove write password clears it." if cfg0[3] == 0xFF else
+              "Whether the password is this backup's, no dump can show; SeedTag's Remove write password works "
+              "only with that one."))
     else:
-        note(f"Pages {total - 2}-{total - 1} hold the tag's password and its 2-byte reply. They always read as "
-             "zero, so no dump shows whether they were changed: 6 bytes nobody can check. With AUTH0 FF they "
-             "protect nothing.")
+        note(f"Pages {cfg + 2}-{cfg + 3} hold the tag's password and its 2-byte reply. They always read as "
+             "zero, so no dump shows whether they were changed: 6 bytes nobody can check. " +
+             ("With AUTH0 FF they protect nothing." if cfg0[3] == 0xFF else
+              "Nor whether the password is this backup's: seedtag.py tag-key shows the one it should be, "
+              "and SeedTag's Remove write password works only with that one."))
     if any(pack[2:]):
-        fail(f"Page {total - 1}, bytes 2-3 aren't zero.")
+        fail(f"Page {cfg + 3}, bytes 2-3 aren't zero.")
+    if extra and any(pages[total - 1]):
+        fail(f"Page {total - 1}, one more than an NXP {chip} has (a read counter on the lookalike tested), isn't "
+             f"zero ({pages[total - 1].hex(' ')}). SeedTag never turns a counter on, and its value can carry data.")
     counters = {k: v for k, v in fields.items() if k.startswith("Counter ") and v not in ("0", "")}
     if counters:
         fail(f"A counter isn't zero ({', '.join(f'{k}: {v}' for k, v in counters.items())}). SeedTag never uses "
              "the chip's counters, and a counter's value can carry data.")
 
-    data = b"".join(pages[n] for n in range(4, total - 5))
+    data = b"".join(pages[n] for n in range(4, cfg - 1))  # up to the dynamic lock bytes
     try:
         tlvs, free = _tlvs(data)
     except ValueError as e:
@@ -1102,7 +1182,7 @@ def main(argv):
     global kdf_used, builtin_only
     kdf_used = None
     _broken.clear()
-    if not argv or argv[0] not in ("encrypt", "decrypt", "verify", "check"):
+    if not argv or argv[0] not in ("encrypt", "decrypt", "verify", "check", "tag-key"):
         print(__doc__)
         return 2
     cmd, rest = argv[0], [a for a in argv[1:] if a != "--builtin"]
@@ -1136,7 +1216,11 @@ def main(argv):
             blob = blob_from_text(text)
             if blob[:1] == bytes([VERSION]) and len(blob) - _OVERHEAD in (16, 20, 24, 28, 32):
                 _say_if_exact(text)  # before the password: it's about the text only
-            entropy, fix = open_forgiving(blob, getpass.getpass("Password: "))
+            password = getpass.getpass("Password: ")
+            if cmd == "tag-key":
+                entropy, fix, key = _open_forgiving_key(blob, password)
+            else:
+                entropy, fix = open_forgiving(blob, password)
             if fix:
                 print(f"note: the password only matched with {FIXES[fix]} ignored; "
                       "check your written copy.", file=sys.stderr)
@@ -1146,6 +1230,16 @@ def main(argv):
                       "(a \"25th word\"), it isn't stored here, and without it the wallet opens empty. A wallet "
                       "can also look empty when the funds are under another account or address type: check "
                       "its settings before you assume anything is lost.", file=sys.stderr)
+            elif cmd == "tag-key":
+                k = tag_keys(tag_secret(key))
+                pages = " ".join(k["ulc_pages"][i:i + 4].hex() for i in range(0, 16, 4))
+                print("The write password SeedTag gives a tag it protects, for this backup and its password.")
+                print("It only guards the tag against writes: it reveals nothing about the seed or the password.")
+                print(f"NTAG213/215/216 and lookalikes  PWD: {k['ntag_pwd'].hex()}  PACK: {k['ntag_pack'].hex()}")
+                print("  to remove it: PWD_AUTH with PWD, then set AUTH0 (byte 3 of page 29h, 83h or E3h) to FF")
+                print(f"MIFARE Ultralight C  3DES key: {k['ulc_key'].hex()}")
+                print(f"  as stored in pages 2Ch-2Fh: {pages}")
+                print("  to remove it: authenticate with the key, then write 30 00 00 00 to page 2Ah")
             else:
                 print(f"OK  {len(entropy) * 3 // 4} words  fingerprint: {fingerprint(entropy)}")
                 print("(SeedTag's own fingerprint, not the one a wallet shows)", file=sys.stderr)

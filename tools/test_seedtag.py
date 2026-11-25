@@ -476,6 +476,32 @@ def ntag213_pages(message: bytes, rest: bytes = b"", cfg0="04 00 00 FF", cfg1="0
     return pages
 
 
+class TagKey(unittest.TestCase):
+    """Same file TagKeyTest.kt reads: both must derive the same write password for a tag."""
+
+    def test_tag_keys_match_vectors(self):
+        vecs = rows("tag-key-vectors.tsv")
+        self.assertGreaterEqual(len(vecs), 5)
+        for pw, b64, ulc_key, ulc_pages, pwd, pack in vecs:
+            _, fix, key = seedtag._open_forgiving_key(base64.b64decode(b64), bytes.fromhex(pw).decode("utf-8"))
+            self.assertIsNone(fix)
+            k = seedtag.tag_keys(seedtag.tag_secret(key))
+            self.assertEqual([ulc_key, ulc_pages, pwd, pack],
+                             [k[n].hex() for n in ("ulc_key", "ulc_pages", "ntag_pwd", "ntag_pack")])
+
+    def test_ultralight_c_page_order(self):
+        # MF0ICU2 datasheet, section 7.5.7: Key1 00..07 and Key2 08..0F as stored in pages 2Ch..2Fh.
+        k = seedtag.tag_keys(bytes.fromhex("000102030405060708090a0b0c0d0e0f") + bytes(16))
+        self.assertEqual("07060504" "03020100" "0f0e0d0c" "0b0a0908", k["ulc_pages"].hex())
+
+    def test_cli_prints_the_password_for_the_backup(self):
+        pw, b64, _, _, pwd, pack = rows("tag-key-vectors.tsv")[0]
+        with mock.patch("getpass.getpass", return_value=bytes.fromhex(pw).decode("utf-8")), \
+                contextlib.redirect_stdout(io.StringIO()) as out, contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(0, seedtag.main(["tag-key", b64]))
+        self.assertIn(f"PWD: {pwd}  PACK: {pack}", out.getvalue())
+
+
 def make_dump(message: bytes, rest: bytes = b"", drop=None, **kw) -> str:
     """A Flipper .nfc dump of ntag213_pages(message, rest, ...)."""
     pages = ntag213_pages(message, rest, **kw)
@@ -486,10 +512,16 @@ def make_dump(message: bytes, rest: bytes = b"", drop=None, **kw) -> str:
     return "\n".join(lines) + "\n"
 
 
-def make_text_dump(message: bytes, rest: bytes = b"", unread=None, **kw) -> str:
+def lookalike_pages(message: bytes, cfg0="00 00 00 FF", counter="00 00 00 00", uid="1D 11 22 33 44 55 66") -> "list[bytes]":
+    """The 46 pages of an NTAG213 lookalike (made-up serial number), like the one tested (a Shanghai Fudan
+    FM11NT021): an NTAG213's layout, its NTAG-only settings bytes unused, and a read counter at 2Dh."""
+    return ntag213_pages(message, cfg0=cfg0, cfg1="00 00 00 00", uid=uid) + [bytes.fromhex(counter)]
+
+
+def make_text_dump(message: bytes, rest: bytes = b"", unread=None, pages=None, **kw) -> str:
     """The same pages as NFC Tools' text export of Read memory; page [unread] as one it couldn't read."""
     lines = []
-    for n, p in enumerate(ntag213_pages(message, rest, **kw)):
+    for n, p in enumerate(pages or ntag213_pages(message, rest, **kw)):
         label = "DATA" if n != unread else "READ ERROR"
         lines.append(f"[ {p.hex(':').upper()} ] Addr. {n:02X} : {label}")
     return "\n".join(lines) + "\n"
@@ -525,7 +557,8 @@ class TagDump(unittest.TestCase):
             found = [m for level, m in lines if level == "FAIL"]
             self.assertTrue(any(words in m for m in found), (words, found))
         fails(make_dump(self.message, rest=b"\x00old text"), "bytes after the message aren't zero")
-        fails(make_dump(self.message, cfg0="04 00 00 10"), "behind a password")
+        fails(make_dump(self.message, cfg0="04 00 00 10"), "behind a password for writing")
+        fails(make_dump(self.message, cfg0="04 00 00 03", cfg1="80 05 00 00"), "for reading and writing")
         fails(make_dump(self.message, cfg1="40 05 00 00"), "aren't the factory defaults")
         fails(make_dump(seedtag.seedtag_message(self.text[:50] + " " + self.text[50:])), "isn't exactly")
         two = bytes([0x91]) + self.message[1:] + bytes([0x51, 1, 1]) + b"T\x00"  # a second record
@@ -533,13 +566,67 @@ class TagDump(unittest.TestCase):
         fails(make_dump(self.message, drop=20), "pages weren't read")
         fails(make_dump(self.message) + "Counter 2: 1234\n", "counter isn't zero")
 
+    def test_seedtags_write_password_is_clean(self):
+        # As SeedTag's Protect from writes leaves an NTAG213: AUTH0 03, PROT 0, AUTHLIM 0.
+        levels, lines, backup = self.levels(make_dump(self.message, cfg0="04 00 00 03"))
+        self.assertNotIn("FAIL", levels)
+        self.assertIsNotNone(backup)
+        text = " ".join(m for _, m in lines)
+        self.assertIn("A write password is on", text)
+        self.assertIn("tag-key", text)
+
+    def test_a_lookalikes_version_is_a_warning(self):
+        # Shanghai Feiju's NTAG213 puts its own maker code (53) in GET_VERSION.
+        dump = make_dump(self.message, uid="53 11 22 33 44 55 66").replace(
+            "Mifare version: 00 04 04", "Mifare version: 00 53 04")
+        levels, lines, _ = self.levels(dump)
+        self.assertNotIn("FAIL", levels)
+        self.assertIn("maker code 53", " ".join(m for _, m in lines))
+
+    def test_a_lookalike_with_an_extra_page(self):
+        def check(**kw):
+            return self.levels(make_text_dump(self.message, pages=lookalike_pages(self.message, **kw)))
+        levels, lines, backup = check()
+        text = " ".join(m for _, m in lines)
+        self.assertNotIn("FAIL", levels)
+        self.assertIn("NTAG213 lookalike: all 46 pages read", text)
+        self.assertIn("one page more than an NXP NTAG213", text)
+        self.assertIn("doesn't officially support", text)
+        self.assertIn("factory defaults", text)
+        self.assertEqual(self.text, backup)
+        # SeedTag's write password on it: AUTH0 03, the unused bytes as they were.
+        levels, lines, _ = check(cfg0="00 00 00 03")
+        self.assertNotIn("FAIL", levels)
+        self.assertIn("A write password is on", " ".join(m for _, m in lines))
+
+        def fails(words, **kw):
+            found = [m for level, m in check(**kw)[1] if level == "FAIL"]
+            self.assertTrue(any(words in m for m in found), (words, found))
+        fails("read counter", counter="00 00 07 00")
+        # The PACK reads back on this lookalike (fudan_pwd_pack_stored.txt): a NOTE. Its password never may.
+        def with_page(n, value, pages):
+            pages[n] = bytes.fromhex(value)
+            return self.levels(make_text_dump(self.message, pages=pages))
+        levels, lines, _ = with_page(0x2C, "AA A8 00 00", lookalike_pages(self.message))
+        self.assertNotIn("FAIL", levels)
+        self.assertIn("PACK AA A8", " ".join(m for _, m in lines))
+        levels, _, _ = with_page(0x2B, "12 34 56 78", lookalike_pages(self.message))
+        self.assertIn("FAIL", levels)
+        # On an NXP chip, a PACK that reads back is a FAIL.
+        levels, _, _ = with_page(0x2C, "AA A8 00 00", ntag213_pages(self.message))
+        self.assertIn("FAIL", levels)
+        fails("aren't the factory defaults", cfg0="00 00 07 FF")
+        # Any maker: the layout decides, not the serial number.
+        levels, _, _ = check(uid="04 11 22 33 44 55 66")
+        self.assertNotIn("FAIL", levels)
+
     def test_lock_bits_are_a_warning(self):
         levels, _, _ = self.levels(make_dump(self.message, lock="FF FF"))
         self.assertIn("WARN", levels)
         self.assertNotIn("FAIL", levels)
 
     def test_only_ntag21x(self):
-        with self.assertRaisesRegex(ValueError, "only NTAG213, NTAG215 and NTAG216"):
+        with self.assertRaisesRegex(ValueError, "only NTAG213, NTAG215 and NTAG216, and lookalikes"):
             seedtag.check_dump(make_dump(self.message).replace("Pages total: 45", "Pages total: 48"))
         with self.assertRaisesRegex(ValueError, "isn't a memory dump"):
             seedtag.check_dump(self.text)

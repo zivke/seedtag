@@ -7,6 +7,17 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- **Protect from writes**, on the Verify tab once a backup is verified: gives an NTAG213, 215 or 216 a write
+  password, so no phone can rewrite, erase or lock the tag without it, and nobody can set a read password of
+  their own. Reading stays open to any phone. The password comes from the backup's password, so it isn't stored
+  anywhere; **Remove write password** takes it off again. Three taps: store it, switch it on, then check that the
+  tag really refuses writes without it, and switch it off again if it doesn't. Chips from other makers that work
+  like an NTAG21x get it too, after a warning that SeedTag doesn't officially support them and it may destroy the
+  tag. Verify shows the chip and whether a write password is on; Erase and **Make tag read-only** refuse a tag that
+  has one. Back up's *Check your tag* says whether the tag can be made read-only and given a write password.
+- `seedtag.py tag-key`: the write password a backup's tag gets (`FORMAT.md` section 6), to remove it without
+  SeedTag. `seedtag.py check` accepts SeedTag's own write password, and checks chips from other makers with an
+  NTAG21x's layout too, with a warning.
 - `seedtag.py check` (and `decrypt` / `verify`) also read NFC Tools' text
   export of *Read memory* (lines like `[ 04:8D:B4:B5 ] Addr. 00 : DATA`),
   with the same page-by-page checks. It holds no chip version, so `check`

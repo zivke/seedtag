@@ -16,11 +16,18 @@ import android.nfc.tech.NfcV
 import rs.zivke.seedtag.core.EraseCheck
 import rs.zivke.seedtag.core.EraseFiller
 import rs.zivke.seedtag.core.NdefText
+import rs.zivke.seedtag.core.NtagChip
+import rs.zivke.seedtag.core.NtagConfig
+import rs.zivke.seedtag.core.NtagIdentity
 import rs.zivke.seedtag.core.OverwriteTarget
+import rs.zivke.seedtag.core.ProtectStage
+import rs.zivke.seedtag.core.Protection
 import rs.zivke.seedtag.core.Rest
 import rs.zivke.seedtag.core.SeedBox
 import rs.zivke.seedtag.core.TagCheck
 import rs.zivke.seedtag.core.TagContent
+import rs.zivke.seedtag.core.TagInfo
+import rs.zivke.seedtag.core.TagKey
 import rs.zivke.seedtag.core.TagRequest
 import rs.zivke.seedtag.core.TagResult
 import rs.zivke.seedtag.core.TagStep
@@ -45,11 +52,13 @@ object TagIo {
             TagRequest.Check -> check(tag)
             is TagRequest.Write -> write(tag, request, report)
             is TagRequest.CheckWritten -> checkWritten(tag, request.expected)
-            TagRequest.Read -> read(tag)
+            is TagRequest.Read -> read(tag, request.withInfo)
             is TagRequest.Lock -> lock(tag, request.expected, report)
             TagRequest.Inspect -> inspect(tag)
             is TagRequest.Erase -> erase(tag, request.target, report)
             is TagRequest.ClearRest -> clearRestOf(tag, request.expected)
+            is TagRequest.Protect -> protect(tag, request, report)
+            is TagRequest.Unprotect -> unprotect(tag, request, report)
         }
     } catch (e: TagLostException) {
         TagResult.Failed("The tag moved away too early. Hold it still against the phone and try again.")
@@ -69,13 +78,17 @@ object TagIo {
 
     /** No I/O: what [perform] starts with, and how many steps the request takes on this tag. */
     private fun firstStep(tag: Tag, request: TagRequest): TagStep = when (request) {
-        TagRequest.Check, TagRequest.Inspect, TagRequest.Read -> TagStep("Reading the tag")
+        TagRequest.Check, TagRequest.Inspect, is TagRequest.Read -> TagStep("Reading the tag")
         is TagRequest.CheckWritten -> TagStep("Reading the backup back to check it")
         is TagRequest.Write -> TagStep(CHECKING, 1, if (Ndef.get(tag) == null) WRITE_BLANK_STEPS else WRITE_STEPS, writes = true)
         is TagRequest.Lock -> TagStep(CHECKING, 1, LOCK_STEPS, writes = true)
         is TagRequest.Erase -> TagStep(CHECKING, 1, ERASE_STEPS, writes = true)
         is TagRequest.ClearRest -> TagStep(CLEARING, writes = true)
+        is TagRequest.Protect -> TagStep(CHECKING, 1, PROTECT_STEPS, writes = true)
+        is TagRequest.Unprotect -> TagStep(CHECKING, 1, PROTECT_STEPS, writes = true)
     }
+
+    private const val PROTECT_STEPS = 2
 
     private const val CHECKING = "Checking the tag"
     private const val WRITE_BLANK_STEPS = 2
@@ -117,6 +130,7 @@ object TagIo {
         ndef.use {
             it.connect()
             if (!it.isWritable) return TagResult.Failed("This tag is read-only.")
+            if (isProtected(tag, it)) return TagResult.Failed(PROTECTED + " Verify it, remove the write password, then write the backup.")
             if (message.byteArrayLength > it.maxSize) {
                 return TagResult.Failed(tooSmall(req.text, message.byteArrayLength, it.maxSize, estimated = false))
             }
@@ -163,7 +177,15 @@ object TagIo {
         data object Unsupported : Probe
         /** Never formatted. */
         data object Blank : Probe
-        class Formatted(val msg: NdefMessage?, val writable: Boolean, val maxSize: Int) : Probe
+        /**
+         * [chip]: which chip it is and its write protection ([chipInfo]), null if that couldn't be checked.
+         * [protected]: it has a write password in force (an NTAG21x's AUTH0 on).
+         */
+        class Formatted(
+            val msg: NdefMessage?, val writable: Boolean, val maxSize: Int, val canMakeReadOnly: Boolean, val chip: TagInfo?,
+        ) : Probe {
+            val protected: Boolean get() = chip?.identity != null && chip.protection != Protection.Off
+        }
     }
 
     private fun probe(tag: Tag): Probe {
@@ -178,7 +200,11 @@ object TagIo {
             val msg = readMessage(it)
             // A read that failed looks like an empty tag: don't call a tag empty that may hold a backup.
             if (msg == null && type2HoldsData(tag, it)) return Probe.NotRead
-            return Probe.Formatted(msg, it.isWritable, it.maxSize)
+            val writable = it.isWritable
+            val canMakeReadOnly = it.canMakeReadOnly()
+            // Last, as it may end the chip's session (GET_VERSION): everything NDEF is read by now.
+            val chip = if (writable) chipInfo(tag, it) else TagInfo(null)
+            return Probe.Formatted(msg, writable, it.maxSize, canMakeReadOnly, chip)
         }
     }
 
@@ -193,7 +219,10 @@ object TagIo {
                 TagResult.Checked(TagCheck(true, ndef = false, capacity = capacity, estimated = capacity != null, classic = classic))
             }
             is Probe.Formatted -> TagResult.Checked(
-                TagCheck(true, ndef = true, capacity = p.maxSize, writable = p.writable, content = contentOf(p.msg), classic = classic),
+                TagCheck(
+                    true, ndef = true, capacity = p.maxSize, writable = p.writable, content = contentOf(p.msg), classic = classic,
+                    canMakeReadOnly = p.canMakeReadOnly, chip = p.chip,
+                ),
             )
         }
     }
@@ -212,7 +241,8 @@ object TagIo {
             EraseCheck(
                 true, ndef = true, writable = p.writable, content = contentOf(p.msg), capacity = p.maxSize,
                 text = runCatching { firstText(p.msg) }.getOrNull(),
-                target = if (p.writable) OverwriteTarget(tag.id ?: ByteArray(0), p.msg?.toByteArray() ?: ByteArray(0)) else null,
+                target = if (p.writable && !p.protected) OverwriteTarget(tag.id ?: ByteArray(0), p.msg?.toByteArray() ?: ByteArray(0)) else null,
+                protected = p.protected,
             ),
         )
     }
@@ -237,6 +267,7 @@ object TagIo {
                 )
             }
             if (!it.isWritable) return TagResult.Failed("This tag is read-only: it can't be erased.")
+            if (isProtected(tag, it)) return TagResult.Failed(PROTECTED + " Verify it, remove the write password, then erase it.")
             val filler = fillerFor(it.maxSize)
             report(TagStep("Overwriting it with zeros", 2, ERASE_STEPS, writes = true))
             try {
@@ -379,6 +410,9 @@ object TagIo {
      * chips answer with SAK 00h; [of] is null for any other tag.
      */
     private class Type2Raw(private val nfcA: NfcA) : Closeable {
+        /** The tag's UID in hex (not secret), to remember what a chip answered. */
+        val uid: String = (nfcA.tag.id ?: ByteArray(0)).joinToString("") { "%02x".format(it) }
+
         fun connect() = nfcA.connect()
 
         /** 16 bytes (4 pages) from [page]. Anything shorter is a NAK, or not a Type 2 chip. */
@@ -393,6 +427,31 @@ object TagIo {
             nfcA.transceive(Type2Memory.writeCommand(page, data))
         }
 
+        /**
+         * GET_VERSION's 8 bytes, or null if the chip refused it (a MIFARE Ultralight or Ultralight C
+         * does). A refused command ends the chip's session: send nothing after a null.
+         */
+        fun getVersion(): ByteArray? = refusedAsNull { nfcA.transceive(NtagChip.GET_VERSION) }?.takeIf { it.size == 8 }
+
+        /**
+         * PWD_AUTH with [pwd]: the chip's PACK if it accepted it, null if it refused (the wrong password,
+         * or no password support). As with [getVersion], a refusal ends the session.
+         */
+        fun pwdAuth(pwd: ByteArray): ByteArray? =
+            refusedAsNull { nfcA.transceive(byteArrayOf(0x1B) + pwd) }?.takeIf { it.size == 2 }
+
+        /**
+         * Android reports a chip's NAK as an IOException (or, on some phones, a reply of one byte); a tag
+         * that left the field is a TagLostException, which is passed on.
+         */
+        private fun refusedAsNull(command: () -> ByteArray): ByteArray? = try {
+            command()
+        } catch (e: TagLostException) {
+            throw e
+        } catch (e: IOException) {
+            null
+        }
+
         override fun close() = nfcA.close()
 
         companion object {
@@ -400,7 +459,7 @@ object TagIo {
         }
     }
 
-    private fun read(tag: Tag): TagResult {
+    private fun read(tag: Tag, withInfo: Boolean): TagResult {
         val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
         ndef.use {
             it.connect()
@@ -408,7 +467,114 @@ object TagIo {
                 "The tag is empty, or it couldn't be read properly. Hold it still against the phone and try again.",
             )
             val text = firstText(msg) ?: return TagResult.Failed("The tag holds no text record.")
-            return TagResult.Read(text, differences(msg, text))
+            return TagResult.Read(text, differences(msg, text), if (withInfo) tagInfo(tag, it) else null)
+        }
+    }
+
+    /** An NTAG21x, a chip that answers like one, or the FM11NT021: which it is, and its settings as READ returned them. */
+    private class NtagState(val identity: NtagIdentity, val config: NtagConfig) {
+        val info: TagInfo get() = TagInfo(identity, config.protection, config.settingsLocked, config.mirrorOn)
+    }
+
+    /**
+     * Which chip a tag is, by UID (not secret), for as long as the app runs: [identities] once GET_VERSION
+     * settled whether it's NXP's own (it answered, or refused), [notNtag] for a chip without the NTAG21x
+     * layout or with another chip's version. A chip that didn't answer GET_VERSION at all isn't remembered:
+     * a tag that moved away looks the same.
+     */
+    private val identities = ConcurrentHashMap<String, NtagIdentity>()
+    private val notNtag: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    /**
+     * On a connected [raw]: which chip it is, and its settings pages. Null if it isn't an NTAG21x or a
+     * lookalike with its layout. The layout and the settings are plain READs; GET_VERSION, which tells
+     * NXP's own from a lookalike, comes last, and only with [askVersion]: some chips refuse it (MIFARE
+     * Ultralight C) or don't answer (some lookalikes), which ends the session until the next tap. So it's
+     * asked only when nothing else follows (Back up's and Erase's first scan, Verify). Without it, a chip
+     * not identified before counts as a lookalike.
+     */
+    private fun ntagState(raw: Type2Raw, askVersion: Boolean): NtagState? {
+        val uid = raw.uid
+        if (uid in notNtag) return null
+        val head = raw.read(0)
+        if ((head[12].toInt() and 0xFF) != 0xE1) return null // not formatted (yet): nothing to remember
+        identities[uid]?.takeIf { (head[14].toInt() and 0xFF) == it.chip.ccSize }?.let { known ->
+            return NtagState(known, NtagConfig(known, raw.read(known.chip.cfgPage)))
+        }
+        val layout = NtagIdentity.byLayout(head, raw::read) ?: run {
+            if (NtagChip.forCcSize(head[14].toInt() and 0xFF) != null) notNtag += uid
+            return null
+        }
+        val settings = raw.read(layout.chip.cfgPage)
+        val identity = if (!askVersion) layout else {
+            val answer = try {
+                raw.getVersion() ?: REFUSED
+            } catch (e: TagLostException) {
+                null // no answer: a lookalike for this tap, not remembered
+            }
+            val version = answer?.takeIf { it !== REFUSED }
+            val combined = NtagIdentity.combine(head, layout, version) ?: run { notNtag += uid; return null }
+            if (answer != null) identities[uid] = combined
+            combined
+        }
+        return NtagState(identity, NtagConfig(identity, settings))
+    }
+
+    /** GET_VERSION refused (a NAK), as opposed to not answered at all. */
+    private val REFUSED = ByteArray(0)
+
+    /**
+     * For Verify, after the backup was read: the chip and its write protection. [ndef] is closed for the
+     * raw I/O. Never fails the read: a tag that moved away by now just has no info ([TagInfo] of null).
+     */
+    private fun tagInfo(tag: Tag, ndef: Ndef): TagInfo {
+        val raw = Type2Raw.of(tag) ?: return TagInfo(null)
+        ndef.close()
+        return try {
+            raw.use {
+                it.connect()
+                val state = ntagState(it, askVersion = true) ?: return TagInfo(null)
+                state.info
+            }
+        } catch (e: Exception) {
+            TagInfo(null)
+        }
+    }
+
+    /**
+     * The chip and its write protection, for the end of Back up's and Erase's first scan: [TagInfo.identity]
+     * null if it isn't a chip SeedTag can protect, the whole result null if that couldn't be checked (the
+     * scan's NDEF result stands either way). [ndef] is closed for the raw I/O and stays closed.
+     */
+    private fun chipInfo(tag: Tag, ndef: Ndef): TagInfo? {
+        val raw = Type2Raw.of(tag) ?: return TagInfo(null)
+        ndef.close()
+        return try {
+            raw.use {
+                it.connect()
+                ntagState(it, askVersion = true)?.info ?: TagInfo(null)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Whether the tag has a write password in force, just before writing to it: plain READs only, never
+     * GET_VERSION ([ntagState]). False if unknown. [ndef] is closed
+     * for the raw reads and connected again afterwards.
+     */
+    private fun isProtected(tag: Tag, ndef: Ndef): Boolean {
+        val raw = Type2Raw.of(tag) ?: return false
+        ndef.close()
+        return try {
+            raw.use { it.connect(); ntagState(it, askVersion = false)?.let { st -> st.config.protection != Protection.Off } ?: false }
+        } catch (e: TagLostException) {
+            throw e
+        } catch (e: IOException) {
+            false
+        } finally {
+            ndef.connect()
         }
     }
 
@@ -442,6 +608,14 @@ object TagIo {
             // set without the lock bits: SeedTag made no change and can't tell whether it's permanent.
             if (!it.isWritable) return TagResult.AlreadyReadOnly
             if (!it.canMakeReadOnly()) return TagResult.CantMakeReadOnly
+            // The lock bytes (page 2) aren't covered by the password, the capability container is: Android's
+            // makeReadOnly would lock half of it. The password has to go first.
+            if (isProtected(tag, it)) {
+                return TagResult.Failed(
+                    "This tag has a write password. Remove it first (Verify the tag, then Remove write password), " +
+                        "then make it read-only. Nothing was changed.",
+                )
+            }
             report(TagStep("Making it read-only", 2, LOCK_STEPS, writes = true))
             return try {
                 if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Making it read-only failed. The tag is unchanged.")
@@ -453,6 +627,240 @@ object TagIo {
                     changedTag = true,
                 )
             }
+        }
+    }
+
+    private const val CANT_PROTECT =
+        "SeedTag can give a write password only to an NTAG213, NTAG215 or NTAG216, or an NTAG21x lookalike that " +
+            "works like one, and this tag isn't one. Nothing was changed."
+    private const val PROTECTED = "This tag has a write password, so nothing can be written to it. Nothing was changed."
+    /** The view model zeroed the secret (a wipe) after this scan was armed. */
+    private const val CLEARED = "SeedTag cleared what it had decrypted in the meantime. Nothing was changed. Verify the tag again."
+    private const val NOT_THIS_TAG = "This isn't the tag you just verified. Nothing was changed."
+
+    /**
+     * The first part of every Protect and Unprotect tap: the tag holds exactly [expected] (an NDEF read,
+     * which a write password never blocks). Null if it does; the NDEF connection is closed either way.
+     */
+    private fun notHolding(tag: Tag, expected: String): TagResult? {
+        val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
+        ndef.use {
+            it.connect()
+            val msg = readMessage(it) ?: return TagResult.Failed(NOT_READ)
+            return if (firstText(msg) != expected) TagResult.Failed(NOT_THIS_TAG) else null
+        }
+    }
+
+    /**
+     * One tap of Protect ([ProtectStage]). Protection covers writes only (PROT 0) and never locks anyone
+     * out (AUTHLIM 0), from page 3 on ([NtagConfig.AUTH0_ON]): reading stays open to every phone.
+     * Every settings write is read back. The secret is copied, and the copies zeroed.
+     */
+    private fun protect(tag: Tag, req: TagRequest.Protect, report: (TagStep) -> Unit): TagResult {
+        val raw = Type2Raw.of(tag) ?: return TagResult.Failed(CANT_PROTECT)
+        val pwd = TagKey.ntagPwd(req.secret)
+        val pack = TagKey.ntagPack(req.secret)
+        try {
+            if (pwd.all { it == 0.toByte() } && pack.all { it == 0.toByte() }) return TagResult.Failed(CLEARED)
+            notHolding(tag, req.expected)?.let { return it }
+            raw.use { r ->
+                r.connect()
+                // Writes follow: no GET_VERSION here. Verify identified the chip just before.
+                val state = ntagState(r, askVersion = false) ?: return TagResult.Failed(CANT_PROTECT)
+                val chip = state.identity.chip
+                val config = state.config
+                if (config.settingsLocked) {
+                    return TagResult.Failed("This tag's settings are locked for good, so it can't be given a write password. Nothing was changed.")
+                }
+                return when (req.stage) {
+                    ProtectStage.Store -> store(r, state, req, pwd, pack, report)
+                    ProtectStage.SwitchOn -> switchOn(r, chip, config, req, pwd, pack, report)
+                    ProtectStage.Confirm -> confirm(r, chip, config, req, pwd, pack, report)
+                }
+            }
+        } finally {
+            pwd.fill(0)
+            pack.fill(0)
+        }
+    }
+
+    /** Tap 1: PWD, PACK and protection to "writes only", while protection is still off. */
+    private fun store(r: Type2Raw, state: NtagState, req: TagRequest.Protect, pwd: ByteArray, pack: ByteArray, report: (TagStep) -> Unit): TagResult {
+        val chip = state.identity.chip
+        val config = state.config
+        if (config.protection != Protection.Off) {
+            // Already on: with this backup's password (an earlier Protect), go on to the check; with another, stop.
+            val answer = r.pwdAuth(pwd)
+            return if (answer != null && answer.contentEquals(pack)) TagResult.ProtectSwitchedOn
+            else TagResult.Failed("This tag already has a write password, and it isn't this backup's. SeedTag can't change it. Nothing was changed.")
+        }
+        // A chip that shows its password to anyone (an NXP chip reads PWD as zeros): it would protect nothing.
+        if (config.passwordReadable) return TagResult.NotEnforced(switchedOff = true)
+        if (!state.identity.genuine && !req.otherMaker) return TagResult.OtherMaker(chip)
+        report(TagStep("Storing the write password", 2, PROTECT_STEPS, writes = true))
+        val cfg1 = config.cfg1WritesOnly()
+        r.write(chip.pwdPage, pwd)
+        r.write(chip.packPage, pack + byteArrayOf(0, 0))
+        r.write(chip.cfgPage + 1, cfg1)
+        val after = config.reread(r.read(chip.cfgPage))
+        if (!after.settingsAre(config.cfg0, cfg1)) {
+            return TagResult.Failed("Storing the password didn't go through. Hold the tag still and try again.", changedTag = true)
+        }
+        return TagResult.ProtectStored
+    }
+
+    /** Tap 2, a new session: the chip must accept the stored password before AUTH0 switches protection on. */
+    private fun switchOn(
+        r: Type2Raw, chip: NtagChip, config: NtagConfig, req: TagRequest.Protect, pwd: ByteArray, pack: ByteArray,
+        report: (TagStep) -> Unit,
+    ): TagResult {
+        val again = req.next(ProtectStage.Store)
+        if (config.protection == Protection.Off && !config.writesOnly) {
+            return TagResult.Failed("The first step didn't stay on the tag. Hold it still to do it again.", retry = again)
+        }
+        if (config.passwordReadable) {
+            // A chip that shows its password to anyone: switching it on would protect nothing. (A PACK that
+            // reads back is fine: it isn't the password.)
+            return TagResult.NotEnforced(switchedOff = config.protection == Protection.Off)
+        }
+        val answer = r.pwdAuth(pwd)
+        if (answer == null || !answer.contentEquals(pack)) {
+            return if (config.protection == Protection.Off) {
+                TagResult.Failed("The tag didn't accept the password just stored. Hold it still to store it again.", retry = again)
+            } else {
+                TagResult.Failed("This tag already has a write password, and it isn't this backup's. Nothing was changed.")
+            }
+        }
+        report(TagStep("Switching the write password on", 2, PROTECT_STEPS, writes = true))
+        val cfg0 = config.cfg0With(NtagConfig.AUTH0_ON)
+        r.write(chip.cfgPage, cfg0)
+        val after = config.reread(r.read(chip.cfgPage))
+        if (!after.settingsAre(cfg0, config.cfg1)) {
+            return TagResult.Failed("Switching the password on didn't go through. Hold the tag still and try again.", changedTag = true)
+        }
+        return TagResult.ProtectSwitchedOn
+    }
+
+    /** Spare-page test pattern ("STAG"): a write the chip must refuse without the password. */
+    private val PROBE = byteArrayOf(0x53, 0x54, 0x41, 0x47)
+
+    /**
+     * Tap 3, a new session, no password sent: reading works (the backup was just read), a write of [PROBE]
+     * to the last spare page after the backup is refused, and so is switching the password off (CFG0 with
+     * AUTH0 off). Each checked by reading again after reconnecting. If the chip took either write,
+     * protection is switched off again and the page zeroed.
+     */
+    private fun confirm(
+        r: Type2Raw, chip: NtagChip, config: NtagConfig, req: TagRequest.Protect, pwd: ByteArray, pack: ByteArray,
+        report: (TagStep) -> Unit,
+    ): TagResult {
+        if (config.protection != Protection.Write || config.auth0 != NtagConfig.AUTH0_ON) {
+            return TagResult.Failed(
+                "The password isn't switched on on this tag any more. Hold it still to switch it on again.",
+                retry = req.next(ProtectStage.SwitchOn),
+            )
+        }
+        val cc = r.read(3)
+        val data = readDataArea(r, (cc[2].toInt() and 0xFF) * 8)
+        val page = Type2Memory.freePages(data)?.last
+            ?: return TagResult.Failed("SeedTag couldn't find a spare page on this tag to test the password on. It is switched on, but untested.")
+        val before = Type2Memory.page(data, page)
+        if (!before.all { it == 0.toByte() }) {
+            return TagResult.Failed("This tag has data after the backup that SeedTag didn't expect, so it can't run its test write. Nothing was changed.")
+        }
+        report(TagStep("Checking that the tag refuses writes without it", 2, PROTECT_STEPS, writes = true))
+        val zeros = ByteArray(4)
+        tryWithoutPassword(r) { r.write(page, PROBE) }
+        if (r.read(page).copyOf(4).contentEquals(zeros)) {
+            // The data was safe; now the settings: without the password, try to switch it off. A chip that
+            // allowed that would let anyone remove the protection.
+            tryWithoutPassword(r) { r.write(chip.cfgPage, config.cfg0With(NtagConfig.AUTH0_OFF)) }
+            if (config.reread(r.read(chip.cfgPage)).settingsAre(config.cfg0, config.cfg1)) return TagResult.Protected
+        } else {
+            r.write(page, zeros)
+        }
+        // It took a write without the password: it doesn't enforce one. Leave it switched off.
+        val answer = r.pwdAuth(pwd)
+        if (answer == null || !answer.contentEquals(pack)) {
+            r.close() // the refusal ended the session
+            r.connect()
+        }
+        r.write(chip.cfgPage, config.cfg0With(NtagConfig.AUTH0_OFF))
+        val after = config.reread(r.read(chip.cfgPage))
+        return TagResult.NotEnforced(switchedOff = after.protection == Protection.Off && r.read(page).copyOf(4).contentEquals(zeros))
+    }
+
+    /**
+     * A write the chip should refuse, as there's no password in this session. A refusal (a NAK) ends the
+     * chip's session, so afterwards [r] is closed and connected again (Android selects the tag anew, which
+     * also drops any authentication); a read then shows whether the write went through.
+     */
+    private fun tryWithoutPassword(r: Type2Raw, write: () -> Unit) {
+        try {
+            write()
+        } catch (e: TagLostException) {
+            throw e
+        } catch (e: IOException) {
+            // Refused, as it should be; the read afterwards decides.
+        }
+        r.close()
+        r.connect()
+    }
+
+    /** Switch the write password off (AUTH0 past the last page). PWD and PACK stay on the chip, unused. */
+    private fun unprotect(tag: Tag, req: TagRequest.Unprotect, report: (TagStep) -> Unit): TagResult {
+        val raw = Type2Raw.of(tag) ?: return TagResult.Failed(CANT_PROTECT)
+        val pwd = TagKey.ntagPwd(req.secret)
+        val pack = TagKey.ntagPack(req.secret)
+        try {
+            if (pwd.all { it == 0.toByte() } && pack.all { it == 0.toByte() }) return TagResult.Failed(CLEARED)
+            notHolding(tag, req.expected)?.let { return it }
+            raw.use { r ->
+                r.connect()
+                // Writes follow: no GET_VERSION here. Verify identified the chip just before.
+                val state = ntagState(r, askVersion = false) ?: return TagResult.Failed(CANT_PROTECT)
+                val chip = state.identity.chip
+                val config = state.config
+                if (config.protection == Protection.Off) {
+                    clearOurPack(r, chip, config, pack) // a retry after the tag moved away
+                    return TagResult.Unprotected
+                }
+                if (config.settingsLocked) {
+                    return TagResult.Failed("This tag's settings are locked for good, so its write password can't be removed.")
+                }
+                val answer = r.pwdAuth(pwd)
+                if (answer == null || !answer.contentEquals(pack)) {
+                    return TagResult.Failed("This tag's write password isn't this backup's, so SeedTag can't remove it. Nothing was changed.")
+                }
+                report(TagStep("Removing the write password", 2, PROTECT_STEPS, writes = true))
+                val cfg0 = config.cfg0With(NtagConfig.AUTH0_OFF)
+                r.write(chip.cfgPage, cfg0)
+                val after = config.reread(r.read(chip.cfgPage))
+                if (!after.settingsAre(cfg0, config.cfg1)) {
+                    return TagResult.Failed("Removing the password didn't go through. Hold the tag still and try again.", changedTag = true)
+                }
+                clearOurPack(r, chip, after, pack)
+                return TagResult.Unprotected
+            }
+        } finally {
+            pwd.fill(0)
+            pack.fill(0)
+        }
+    }
+
+    /**
+     * On a lookalike that lets anyone read the PACK back: zero it once the password is off, if it's this
+     * backup's, so the tag reads as it did before Protect. (The password itself stays stored, unreadable,
+     * as on an NXP chip.) Best effort: the password is already off, so a refused write changes nothing.
+     */
+    private fun clearOurPack(r: Type2Raw, chip: NtagChip, config: NtagConfig, pack: ByteArray) {
+        if (config.protection != Protection.Off || !config.packReadable || !config.packIs(pack)) return
+        try {
+            r.write(chip.packPage, ByteArray(4))
+        } catch (e: TagLostException) {
+            throw e
+        } catch (e: IOException) {
+            // Refused: left as it is.
         }
     }
 

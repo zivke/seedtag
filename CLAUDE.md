@@ -84,7 +84,19 @@ Two Gradle modules plus the Python tool:
     `openForgiving` retries a wrong password with spaces collapsed, then
     lower-cased (`passwordVariants`); `seedtag.py` has the same rules, checked
     against `password-variants.tsv`. Only the typed password changes, never
-    the format.
+    the format. `openForgiving(…, withTagSecret = true)` also returns the
+    tag's write-password secret, from the key that matched.
+  - `TagKey.kt`: the tag's write password, HMAC-SHA256 of the blob's AES key
+    (`FORMAT.md` section 6): NTAG PWD / PACK and the Ultralight C 3DES key;
+    `seedtag.py tag-key` derives the same, checked against `tag-key-vectors.tsv`.
+    Never change it in place. `UltralightCAuth.kt`: the reader's side of the
+    Ultralight C 3DES handshake, no I/O, tested against the MF0ICU2 example.
+  - `Ntag.kt`: the chips SeedTag can give a write password: NTAG213/215/216 and NTAG21x lookalikes with
+    their layout, from any maker, recognised by READs alone (`NtagIdentity.byLayout`: capability container
+    size, BDh on the dynamic lock page, where READ wraps to page 0; one extra page allowed, as on the
+    Fudan FM11NT021). GET_VERSION, asked last, only decides `genuine` (NXP's code in both the UID and the
+    reply); lookalikes aren't officially supported and the UI never names their maker or model.
+    `NtagConfig`: CFG0/CFG1 as read, protection state, the values SeedTag writes.
   - `Passphrase.kt`: 7-word generator from the BIP39 list, rough strength estimate.
   - `SecretChars.kt`: zeroable, in-place password buffer.
   - `NdefText.kt`: Text-record payload decode (encode is `NdefRecord.createTextRecord`), and how a
@@ -136,6 +148,9 @@ Two Gradle modules plus the Python tool:
     goes through `NfcA` (`Type2Raw`, any chip with SAK 00h), not `MifareUltralight`,
     which Android offers only for NXP UIDs. Never write past the data area: the lock
     and configuration pages follow it (AUTH0 = 00 would lock the tag behind a password).
+  - `ChipTest.kt`: debug builds only (`src/debug`; `src/release` has a stub without commands): the
+    NFC-spot page's chip test, one raw command per tap (GET_VERSION, READs, PWD_AUTH with the factory
+    password), to see how an unknown chip answers. Nothing is written.
   - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
     `IdleWatch` keeps the screen on while `holdsSecrets` and shows *Still
     there?* (`Dialog.StillThere`); behind it, both Back questions
@@ -149,8 +164,8 @@ Two Gradle modules plus the Python tool:
   decryption (slow, standard library only); encrypt needs `cryptography`.
   `check` reads a full memory dump (Flipper `.nfc`, as NFC Tools exports it, or NFC Tools'
   plain-text *Read memory* export, pages only) and
-  checks every page of an NTAG213/215/216 for anything besides the backup; no
-  crypto, no password.
+  checks every page of an NTAG213/215/216, or a lookalike with their layout (one extra page
+  allowed), for anything besides the backup; no crypto, no password.
 
 ## Blob format v1 (do not change in place)
 

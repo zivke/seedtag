@@ -11,7 +11,7 @@ package rs.zivke.seedtag.core
 enum class Haptic { Tick, Success, Failure, Found, Detected }
 
 /** What a scan is for: decides how its result is handled. */
-enum class Purpose { Check, BackupWrite, ClearRest, Verify, Restore, Lock, Inspect, Erase }
+enum class Purpose { Check, BackupWrite, ClearRest, Verify, Restore, Lock, Inspect, Erase, Protect, Unprotect }
 
 /**
  * A scan waiting for a tag. [id] tells a result for the current scan from one that arrives after Cancel
@@ -36,14 +36,28 @@ sealed interface TagNotice {
     data object CantMakeReadOnly : TagNotice
     /** [rest]: whether the data area was then checked page by page. */
     data class Erased(val rest: Rest) : TagNotice
+    /** Protect found a chip that isn't NXP's: warn, and go on only if the user says so ([TagFlow.protect]). */
+    data class ConfirmOtherMaker(val chip: NtagChip) : TagNotice
+    /** The write password is on, and a fresh tap showed reads work and writes are refused. */
+    data object Protected : TagNotice
+    /** The chip accepted a write without the password. [switchedOff]: SeedTag switched it off again. */
+    data class NotEnforced(val switchedOff: Boolean) : TagNotice
+    /** Protect was canceled, or the app left, after the password was switched on but before it was checked. */
+    data object ProtectUnchecked : TagNotice
+    data object Unprotected : TagNotice
 }
 
 /** What the app does besides taking the new [TagFlow]: the parts that live outside it. */
 sealed interface TagEffect {
     data class Buzz(val haptic: Haptic) : TagEffect
     data class Notify(val notice: TagNotice) : TagEffect
-    /** Decrypt [text] with the password typed (Argon2id, off the tag thread), then call [TagFlow.opened]. */
-    data class Decrypt(val text: String, val reveal: Boolean, val differences: List<String>) : TagEffect
+    /**
+     * Decrypt [text] with the password typed (Argon2id, off the tag thread), then call [TagFlow.opened].
+     * [info]: the chip and its write protection, for Verify (null if not asked for or not known).
+     */
+    data class Decrypt(val text: String, val reveal: Boolean, val differences: List<String>, val info: TagInfo? = null) : TagEffect
+    /** The tag that holds [text] now has write protection [protection]: what Verify shows about it. */
+    data class ProtectionChanged(val text: String, val protection: Protection) : TagEffect
     /** The backup is on the tag: wipe the words and passwords, clear Verify and Restore, show Done. */
     data object BackupWritten : TagEffect
     /** The tag the Erase tab scanned was erased: it starts afresh (its password and decrypted check too). */
@@ -62,7 +76,8 @@ data class Sealed(val text: String, val fingerprint: String)
  * The tag flow: which scan waits for a tag, what earlier scans found, and what a tag's result does.
  * Immutable and free of Android, so every path can be tested on the JVM. Each call returns the
  * [Next] state and the [TagEffect]s for the app to carry out; nothing here holds a secret (tag texts
- * are Base64 blobs anyone can read from the tag, fingerprints aren't secret).
+ * are Base64 blobs anyone can read from the tag, fingerprints aren't secret), except that a Protect or
+ * Unprotect scan refers to the tag's write-password secret, which the view model owns and zeroes.
  *
  * Threading, in the app: [pending] mirrors the atomic slot the NFC thread takes a scan from. That
  * thread posts [claimed] before any I/O, then [working] for each step and [handle] last, in order,
@@ -122,9 +137,29 @@ data class TagFlow(
         )
     }
 
-    /** Verify, or Restore if [reveal]. */
-    fun scanToRead(reveal: Boolean) =
-        arm(TagRequest.Read, if (reveal) Purpose.Restore else Purpose.Verify, "Hold the tag to the back of the phone to read it")
+    /** Verify, or Restore if [reveal]. Verify also looks at the chip and its write protection. */
+    fun scanToRead(reveal: Boolean) = arm(
+        TagRequest.Read(withInfo = !reveal), if (reveal) Purpose.Restore else Purpose.Verify,
+        "Hold the tag to the back of the phone to read it",
+    )
+
+    /**
+     * Give the tag that holds [lockTarget] (just verified) its write password, from [secret]; nothing if
+     * there's no such tag. [otherMaker]: the user read the warning about a chip that isn't NXP's.
+     */
+    fun protect(secret: ByteArray, otherMaker: Boolean = false): Next {
+        val target = lockTarget ?: return next()
+        return arm(
+            TagRequest.Protect(target, secret, ProtectStage.Store, otherMaker), Purpose.Protect,
+            "Hold the same tag to the phone to store its write password (step 1 of 3)",
+        )
+    }
+
+    /** Switch the write password of the tag that holds [lockTarget] off again. */
+    fun unprotect(secret: ByteArray): Next {
+        val target = lockTarget ?: return next()
+        return arm(TagRequest.Unprotect(target, secret), Purpose.Unprotect, "Hold the same tag to remove its write password")
+    }
 
     /** Lock [lockTarget]; nothing if there's none. */
     fun lock(): Next {
@@ -195,8 +230,8 @@ data class TagFlow(
         val closed = if (!stale || pending == null) copy(prompt = null) else this
         fun buzz(h: Haptic) = TagEffect.Buzz(h)
         fun notify(n: TagNotice) = TagEffect.Notify(n)
-        fun tapAgain(error: String) = copy(
-            pending = p, // stay armed, so the user can simply tap again
+        fun tapAgain(error: String, retry: TagRequest? = null) = copy(
+            pending = if (retry == null) p else p.copy(request = retry), // stay armed: the user can simply tap again
             prompt = prompt?.copy(error = error, working = null) ?: ScanPrompt("Hold the tag to the phone", error),
         ).next(buzz(Haptic.Failure))
         if (stale && r.onlyAsks) return next()
@@ -206,7 +241,7 @@ data class TagFlow(
             is TagResult.Failed ->
                 // A late failure that may have changed the tag is said, but doesn't arm a scan nobody waits for.
                 if (stale) closed.next(buzz(Haptic.Failure), notify(TagNotice.LateFailure(r.message)))
-                else tapAgain(r.message)
+                else tapAgain(r.message, r.retry)
             is TagResult.NotEmpty -> copy(prompt = null, overwriteTarget = r.target).next(
                 buzz(Haptic.Failure),
                 notify(TagNotice.ConfirmOverwrite(SeedBox.kindOf(r.existing) != SeedBox.Kind.NotBackup)),
@@ -251,8 +286,45 @@ data class TagFlow(
                 effects += notify(TagNotice.Erased(r.rest))
                 Next(f, effects)
             }
-            is TagResult.Read -> copy(prompt = null).next(TagEffect.Decrypt(r.text, p.purpose == Purpose.Restore, r.differences))
+            is TagResult.Read -> copy(prompt = null).next(TagEffect.Decrypt(r.text, p.purpose == Purpose.Restore, r.differences, r.info))
+            is TagResult.OtherMaker -> closed.next(buzz(Haptic.Failure), notify(TagNotice.ConfirmOtherMaker(r.chip)))
+            // Each step in a new session: take the tag away and hold it again.
+            TagResult.ProtectStored -> (p.request as? TagRequest.Protect)?.let { req ->
+                arm(
+                    req.next(ProtectStage.SwitchOn), Purpose.Protect,
+                    "Stored. Take the tag away, then hold it to the phone again to switch the password on (step 2 of 3)",
+                    buzz(Haptic.Tick),
+                )
+            } ?: closed.next()
+            TagResult.ProtectSwitchedOn ->
+                if (stale) closed.next(buzz(Haptic.Tick), notify(TagNotice.ProtectUnchecked))
+                else (p.request as? TagRequest.Protect)?.let { req ->
+                    arm(
+                        req.next(ProtectStage.Confirm), Purpose.Protect,
+                        "Switched on. Take the tag away, then hold it once more to check it (step 3 of 3)",
+                        buzz(Haptic.Tick),
+                    )
+                } ?: closed.next()
+            TagResult.Protected -> closed.next(
+                buzz(Haptic.Success), notify(TagNotice.Protected), *protectionOf(p, Protection.Write),
+            )
+            is TagResult.NotEnforced -> closed.next(
+                buzz(Haptic.Failure), notify(TagNotice.NotEnforced(r.switchedOff)),
+                *protectionOf(p, if (r.switchedOff) Protection.Off else Protection.Write),
+            )
+            TagResult.Unprotected -> closed.next(
+                buzz(Haptic.Success), notify(TagNotice.Unprotected), *protectionOf(p, Protection.Off),
+            )
         }
+    }
+
+    private fun protectionOf(p: Pending, protection: Protection): Array<TagEffect> {
+        val text = when (val r = p.request) {
+            is TagRequest.Protect -> r.expected
+            is TagRequest.Unprotect -> r.expected
+            else -> return emptyArray()
+        }
+        return arrayOf(TagEffect.ProtectionChanged(text, protection))
     }
 
     private companion object {
@@ -262,7 +334,10 @@ data class TagFlow(
         val TagResult.onlyAsks: Boolean
             get() = when (this) {
                 is TagResult.Checked, is TagResult.NotEmpty, TagResult.AlreadyReadOnly, TagResult.CantMakeReadOnly,
-                is TagResult.Inspected, is TagResult.Read -> true
+                is TagResult.Inspected, is TagResult.Read, is TagResult.OtherMaker -> true
+                // Only stored: protection is still off, so a canceled Protect leaves nothing to say.
+                TagResult.ProtectStored -> true
+                TagResult.ProtectSwitchedOn, TagResult.Protected, is TagResult.NotEnforced, TagResult.Unprotected -> false
                 is TagResult.Failed -> !changedTag
                 is TagResult.RestCleared -> rest == Rest.Interrupted
                 is TagResult.WrittenUnchecked, is TagResult.Written, TagResult.Locked, is TagResult.Erased -> false

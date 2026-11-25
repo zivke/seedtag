@@ -21,6 +21,7 @@ import rs.zivke.seedtag.core.BackAction
 import rs.zivke.seedtag.core.Bip39
 import rs.zivke.seedtag.core.EraseCheck
 import rs.zivke.seedtag.core.Haptic
+import rs.zivke.seedtag.core.NtagChip
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
 import rs.zivke.seedtag.core.Pending
@@ -34,6 +35,7 @@ import rs.zivke.seedtag.core.TagCheck
 import rs.zivke.seedtag.core.TagContent
 import rs.zivke.seedtag.core.TagEffect
 import rs.zivke.seedtag.core.TagFlow
+import rs.zivke.seedtag.core.TagInfo
 import rs.zivke.seedtag.core.TagNotice
 import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
@@ -77,6 +79,8 @@ data class VerifyResult(
     val tagDifferences: List<String> = emptyList(),
     /** The tag's text (the Base64 blob, not secret): which tag this result is about. */
     val tagText: String? = null,
+    /** Verify only: the chip and its write protection, null if not known. */
+    val tagInfo: TagInfo? = null,
 )
 
 /** A system Settings screen the app links to. */
@@ -93,6 +97,11 @@ sealed interface Dialog {
     data class Info(val title: String, val message: String) : Dialog
     data class ConfirmOverwrite(val looksLikeSeedTag: Boolean) : Dialog
     data object ConfirmLock : Dialog
+    /**
+     * Give the verified tag a write password. [otherMaker]: Verify found a chip that answers like [chip] but
+     * isn't NXP's, so the question carries a warning.
+     */
+    data class ConfirmProtect(val chip: NtagChip, val otherMaker: Boolean) : Dialog
     /** Erase the scanned tag, which holds [content]; [checked] if its backup was decrypted with its password first. */
     data class ConfirmErase(val content: TagContent, val checked: Boolean, val fingerprint: String?) : Dialog
     /** Generate a passphrase over a password that's already there; [generated] if that one was generated too. */
@@ -346,7 +355,11 @@ class SeedTagViewModel : ViewModel() {
             when (effect) {
                 is TagEffect.Buzz -> _haptics.tryEmit(effect.haptic)
                 is TagEffect.Notify -> dialog = dialogFor(effect.notice)
-                is TagEffect.Decrypt -> decrypt(effect.text, effect.reveal, effect.differences)
+                is TagEffect.Decrypt -> decrypt(effect.text, effect.reveal, effect.differences, effect.info)
+                is TagEffect.ProtectionChanged -> verifyResult?.let { r ->
+                    val info = r.tagInfo
+                    if (r.tagText == effect.text && info != null) verifyResult = r.copy(tagInfo = info.copy(protection = effect.protection))
+                }
                 TagEffect.BackupWritten -> {
                     // A Verify or Restore from before this backup describes another tag, or compared
                     // with an older backup: clear it, and a password typed there.
@@ -368,7 +381,35 @@ class SeedTagViewModel : ViewModel() {
         private set
 
     fun startProbe() { probe = null; probing.set(true) }
-    fun stopProbe() { probing.set(false); probe = null }
+    fun stopProbe() { probing.set(false); probe = null; stopChipTest() }
+
+    /** Debug builds only ([ChipTest]): the NFC-spot finder sends one raw command per tap instead of counting. */
+    private val chipTesting = AtomicBoolean(false)
+    private val chipTestNext = java.util.concurrent.atomic.AtomicInteger(0)
+    var chipTestLines by mutableStateOf<List<String>>(emptyList())
+        private set
+    var chipTestNextLabel by mutableStateOf<String?>(null)
+        private set
+
+    fun startChipTest() {
+        if (!ChipTest.AVAILABLE) return
+        chipTestNext.set(0); chipTestLines = emptyList(); chipTestNextLabel = ChipTest.labels.first(); chipTesting.set(true)
+    }
+
+    fun stopChipTest() {
+        chipTesting.set(false); chipTestLines = emptyList(); chipTestNextLabel = null
+    }
+
+    private fun chipTested(tag: Tag) {
+        val i = chipTestNext.getAndIncrement()
+        val line = ChipTest.run(tag, i)
+        viewModelScope.launch {
+            if (!chipTesting.get()) return@launch
+            chipTestLines = chipTestLines + "${chipTestLines.size + 1}. $line"
+            chipTestNextLabel = ChipTest.labels[(i + 1) % ChipTest.labels.size]
+            _haptics.tryEmit(Haptic.Found)
+        }
+    }
 
     /** Bumped by wipeAll(): Argon2 work that finishes after it is thrown away. */
     private var wipes = 0L
@@ -561,6 +602,8 @@ class SeedTagViewModel : ViewModel() {
         current: () -> Boolean = { true },
         wrongPassword: Dialog.WrongPassword? = null,
         work: () -> T,
+        /** The result came after a wipe or a newer step, so [done] isn't called: zero what it holds. */
+        dropped: (T) -> Unit = {},
         done: (T) -> Unit,
     ) {
         if (busy != null) {
@@ -573,7 +616,7 @@ class SeedTagViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val result = withContext(Dispatchers.Default) { work() }
-                if (!stale()) done(result)
+                if (!stale()) done(result) else dropped(result)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: SeedTagException.WrongPassword) {
@@ -688,7 +731,39 @@ class SeedTagViewModel : ViewModel() {
 
     /** "Verify another tag" / "Restore another tag": back to the password step, nothing kept. */
     fun readAnother() {
-        verifyResult = null; restoredWords = null; clearPasswords(PwField.Read)
+        verifyResult = null; restoredWords = null; clearPasswords(PwField.Read); setTagSecret(null)
+    }
+
+    /**
+     * The verified tag's write-password secret ([TagKey.secret]), from Verify's decrypt; zeroed by
+     * [readAnother] and [wipeAll]. A Protect scan refers to this very array, so a wipe during it reaches
+     * tag I/O too (which then refuses a zeroed secret).
+     */
+    private var tagSecret: ByteArray? = null
+
+    private fun setTagSecret(secret: ByteArray?) {
+        tagSecret?.fill(0)
+        tagSecret = secret
+    }
+
+    /** Verify's "Protect from writes": ask first, with a warning for a chip that isn't NXP's. */
+    fun requestProtect() {
+        val identity = verifyResult?.tagInfo?.identity
+        if (tagSecret == null || flow.lockTarget == null || identity == null) return showError("Verify the tag first.")
+        dialog = Dialog.ConfirmProtect(identity.chip, otherMaker = !identity.genuine)
+    }
+
+    fun confirmProtect() {
+        val d = dialog as? Dialog.ConfirmProtect
+        dialog = null
+        val secret = tagSecret ?: return
+        apply(flow.protect(secret, otherMaker = d?.otherMaker == true))
+    }
+
+    /** Verify's "Remove write password". Nothing is lost by it, so no question. */
+    fun unprotect() {
+        val secret = tagSecret ?: return showError("Verify the tag first.")
+        apply(flow.unprotect(secret))
     }
 
     fun startOver() {
@@ -702,7 +777,7 @@ class SeedTagViewModel : ViewModel() {
     fun onTagDiscovered(tag: Tag) {
         val p = pending.getAndSet(null)
         if (p == null) {
-            if (probing.get()) probed(tag)
+            if (ChipTest.AVAILABLE && chipTesting.get()) chipTested(tag) else if (probing.get()) probed(tag)
             return
         }
         // Posted to the main thread in order: the claim first, then the steps, the result last.
@@ -754,6 +829,31 @@ class SeedTagViewModel : ViewModel() {
             "This tag can't be made read-only from this phone. Android usually only offers it for NFC Forum Type 1 " +
                 "and 2 tags (NTAG, MIFARE Ultralight). Nothing was changed: the backup on it is as it was.",
         )
+        is TagNotice.ConfirmOtherMaker -> Dialog.ConfirmProtect(n.chip, otherMaker = true)
+        TagNotice.Protected -> Dialog.Info(
+            "Write password on",
+            "The tag now refuses every write without its password, and SeedTag checked that on a fresh tap. Reading it " +
+                "works as before, on any phone, with no password.\n\nThe write password comes from your backup's " +
+                "password, so only someone who knows that can remove it: SeedTag (Verify, then Remove write password) " +
+                "or seedtag.py tag-key. Erasing, rewriting or making the tag read-only all need it removed first.",
+        )
+        is TagNotice.NotEnforced -> Dialog.Info(
+            "This chip doesn't enforce a write password",
+            "It accepted a write without the password, or shows the password to anyone who reads it, so a password " +
+                "would protect nothing. " +
+                (if (n.switchedOff) "SeedTag left it switched off: the tag works as before." else
+                    "SeedTag couldn't switch it off again. Verify the tag and tap Remove write password.") +
+                " The backup on it is unchanged.",
+        )
+        TagNotice.ProtectUnchecked -> Dialog.Info(
+            "Write password on, not checked",
+            "The write password was switched on, but the scan ended before SeedTag could check that the tag refuses " +
+                "writes without it. Verify the tag and tap Protect from writes again to check it.",
+        )
+        TagNotice.Unprotected -> Dialog.Info(
+            "Write password removed",
+            "Any phone can write to the tag, erase it or make it read-only again. The backup on it is unchanged.",
+        )
         is TagNotice.Erased -> Dialog.Info(
             "Tag erased",
             when (n.rest) {
@@ -776,22 +876,33 @@ class SeedTagViewModel : ViewModel() {
         )
     }
 
-    private fun decrypt(text: String, reveal: Boolean, differences: List<String>) {
+    /** What a decrypt found; [tagSecret] (Verify only) is zeroed by whoever ends up with it. */
+    private class Decrypted(val words: List<String>, val fingerprint: String, val fix: PasswordFix, val tagSecret: ByteArray?)
+
+    private fun decrypt(text: String, reveal: Boolean, differences: List<String>, info: TagInfo?) {
         val pw = readPassword.copy()
         runKdf(
             "Decrypting… (Argon2id takes a few seconds, longer if the password needs a second try)", pw,
             wrongPassword = Dialog.WrongPassword(Passphrase.nonWordPositions(pw), erase = false),
             work = {
-                // A wrong password is retried without extra spaces, then lower-cased.
-                val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw)
+                // A wrong password is retried without extra spaces, then lower-cased. Verify also keeps the
+                // tag's write-password secret, for Protect / Remove write password.
+                val opened = SeedBox.openForgiving(SeedBox.fromBase64(text), pw, withTagSecret = !reveal)
                 try {
-                    Triple(Bip39.entropyToWords(opened.entropy), SeedBox.fingerprint(opened.entropy), opened.fix)
+                    Decrypted(Bip39.entropyToWords(opened.entropy), SeedBox.fingerprint(opened.entropy), opened.fix, opened.tagSecret)
+                } catch (e: Throwable) {
+                    opened.tagSecret?.fill(0)
+                    throw e
                 } finally { opened.entropy.fill(0) }
             },
-        ) { (words, fp, fix) ->
+            dropped = { it.tagSecret?.fill(0) },
+        ) { d ->
+            val words = d.words
+            val fp = d.fingerprint
+            setTagSecret(d.tagSecret)
             verifyResult = VerifyResult(
-                words.size, fp, backupFingerprint?.let { it == fp }, backupFingerprint, fix, restored = reveal,
-                tagDifferences = differences, tagText = text,
+                words.size, fp, backupFingerprint?.let { it == fp }, backupFingerprint, d.fix, restored = reveal,
+                tagDifferences = differences, tagText = text, tagInfo = info,
             )
             apply(flow.opened(text))
             if (reveal) restoredWords = words
@@ -884,13 +995,14 @@ class SeedTagViewModel : ViewModel() {
         if (step != BackupStep.Done && step != BackupStep.Tag) step = BackupStep.Length
         wipeBackup()
         clearPasswords(PwField.Read); restoredWords = null
+        setTagSecret(null)
         clearEraseState() // its scan went with the flow's wipe
         // Every question goes, so nobody picking up the phone later can answer one. Messages stay.
         idle = false
         val d = below
         if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
             d is Dialog.ConfirmBack || d is Dialog.ConfirmSettings || d is Dialog.ConfirmTab ||
-            d is Dialog.ConfirmClearWords || d is Dialog.ConfirmErase || d == Dialog.ConfirmLock
+            d is Dialog.ConfirmClearWords || d is Dialog.ConfirmErase || d == Dialog.ConfirmLock || d is Dialog.ConfirmProtect
         ) below = null
     }
 

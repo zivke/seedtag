@@ -123,10 +123,12 @@ import rs.zivke.seedtag.core.EraseCheck
 import rs.zivke.seedtag.core.Haptic
 import rs.zivke.seedtag.core.Passphrase
 import rs.zivke.seedtag.core.PasswordFix
+import rs.zivke.seedtag.core.Protection
 import rs.zivke.seedtag.core.Rest
 import rs.zivke.seedtag.core.SeedBox
 import rs.zivke.seedtag.core.TagCheck
 import rs.zivke.seedtag.core.TagContent
+import rs.zivke.seedtag.core.TagInfo
 import rs.zivke.seedtag.core.TagStep
 
 // ============================================================== theme ===
@@ -1111,6 +1113,9 @@ private fun TagCheckResult(c: TagCheck) {
         !c.supported -> "This tag can't be used" to
             "It doesn't support NDEF, the standard way of storing data on NFC tags. Use another tag (an NTAG215 or NTAG216, for example)."
         !c.writable -> "This tag can't be used" to "It's read-only, so nothing can be written to it. Use another tag."
+        c.protected -> "This tag has a write password" to
+            "SeedTag gave it a write password, so nothing can be written to it. To use it for a new backup, verify it on " +
+            "the Verify tab with its backup's password and tap Remove write password, then check it here again."
         c.tooSmall -> "This tag is too small" to "Use a bigger tag (an NTAG215 or NTAG216, for example)."
         c.classic -> "Better use another tag" to
             "This is a MIFARE Classic tag. Many phones can't read MIFARE Classic at all, so a backup on it may not be " +
@@ -1139,6 +1144,8 @@ private fun TagCheckResult(c: TagCheck) {
                         ),
                     )
                     add(Fact("State", if (c.ndef) "Read without problems" else "Blank – it's formatted when the backup is written, then a second tap reads it back"))
+                    add(readOnlyFact(c))
+                    add(writePasswordFact(c))
                     when (c.content) {
                         TagContent.Backup -> add(Fact("Holds", "A SeedTag backup. A new backup would replace it (the app asks first).", Tone.Caution))
                         TagContent.NewerBackup -> add(
@@ -1155,6 +1162,33 @@ private fun TagCheckResult(c: TagCheck) {
                 },
             )
         }
+    }
+}
+
+/** Back up's tag check: whether the tag can be made read-only for good (done on the Verify tab). */
+private fun readOnlyFact(c: TagCheck): Fact = when (c.canMakeReadOnly) {
+    true -> Fact("Read-only", "Can be made read-only for good, on the Verify tab once the backup is verified")
+    false -> Fact("Read-only", "Can't be made read-only from this phone")
+    null -> Fact("Read-only", "Not known yet: the tag is blank. Check it again once the backup is written.")
+}
+
+/** Back up's tag check: whether SeedTag can give the tag a write password (done on the Verify tab). */
+private fun writePasswordFact(c: TagCheck): Fact {
+    val chip = c.chip
+    val id = chip?.identity
+    return when {
+        chip == null && !c.ndef -> Fact("Write password", "Not known yet: the tag is blank. Check it again once the backup is written.")
+        chip == null -> Fact("Write password", "Not known: the chip couldn't be checked. Verify shows it once the backup is written.")
+        id == null -> Fact("Write password", NOT_PROTECTABLE)
+        c.protected -> Fact("Write password", "On (see above)", Tone.Caution)
+        chip.settingsLocked -> Fact("Write password", "Not possible: this tag's settings are locked for good", Tone.Caution)
+        !id.genuine -> Fact(
+            "Write password",
+            "Possible, at your own risk: it's an NTAG21x lookalike, which SeedTag doesn't officially support, and " +
+                "setting one may destroy the tag. Set on the Verify tab once the backup is verified.",
+            Tone.Caution,
+        )
+        else -> Fact("Write password", "Possible (${id.chip.label}): set on the Verify tab once the backup is verified")
     }
 }
 
@@ -1679,6 +1713,11 @@ private fun EraseCheckResult(c: EraseCheck, verified: VerifyResult?) {
             "This tag is read-only. If it was made read-only for good, nothing can rewrite or erase it. To get rid of " +
                 "what it holds, destroy the tag (cut through its antenna and chip).",
         )
+        c.protected -> Triple(
+            Tone.Caution, "Has a write password",
+            "SeedTag gave this tag a write password, so it can't be erased. Verify it on the Verify tab with its " +
+                "backup's password and tap Remove write password, then erase it here.",
+        )
         verified != null -> Triple(Tone.Success, "Password checked", "Your password decrypts this tag to a valid ${verified.wordCount}-word seed.")
         c.content == TagContent.Backup -> Triple(
             Tone.Caution, "A SeedTag backup",
@@ -1702,7 +1741,13 @@ private fun EraseCheckResult(c: EraseCheck, verified: VerifyResult?) {
             Facts(
                 buildList {
                     c.capacity?.let { add(Fact("Size", "$it bytes")) }
-                    add(Fact("State", if (c.writable) "Can be erased" else "Read-only", if (c.writable) null else Tone.Caution))
+                    add(
+                        when {
+                            !c.writable -> Fact("State", "Read-only", Tone.Caution)
+                            c.protected -> Fact("State", "Write password on", Tone.Caution)
+                            else -> Fact("State", "Can be erased")
+                        },
+                    )
                     verified?.let { v ->
                         add(Fact("Fingerprint", v.fingerprint, mono = true))
                         when (v.matchesBackup) {
@@ -1775,6 +1820,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                     if (result.tagDifferences.isEmpty()) Fact("The tag's message", "Exactly as SeedTag writes it", Tone.Success)
                     else Fact("The tag's message", "Not as SeedTag writes it: see below", Tone.Caution),
                 )
+                result.tagInfo?.let { addAll(chipFacts(it)) }
                 when (result.matchesBackup) {
                     true -> add(Fact("Backup from this session", "Same seed", Tone.Success))
                     false -> add(
@@ -1816,6 +1862,9 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                     "match, this tag holds that seed. It's SeedTag's own: a wallet may show a fingerprint too, but that's " +
                     "a different number.",
             )
+            val info = result.tagInfo
+            val protection = info?.identity?.let { info.protection }
+            if (info?.identity != null) WritePasswordSection(vm, info)
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionLabel("Make it read-only")
                 Text(
@@ -1825,8 +1874,71 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                LockButton(vm)
+                if (protection == null || protection == Protection.Off) LockButton(vm)
+                else Text(
+                    "The tag has a write password: remove it first, then make the tag read-only.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
+        }
+    }
+}
+
+private const val NOT_PROTECTABLE =
+    "Not possible: SeedTag can give one only to an NTAG213, NTAG215 or NTAG216, or an NTAG21x lookalike that works like one"
+
+/** Verify's lines about the chip: which it is, and its write password. */
+private fun chipFacts(info: TagInfo): List<Fact> {
+    val id = info.identity ?: return listOf(Fact("Chip", NOT_PROTECTABLE))
+    return buildList {
+        add(
+            when {
+                id.genuine -> Fact("Chip", id.chip.label)
+                else -> Fact("Chip", "NTAG21x lookalike, not made by NXP: not officially supported", Tone.Caution)
+            },
+        )
+        add(
+            when (info.protection) {
+                Protection.Off -> Fact("Write password", "Off: any phone can rewrite or erase the tag")
+                Protection.Write -> Fact("Write password", "On: writing needs it, reading doesn't", Tone.Success)
+                Protection.ReadWrite -> Fact("Write password", "On for reading too. SeedTag never sets that: another app did", Tone.Caution)
+            },
+        )
+        if (info.settingsLocked) add(Fact("Settings", "Locked for good: its write password can't be changed", Tone.Caution))
+    }
+}
+
+/** Verify's "Write password": protect the tag from writes, or remove that again. */
+@Composable
+private fun WritePasswordSection(vm: SeedTagViewModel, info: TagInfo) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionLabel("Write password")
+        when (info.protection) {
+            Protection.Off -> {
+                Text(
+                    "SeedTag can give the tag a write password, made from your backup's password. Then no phone can rewrite " +
+                        "or erase it, or make it read-only, without that password; reading stays open to any phone. Unlike " +
+                        "making it read-only, it can be removed again.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (!info.settingsLocked) SecondaryButton("Protect from writes", vm::requestProtect)
+            }
+            Protection.Write -> {
+                Text(
+                    "Writing to the tag needs its write password. To rewrite, erase or lock the tag, remove it first. " +
+                        "Only this backup's password can remove it.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (!info.settingsLocked) SecondaryButton("Remove write password", vm::unprotect)
+            }
+            Protection.ReadWrite -> Text(
+                "Another app set a password on this tag. SeedTag doesn't change it.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -2050,6 +2162,7 @@ private fun AntennaPage(vm: SeedTagViewModel, nfcState: NfcState, openNfcSetting
                 ),
             )
         }
+        if (ChipTest.AVAILABLE) ChipTestSection(vm)
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             SectionLabel("Tips")
             Steps(
@@ -2062,6 +2175,30 @@ private fun AntennaPage(vm: SeedTagViewModel, nfcState: NfcState, openNfcSetting
                     "Later, you only need to hold the tag there when the app asks for it, not the whole time.",
                 ),
             )
+        }
+    }
+}
+
+/** Debug builds only ([ChipTest]): raw commands, one per tap, and what the chip answered. */
+@Composable
+private fun ChipTestSection(vm: SeedTagViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        SectionLabel("Chip test (debug build only)")
+        Text(
+            "Sends one command per tap and shows the chip's raw answer: ${ChipTest.labels.joinToString(", ")}. " +
+                "Nothing is written. Take the tag away between taps.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        val next = vm.chipTestNextLabel
+        if (next == null) {
+            SecondaryButton("Start chip test", vm::startChipTest)
+        } else {
+            Text("Next tap: $next", style = MaterialTheme.typography.titleSmall)
+            vm.chipTestLines.forEach { line ->
+                Text(line, style = MaterialTheme.typography.bodySmall, fontFamily = FontFamily.Monospace)
+            }
+            SecondaryButton("Stop chip test", vm::stopChipTest)
         }
     }
 }
@@ -2538,6 +2675,37 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Sett
                 )
             },
             confirmButton = { TextButton(onClick = vm::confirmLock) { DangerText("Make read-only") } },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
+        )
+        is Dialog.ConfirmProtect -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            icon = { if (d.otherMaker) WarningIcon() },
+            title = {
+                Text(
+                    if (d.otherMaker) "Not officially supported" else "Give the tag a write password?",
+                )
+            },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    (if (d.otherMaker) {
+                        "This tag is an NTAG21x lookalike: it works like NXP's NTAG21x chips, but NXP didn't make it, and " +
+                            "SeedTag doesn't officially support it. Setting a write password may destroy the tag. It does " +
+                            "seem to support one: SeedTag found the password settings where an NTAG21x has them. At the " +
+                            "end, SeedTag checks that the tag refuses writes without the password, and switches it off " +
+                            "again if it doesn't, but it can't foresee how every lookalike behaves: one could, for " +
+                            "example, never accept a write again. Go on only if losing this tag wouldn't matter: you " +
+                            "have other backups of the seed.\n\n"
+                    } else "") +
+                        "The tag will refuse every write (rewriting, erasing, making it read-only) without the password. " +
+                        "Reading stays open to any phone, as now. The password is made from your backup's password, so " +
+                        "whoever can decrypt the tag can remove it: SeedTag (Verify, then Remove write password) or " +
+                        "seedtag.py tag-key.\n\nIt takes three taps: hold the tag to the phone, take it away and hold " +
+                        "it again when asked. The write password goes to the tag unencrypted, now and whenever it's " +
+                        "removed, so do this where nobody could be listening in with a radio receiver nearby.",
+                )
+            },
+            confirmButton = { TextButton(onClick = vm::confirmProtect) { Text(if (d.otherMaker) "Protect anyway" else "Protect") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
         )
     }
