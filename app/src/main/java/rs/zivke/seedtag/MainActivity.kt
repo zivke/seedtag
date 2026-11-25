@@ -9,6 +9,7 @@ import android.content.pm.ApplicationInfo
 import android.os.Build
 import android.nfc.NfcAdapter
 import android.os.Bundle
+import android.os.Process
 import android.provider.Settings
 import android.view.MotionEvent
 import android.view.View
@@ -90,6 +91,7 @@ class MainActivity : ComponentActivity() {
                     accessibilityApps = if (apps == accessibilityHidden.value) emptyList() else apps,
                     hideAccessibilityBanner = { accessibilityHidden.value = apps },
                     leave = { finish() },
+                    close = ::closeSeedTag,
                 )
             }
         }
@@ -262,6 +264,27 @@ class MainActivity : ComponentActivity() {
         // screen doesn't time out meanwhile (IdleWatch in Ui.kt keeps it on, with the app's own timeout).
         if (!isChangingConfigurations) vm.wipeAll()
         super.onStop()
+    }
+
+    /** Close SeedTag was confirmed: [onDestroy] ends the process. */
+    private var closing = false
+
+    /**
+     * Close SeedTag (board B4): clear everything, take the task out of Recents (so it doesn't come back
+     * as an empty screen), then end the process in [onDestroy], once the activity is gone. The copies
+     * [SeedTagViewModel.wipeAll] can't zero (a password shown as text, text already drawn, the Argon2id
+     * memory, copies of the AES key) go with the process. Nothing is saved for a restart.
+     */
+    private fun closeSeedTag() {
+        if (closing) return
+        closing = true
+        vm.wipeAll()
+        finishAndRemoveTask()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (closing) Process.killProcess(Process.myPid())
     }
 }
 

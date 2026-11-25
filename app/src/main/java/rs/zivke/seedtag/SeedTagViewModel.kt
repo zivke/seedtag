@@ -108,6 +108,11 @@ sealed interface Dialog {
     data class ConfirmNewPassphrase(val generated: Boolean) : Dialog
     /** Back would drop what was entered: [toWords] for the Password step's Back (clears the passwords), else leaving the app. */
     data class ConfirmBack(val toWords: Boolean) : Dialog
+    /**
+     * Close SeedTag: clear everything and end the process, so the copies [wipeAll] can't zero go with it
+     * (board B4). MainActivity does the closing; this only asks.
+     */
+    data object ConfirmClose : Dialog
     /** Opening Settings at [page] would leave the app, which drops what was entered or restored. */
     data class ConfirmSettings(val page: SettingsPage) : Dialog
     /** The Words step's Clear would drop the [count] words entered so far. */
@@ -949,6 +954,14 @@ class SeedTagViewModel : ViewModel() {
         }
     }
 
+    /** A tag is being read or written right now: Close SeedTag waits for it ([requestClose]). */
+    val tagWorking: Boolean get() = scanPrompt?.working != null
+
+    /** Close SeedTag (top bar, Done, the Verify and Restore results): asks first, never during tag I/O. */
+    fun requestClose() {
+        if (!tagWorking) dialog = Dialog.ConfirmClose
+    }
+
     /** Bumped by every touch (and Keep): restarts the idle timeout. */
     var touches by mutableIntStateOf(0)
         private set
@@ -1002,7 +1015,8 @@ class SeedTagViewModel : ViewModel() {
         val d = below
         if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
             d is Dialog.ConfirmBack || d is Dialog.ConfirmSettings || d is Dialog.ConfirmTab ||
-            d is Dialog.ConfirmClearWords || d is Dialog.ConfirmErase || d == Dialog.ConfirmLock || d is Dialog.ConfirmProtect
+            d is Dialog.ConfirmClearWords || d is Dialog.ConfirmErase || d == Dialog.ConfirmLock || d is Dialog.ConfirmProtect ||
+            d == Dialog.ConfirmClose
         ) below = null
     }
 

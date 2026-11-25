@@ -7,6 +7,13 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- **Close SeedTag**: the ✕ at the top right, on every screen, and a button at the end of Back up, Verify and
+  Restore. Leaving SeedTag clears what was typed or decrypted, but some copies an app can't clear (the password as
+  text while Show is on, text already drawn, the memory Argon2id used, copies of the key) stay in memory until
+  Android ends SeedTag, which can take days. Close SeedTag ends it at once, after asking: the question says what
+  goes with it (the backup's fingerprint, a Verify or Restore result) and what no app can clear, so you still
+  restart the phone. It also takes SeedTag out of Recents, and waits while a tag is being read or written. The
+  checklist's *Nothing is kept* and the About page explain it.
 - **Protect from writes**, on the Verify tab once a backup is verified: gives an NTAG213, 215 or 216 a write
   password, so no phone can rewrite, erase or lock the tag without it, and nobody can set a read password of
   their own. Reading stays open to any phone. The password comes from the backup's password, so it isn't stored

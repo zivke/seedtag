@@ -293,6 +293,7 @@ fun SeedTagApp(
     accessibilityApps: List<String> = emptyList(),
     hideAccessibilityBanner: () -> Unit = {},
     leave: () -> Unit = {},
+    close: () -> Unit = {},
 ) {
     // Settings is another app: going there stops SeedTag, which wipes what was entered. Ask first.
     val settings: (SettingsPage) -> Unit = { p -> if (vm.holdsSecrets) vm.dialog = Dialog.ConfirmSettings(p) else openSettings(p) }
@@ -336,6 +337,8 @@ fun SeedTagApp(
                         onBack = { vm.page = null },
                         onFindSpot = { vm.page = Page.Antenna },
                         onAbout = { vm.page = Page.About },
+                        onClose = vm::requestClose,
+                        closeEnabled = !vm.tagWorking,
                     )
                 },
             ) { pad ->
@@ -361,7 +364,7 @@ fun SeedTagApp(
         }
         if (veiled && !blurs) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
     }
-    Dialogs(vm, leave, openSettings)
+    Dialogs(vm, leave, openSettings, close)
 }
 
 /**
@@ -403,12 +406,19 @@ private fun TextStyle.centered() =
     copy(lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both))
 
 /**
- * The top bar: one row, so the icon, the title, Find NFC spot and ⓘ (or the back arrow and a page's
- * title) all share the same vertical center.
+ * The top bar: one row, so the icon, the title, Find NFC spot, ⓘ and ✕ Close SeedTag (or the back arrow,
+ * a page's title and ✕) all share the same vertical center.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun Header(page: Page?, onBack: () -> Unit, onFindSpot: () -> Unit, onAbout: () -> Unit) {
+private fun Header(
+    page: Page?,
+    onBack: () -> Unit,
+    onFindSpot: () -> Unit,
+    onAbout: () -> Unit,
+    onClose: () -> Unit,
+    closeEnabled: Boolean,
+) {
     Row(
         Modifier.fillMaxWidth()
             .background(MaterialTheme.colorScheme.background)
@@ -421,9 +431,9 @@ private fun Header(page: Page?, onBack: () -> Unit, onFindSpot: () -> Unit, onAb
             IconButton(onClick = onBack) { Icon(ImageVector.vectorResource(R.drawable.ic_arrow_back), "Back") }
             Spacer(Modifier.width(4.dp))
         } else {
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(8.dp))
             AppIcon()
-            Spacer(Modifier.width(10.dp))
+            Spacer(Modifier.width(8.dp))
         }
         Text(
             page?.title ?: "SeedTag",
@@ -437,6 +447,9 @@ private fun Header(page: Page?, onBack: () -> Unit, onFindSpot: () -> Unit, onAb
                 Text(Page.Antenna.button, style = MaterialTheme.typography.labelLarge.centered())
             }
             IconButton(onClick = onAbout) { Icon(iconOf(Tone.Info), Page.About.title) }
+        }
+        IconButton(onClick = onClose, enabled = closeEnabled) {
+            Icon(ImageVector.vectorResource(R.drawable.ic_close), CLOSE_SEEDTAG)
         }
     }
 }
@@ -898,8 +911,8 @@ private fun Steps(steps: List<String>) {
  */
 @Composable
 private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
-    val restart = "close SeedTag and restart the phone before it goes back online. Some spyware doesn't survive a " +
-        "restart and loses whatever it captured."
+    val restart = "tap Close SeedTag (✕, top right) and restart the phone before it goes back online. Some spyware " +
+        "doesn't survive a restart and loses whatever it captured."
     val offline = if (LocalAirplaneMode.current) {
         Item(
             Tone.Info,
@@ -975,8 +988,9 @@ private fun Preflight(vm: SeedTagViewModel, flow: Flow) {
             Item(
                 Tone.Info,
                 "Nothing is kept",
-                "Everything you type or decrypt is deleted as soon as you close or leave SeedTag, and nothing is ever " +
-                    "saved on the phone. If you leave halfway through, you'll have to type it again.",
+                "Everything you type or decrypt is cleared as soon as you leave SeedTag, and nothing is ever saved on " +
+                    "the phone. If you leave halfway through, you'll have to type it again.",
+                CLOSE_DETAILS,
             ),
         )
         if (flow == Flow.Verify) {
@@ -1064,6 +1078,18 @@ private const val SPARE_PHONE_DETAILS =
         "If you don't have a spare phone, you can use your everyday phone after making sure it's offline, but be " +
         "aware that it is a less safe option. For more details, read Go offline first, in the checklist on Back up, " +
         "Verify and Restore."
+
+private const val CLOSE_SEEDTAG = "Close SeedTag"
+
+/** Why Close SeedTag exists (board B4): the checklist's Nothing is kept, and the About section. */
+private const val CLOSE_DETAILS =
+    "Leaving SeedTag clears what you typed or decrypted, but a few copies can't be cleared by an app: the password " +
+        "as text while Show is on, text already drawn on the screen, the memory used to turn the password into a " +
+        "key, and copies of the key inside Android's encryption. They stay in SeedTag's memory until Android ends " +
+        "SeedTag, which can take hours or days.\n\n" +
+        "Close SeedTag (✕ at the top right, and at the end of Back up, Verify and Restore) ends it at once, so they go " +
+        "with it. Even then, copies outside SeedTag, such as the screen's graphics memory, and freed memory until " +
+        "it's used again, can't be cleared by any app: restart the phone before it goes back online."
 
 private const val DISCLAIMER =
     "SeedTag comes without any warranty, and its developer is not responsible for any loss or damage resulting from " +
@@ -1619,6 +1645,22 @@ private fun DoneStep(vm: SeedTagViewModel) {
                 "Only then make the tag read-only (on the Verify tab – it's permanent) and keep another backup of the seed somewhere else.",
             ),
         )
+        CloseSection(vm)
+    }
+}
+
+/** Close SeedTag where a procedure ends: Done, and the Verify and Restore results. */
+@Composable
+private fun CloseSection(vm: SeedTagViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        SectionLabel("When you're done")
+        Text(
+            "Close SeedTag clears everything and ends the app, together with the copies in memory that leaving it " +
+                "can't clear. Then restart the phone before it goes back online.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        SecondaryButton(CLOSE_SEEDTAG, vm::requestClose, enabled = !vm.tagWorking)
     }
 }
 
@@ -1882,6 +1924,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                 )
             }
         }
+        CloseSection(vm)
     }
 }
 
@@ -2264,6 +2307,7 @@ private fun AboutPage() {
                     "overlays and vibration. It stores nothing on the phone – everything typed or decrypted is wiped " +
                     "when you leave the app.",
             )
+            AboutSection("Closing SeedTag", CLOSE_DETAILS)
             AboutSection(
                 "Protection on the phone",
                 "Seed words and passwords are typed on the app's own keyboards, never the system keyboard. Screenshots " +
@@ -2289,7 +2333,7 @@ private fun AboutPage() {
                 "Donate" to DONATE_URL,
             )
             Text(
-                "Links open in your browser. Leaving SeedTag deletes everything you've typed in it.",
+                "Links open in your browser. Leaving SeedTag clears what you've typed in it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -2368,7 +2412,7 @@ private fun TagWorking(step: TagStep) {
 }
 
 @Composable
-private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (SettingsPage) -> Unit) {
+private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (SettingsPage) -> Unit, close: () -> Unit) {
     vm.busy?.let { msg ->
         AlertDialog(
             onDismissRequest = {},
@@ -2550,6 +2594,42 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Sett
                 TextButton(onClick = { vm.dialog = null; if (d.toWords) vm.backToWords() else leave() }) {
                     DangerText(if (d.toWords) "Clear and go back" else "Leave")
                 }
+            },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Stay") } },
+        )
+        Dialog.ConfirmClose -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            title = { Text("Close SeedTag?") },
+            text = {
+                GuardDialogWindow()
+                val lost = buildList {
+                    vm.backupFingerprint?.let {
+                        add("the fingerprint of the backup you just wrote ($it: note it first if you need it), and Verify " +
+                            "won't be able to say whether a tag holds that backup")
+                    }
+                    vm.verifyResult?.let { add(if (it.restored) "the Restore result" else "the Verify result") }
+                    if (vm.restoredWords != null) add("the restored words")
+                }
+                Text(
+                    "Everything you typed or decrypted is cleared, and SeedTag ends, so the copies that clearing " +
+                        "can't reach go with it: the password as text while Show was on, text already drawn on the " +
+                        "screen, the memory used to turn the password into a key, and copies of the key." +
+                        (if (lost.isEmpty()) "" else "\n\nWhat's on screen goes too: " + lost.joinToString("; ") + ".") +
+                        "\n\nCopies outside SeedTag, such as the screen's graphics memory, and freed memory until " +
+                        "it's used again, can't be cleared by any app: restart the phone before it goes back online.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.dialog = null
+                        if (vm.tagWorking) {
+                            vm.dialog = Dialog.Info("Wait for the tag", "A tag is being read or written. Close SeedTag once it's done.")
+                        } else {
+                            close()
+                        }
+                    },
+                ) { Text(CLOSE_SEEDTAG) }
             },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Stay") } },
         )

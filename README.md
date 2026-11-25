@@ -248,8 +248,8 @@ seed. From safest down:
    - restart it before you start;
    - turn on airplane mode, and check that Wi-Fi and Bluetooth are off too: they can be switched back on in
      airplane mode. NFC normally stays on; if the app says NFC is off, switch NFC back on;
-   - when you're done, close SeedTag and **restart the phone before it goes back online**. Some spyware doesn't
-     survive a restart, so it loses whatever it caught before it could send it.
+   - when you're done, tap **Close SeedTag** (✕, top right) and **restart the phone before it goes back online**.
+     Some spyware doesn't survive a restart, so it loses whatever it caught before it could send it.
 
    This stops anything that sends data live, such as remote-control malware, and spyware that doesn't survive a
    restart. It doesn't stop malware that survives the restart and uploads later: only a phone that's never online
@@ -311,9 +311,9 @@ The safest way to use SeedTag, from start to finish:
    unchanged into a file, move it to an offline computer (a live USB system is ideal) and run
    `python3 -I -S seedtag.py verify <FILE>`: it must print the same fingerprint, and say the text is exactly what
    SeedTag writes.
-6. **Read-only comes last; it's permanent.** Only after steps 4 and 5 pass, use **Make tag read-only**. A write
-   password for the tag is planned; once it's in the app, its instructions here will say where it fits, before
-   making the tag read-only.
+6. **Protect the tag last.** Only after steps 4 and 5 pass, Verify it once more and protect it on the Verify tab:
+   **Protect from writes** (an NTAG213, 215 or 216; it can be undone), or **Make tag read-only** (permanent), see
+   [Using it](#using-it), step 5. Then tap **Close SeedTag** and restart the phone.
 7. **Make at least two tags** this way and keep them in different places, out of strangers' reach (a metal box or
    shielding sleeve), cool and dry, and away from wireless chargers and induction hobs ([Storing a
    tag](#choosing-a-tag)). Keep your paper or metal copy of the seed too, somewhere else again. Keep the written
@@ -443,10 +443,14 @@ to be seen again.
 When a screen goes on below what's visible, for example above the word keypad or the password keyboard, its bottom
 edge fades out and a small round **↓** button scrolls further; the top edge fades when there's more above.
 
-Leaving or closing the app (home button, Recents, screen off) clears everything typed or decrypted from the app;
-nothing is ever saved on the phone. Some copies stay in the phone's memory until Android ends SeedTag's process,
-which can take days ([Security notes](#security-notes), *What's wiped from memory*): restart the phone when you're
-done, or at least force-stop SeedTag. So that a screen timeout doesn't wipe a half-typed phrase, the screen stays on while
+Leaving the app (home button, Recents, screen off) clears everything typed or decrypted from the app; nothing is
+ever saved on the phone. Some copies stay in the phone's memory until Android ends SeedTag's process, which can take
+days ([Security notes](#security-notes), *What's wiped from memory*). **Close SeedTag** ends it: the ✕ at the top
+right, on every screen, and a button at the end of Back up (*Backup written*), Verify and Restore. It asks first
+(**Close SeedTag** / **Stay**), saying what goes with it, such as the fingerprint of the backup you just wrote, so
+note that first. Then it clears everything, takes SeedTag out of Recents and ends its process. It waits while a tag
+is being read or written. Copies outside SeedTag (the screen's graphics memory) and freed memory stay until they're
+used again, so restart the phone when you're done anyway. So that a screen timeout doesn't wipe a half-typed phrase, the screen stays on while
 words, a password or restored words are on the phone. Instead, SeedTag has its own timeout: after 3 minutes without a
 touch it asks *Still there?* (with a buzz), with the screen behind it blurred (covered before Android 12), and
 clears everything a minute later unless you tap **Keep**, which brings back whatever message was open. Clearing
@@ -774,9 +778,11 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
 
   When the app is backgrounded, it drops every reference to what was typed or decrypted, but Android usually keeps
   the app's process in memory for a while (minutes to days), and the copies above stay in it until they're
-  overwritten. They can only be read with root access, a debugger or a forensic memory dump. To clear them, restart
-  the phone when you're done (the offline advice in [Using it safely](#using-it-safely) asks for that anyway), or at
-  least force-stop SeedTag (*Settings › Apps › SeedTag › Force stop*).
+  overwritten. They can only be read with root access, a debugger or a forensic memory dump. **Close SeedTag** ends
+  the process, and they go with it (a force-stop, *Settings › Apps › SeedTag › Force stop*, does the same). What no
+  app can clear: copies outside its process, such as the screen's graphics memory, and freed memory until it's
+  reused. So restart the phone when you're done too (the offline advice in [Using it safely](#using-it-safely) asks
+  for that anyway).
 - The Ultralight C's own 3DES access protection isn't used, and isn't needed: the payload is encrypted.
 
 ## Tests
