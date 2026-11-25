@@ -141,14 +141,15 @@ report's tests N1–N12, A1–A3, H1).
   `release-cert.sha256` hang on it too. Check what the container's credential can do; add a `v*` tag ruleset and
   immutable releases; publish the certificate digest somewhere the account can't edit (F-Droid reproducible build,
   or a personal site).
-- [ ] **B4: the process outlives the wipe.** **High priority** (owner, 2026-11-24; moved up from Medium).
+- [x] **B4: the process outlives the wipe.** **High priority** (owner, 2026-11-24; moved up from Medium).
   - [x] Correct the README ("deletes everything", now around line 432 and in the About paragraph) and advise a
     force-stop or restart. *Security notes* already said so.
   - [x] Decide whether to end the process in `onStop`. Decided (2026-11-24): **no automatic end** (it would cut off
     a tag write, erase or lock in progress, or, once deferred until the tag is done, lose its result: *Backup
     written* and its fingerprint, the Verify result, Make read-only after a write; and every short trip out of the
     app would start over). Instead, option C below.
-  - [ ] **Option C: an explicit Close SeedTag**, ending the task and the process when the user chooses.
+  - [x] **Option C: an explicit Close SeedTag**, ending the task and the process when the user chooses. Done
+    2026-11-25 (`e272140`; device rows 7.52-7.56).
     - Where: on Done, on the Verify and Restore results, and in the top bar (always reachable).
     - A confirmation dialog first (**Close SeedTag** / **Stay**) that says exactly what happens: everything
       typed or decrypted is cleared, and SeedTag's process ends, so the copies the wipe can't zero (the
