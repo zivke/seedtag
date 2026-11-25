@@ -223,7 +223,7 @@ report's tests N1–N12, A1–A3, H1).
     `TagFlowTest`. Erase is no longer a parallel copy in the view model. Behaviour unchanged (B15 is next).
   - [ ] Not done: the idle timer with an injected clock. It's three `delay`s in `IdleWatch`, restarted by
     Compose on every touch; a clock-driven copy would be new code to get wrong, for little to test.
-- [ ] **B17: `tag-write-password` drift and design gaps.** Drop `7e99a92`, re-apply `c235d3c`, land the pure
+- [x] **B17: `tag-write-password` drift and design gaps.** Drop `7e99a92`, re-apply `c235d3c`, land the pure
   additions first; fresh-tap check before "Protected"; compare all of CFG0/CFG1; map a NAK after AUTH to "wrong
   key"; Erase aware of protection; README: the NTAG password goes over the air in the clear. Rebuilt on
   `b17-tag-write-password` from `develop` (the old branch stays as a reference until this merges):
@@ -251,7 +251,9 @@ report's tests N1–N12, A1–A3, H1).
     repaired, Erase and Make read-only aware of protection.
   - [x] Docs: README (what it protects and not; the NTAG password and the Ultralight C key go over the air in the
     clear when set; `tag-key`), `FORMAT.md` section 6's chip settings, changelog, device rows (N11).
-  - [ ] **Later: MIFARE Ultralight C** (owner, 2026-11-24). The derivation (`TagKey.ultralightCKey`) and the 3DES
+  - Done 2026-11-25: every device row (7.42-7.51, 5.18) passed on an NXP NTAG215 and two lookalikes; 5.17's raw
+    PWD_AUTH by hand is optional. The Ultralight C moved to its own item below.
+- [ ] **B17 follow-up: MIFARE Ultralight C** (owner, 2026-11-24). The derivation (`TagKey.ultralightCKey`) and the 3DES
     handshake (`UltralightCAuth`) are in and tested; the app part waits for a real Ultralight C to test on (none
     yet: the tested tag was an NTAG213). Key pages 2Ch-2Fh, AUTH0 (2Ah) and AUTH1 (2Bh, 01h = writes only); the
     key goes over the air in the clear when it's set; old branch `c235d3c` has a first version.
