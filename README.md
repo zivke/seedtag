@@ -336,7 +336,8 @@ found*, with what's being done and, for writing, erasing or making a tag read-on
 being written there's no Cancel: the write can't be stopped halfway, and moving the tag away is what would leave the
 job half-done (Cancel comes back if a step hangs for 15 seconds). If it moves away too early, just hold it there again. A thick or metal case can block it.
 Small tags and rings have a small NFC symbol on them: put that side right against the spot. Not sure where the spot
-is? **Find NFC spot** in the top bar opens a finder (*Where to hold the tag*): first it checks that NFC is on, then
+is? *Not sure where to hold the tag? Find your NFC spot*, under the first step's heading on every tab, opens a
+finder (*Where to hold the tag*): first it checks that NFC is on, then
 you slide a tag or any contactless card over the back of the phone until it vibrates and says *Tag detected*, and
 for an NDEF tag how long a backup it has room for. It doesn't write to the tag or read its contents. The phone vibrates when the tag has been handled: a short confirmation when it
 worked, a "rejected" buzz when something went wrong (it follows the phone's touch-feedback setting).

@@ -43,10 +43,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
 
 enum class Screen(val title: String) { Backup("Back up"), Verify("Verify"), Restore("Restore"), Erase("Erase") }
-/** Pages opened from the top bar ([button]), shown instead of the tabs. */
-enum class Page(val title: String, val button: String) {
-    Antenna("Where to hold the tag", "Find NFC spot"),
-    About("About", "About"),
+/** Pages shown instead of the tabs: the NFC-spot finder (a link on every tab's first step) and About (the top bar's ⓘ). */
+enum class Page(val title: String) {
+    Antenna("Where to hold the tag"),
+    About("About"),
 }
 
 /** What the NFC-spot finder saw, from the tag's discovery info only: nothing is read from its memory. */

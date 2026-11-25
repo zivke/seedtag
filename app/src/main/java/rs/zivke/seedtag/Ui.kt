@@ -335,7 +335,6 @@ fun SeedTagApp(
                     Header(
                         page = page,
                         onBack = { vm.page = null },
-                        onFindSpot = { vm.page = Page.Antenna },
                         onAbout = { vm.page = Page.About },
                         onClose = vm::requestClose,
                         closeEnabled = !vm.tagWorking,
@@ -406,15 +405,14 @@ private fun TextStyle.centered() =
     copy(lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both))
 
 /**
- * The top bar: one row, so the icon, the title, Find NFC spot, ⓘ and ✕ Close SeedTag (or the back arrow,
- * a page's title and ✕) all share the same vertical center.
+ * The top bar: one row, so the icon, the title, ⓘ and ✕ Close SeedTag (or the back arrow, a page's title
+ * and ✕) all share the same vertical center. The NFC-spot finder is a link on each tab ([NfcSpotLink]).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun Header(
     page: Page?,
     onBack: () -> Unit,
-    onFindSpot: () -> Unit,
     onAbout: () -> Unit,
     onClose: () -> Unit,
     closeEnabled: Boolean,
@@ -431,9 +429,9 @@ private fun Header(
             IconButton(onClick = onBack) { Icon(ImageVector.vectorResource(R.drawable.ic_arrow_back), "Back") }
             Spacer(Modifier.width(4.dp))
         } else {
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(12.dp))
             AppIcon()
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(10.dp))
         }
         Text(
             page?.title ?: "SeedTag",
@@ -443,9 +441,6 @@ private fun Header(
             modifier = Modifier.weight(1f),
         )
         if (page == null) {
-            TextButton(onClick = onFindSpot) {
-                Text(Page.Antenna.button, style = MaterialTheme.typography.labelLarge.centered())
-            }
             IconButton(onClick = onAbout) { Icon(iconOf(Tone.Info), Page.About.title) }
         }
         IconButton(onClick = onClose, enabled = closeEnabled) {
@@ -1125,11 +1120,17 @@ private fun TagStep(vm: SeedTagViewModel) {
                 "First, SeedTag scans your tag to check whether it works, whether it already holds data and how much " +
                     "it can hold. Nothing is written to it. Tap Scan tag, then hold the tag to the phone.",
             )
-            Link("Not sure where to hold it? Find your NFC spot") { vm.page = Page.Antenna }
+            NfcSpotLink(vm)
         }
         if (check != null) TagCheckResult(check)
         Preflight(vm, Flow.Backup)
     }
+}
+
+/** The way to the NFC-spot finder, under the first step's heading on every tab. */
+@Composable
+private fun NfcSpotLink(vm: SeedTagViewModel) {
+    Link("Not sure where to hold the tag? Find your NFC spot") { vm.page = Page.Antenna }
 }
 
 /** The result of the first Back up step: can this tag take a backup, and how many words. */
@@ -1719,6 +1720,7 @@ private fun EraseScreen(vm: SeedTagViewModel) {
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                NfcSpotLink(vm)
             }
         }
         when {
@@ -1827,12 +1829,15 @@ private fun ReadPasswordStep(vm: SeedTagViewModel, reveal: Boolean) {
             PrimaryButton("Scan tag", if (reveal) vm::scanForRestore else vm::scanForVerify, enabled = vm.passwordLength(PwField.Read) > 0)
         },
     ) {
-        StepHeader(
-            1, 2,
-            if (reveal) "Restore a seed" else "Verify a tag",
-            if (reveal) "Type the password, then scan the tag. The words will be shown on screen." else
-                "Type the password from your written copy, then scan the tag. The words stay hidden.",
-        )
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            StepHeader(
+                1, 2,
+                if (reveal) "Restore a seed" else "Verify a tag",
+                if (reveal) "Type the password, then scan the tag. The words will be shown on screen." else
+                    "Type the password from your written copy, then scan the tag. The words stay hidden.",
+            )
+            NfcSpotLink(vm)
+        }
         Preflight(vm, if (reveal) Flow.Restore else Flow.Verify)
     }
 }

@@ -75,6 +75,9 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- The NFC-spot finder moved from the top bar to a link under the first step's heading on every tab, *Not sure
+  where to hold the tag? Find your NFC spot* (Back up had it already; Verify, Restore and Erase have it now). The
+  top bar keeps ⓘ and gets ✕ (*Close SeedTag*).
 - *USB or wireless debugging is on* says, on Android 11 and older, that a
   computer with debugging access can also mirror the screen, SeedTag's
   included (README too).
