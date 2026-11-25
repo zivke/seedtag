@@ -179,6 +179,104 @@ class TagFlowTest {
     }
 
     @Test
+    fun verifyAsksForTheChipRestoreDoesnt() {
+        assertEquals(TagRequest.Read(withInfo = true), TagFlow().scanToRead(reveal = false).flow.pending!!.request)
+        assertEquals(TagRequest.Read(withInfo = false), TagFlow().scanToRead(reveal = true).flow.pending!!.request)
+        val info = TagInfo(NtagIdentity(NtagChip.Ntag213, genuine = true), Protection.Write)
+        val read = TagFlow().scanToRead(reveal = false).tap(TagResult.Read(text, info = info))
+        assertEquals(TagEffect.Decrypt(text, false, emptyList(), info), read.effects.last())
+    }
+
+    private val secret = ByteArray(32) { it.toByte() }
+
+    private val TagFlow.Next.protect get() = flow.pending!!.request as TagRequest.Protect
+
+    @Test
+    fun protectTakesThreeTapsInNewSessions() {
+        assertNull(TagFlow().protect(secret).flow.pending) // nothing verified: no tag to protect
+        val armed = TagFlow().opened(text).flow.protect(secret)
+        assertEquals(Purpose.Protect, armed.flow.pending!!.purpose)
+        assertEquals(ProtectStage.Store, armed.protect.stage)
+        assertEquals(text, armed.protect.expected)
+        assertSame(secret, armed.protect.secret) // the view model's array, which it zeroes
+        val stored = armed.tap(TagResult.ProtectStored)
+        assertEquals(ProtectStage.SwitchOn, stored.protect.stage)
+        assertTrue(stored.flow.prompt!!.title.contains("step 2 of 3"))
+        assertEquals(Haptic.Tick, stored.buzzes.last())
+        val on = stored.tap(TagResult.ProtectSwitchedOn)
+        assertEquals(ProtectStage.Confirm, on.protect.stage)
+        assertTrue(on.flow.prompt!!.title.contains("step 3 of 3"))
+        val done = on.tap(TagResult.Protected)
+        assertEquals(listOf(TagNotice.Protected), done.notices)
+        assertTrue(TagEffect.ProtectionChanged(text, Protection.Write) in done.effects)
+        assertEquals(Haptic.Success, done.buzzes.last())
+        assertNull(done.flow.pending)
+        assertNull(done.flow.prompt)
+    }
+
+    @Test
+    fun anotherMakersChipAsksFirst() {
+        val opened = TagFlow().opened(text).flow
+        val asked = opened.protect(secret).tap(TagResult.OtherMaker(NtagChip.Ntag213))
+        assertEquals(listOf(TagNotice.ConfirmOtherMaker(NtagChip.Ntag213)), asked.notices)
+        assertNull(asked.flow.pending)
+        // "Protect anyway": the same request, with the user's OK.
+        val anyway = asked.flow.protect(secret, otherMaker = true)
+        assertTrue(anyway.protect.otherMaker)
+        assertTrue(anyway.tap(TagResult.ProtectStored).protect.otherMaker) // carried to the next steps
+    }
+
+    @Test
+    fun aFailedStepCanGoBackAStep() {
+        val on = TagFlow().opened(text).flow.protect(secret).tap(TagResult.ProtectStored)
+        val switchOn = on.protect
+        // The chip refused the password stored on the first tap: store it again.
+        val back = on.tap(TagResult.Failed("refused", retry = switchOn.next(ProtectStage.Store)))
+        assertEquals(ProtectStage.Store, back.protect.stage)
+        assertEquals("refused", back.flow.prompt!!.error)
+        // Without a retry request, the same step stays armed.
+        assertEquals(ProtectStage.SwitchOn, on.tap(TagResult.Failed("moved")).protect.stage)
+    }
+
+    @Test
+    fun aCanceledProtect() {
+        val armed = TagFlow().opened(text).flow.protect(secret)
+        // Only stored: protection is still off, nothing to say.
+        val (p1, busy1) = armed.claim()
+        assertTrue(busy1.cancel().flow.handle(p1, TagResult.ProtectStored).effects.isEmpty())
+        // Switched on but not checked: say so, and don't arm step 3 behind the user's back.
+        val stored = armed.tap(TagResult.ProtectStored)
+        val (p2, busy2) = stored.claim()
+        val late = busy2.cancel().flow.handle(p2, TagResult.ProtectSwitchedOn)
+        assertEquals(listOf(TagNotice.ProtectUnchecked), late.notices)
+        assertNull(late.flow.pending)
+    }
+
+    @Test
+    fun aChipThatDoesntEnforceIt() {
+        val on = TagFlow().opened(text).flow.protect(secret).tap(TagResult.ProtectStored).tap(TagResult.ProtectSwitchedOn)
+        val off = on.tap(TagResult.NotEnforced(switchedOff = true))
+        assertEquals(listOf(TagNotice.NotEnforced(true)), off.notices)
+        assertTrue(TagEffect.ProtectionChanged(text, Protection.Off) in off.effects)
+        assertEquals(Haptic.Failure, off.buzzes.last())
+        assertTrue(TagEffect.ProtectionChanged(text, Protection.Write) in on.tap(TagResult.NotEnforced(false)).effects)
+    }
+
+    @Test
+    fun unprotect() {
+        assertNull(TagFlow().unprotect(secret).flow.pending)
+        val armed = TagFlow().opened(text).flow.unprotect(secret)
+        val req = armed.flow.pending!!.request as TagRequest.Unprotect
+        assertEquals(text, req.expected)
+        val done = armed.tap(TagResult.Unprotected)
+        assertEquals(listOf(TagNotice.Unprotected), done.notices)
+        assertTrue(TagEffect.ProtectionChanged(text, Protection.Off) in done.effects)
+        // It did happen, so it's taken after Cancel too.
+        val (p, busy) = TagFlow().opened(text).flow.unprotect(secret).claim()
+        assertEquals(listOf(TagNotice.Unprotected), busy.cancel().flow.handle(p, TagResult.Unprotected).notices)
+    }
+
+    @Test
     fun lockOnlyTheTagLastWrittenOrDecrypted() {
         assertNull(TagFlow().lock().flow.pending)
         val opened = TagFlow().opened(text).flow

@@ -342,7 +342,8 @@ for an NDEF tag how long a backup it has room for. It doesn't write to the tag o
 worked, a "rejected" buzz when something went wrong (it follows the phone's touch-feedback setting).
 
 1. **Back up**: first hold the tag you'll use to the phone. The app checks it (nothing is written): whether it
-   works, whether it's read-only, blank or already holds data, and how long a backup it has room for. A 24-word
+   works, whether it's read-only, blank or already holds data, how long a backup it has room for, and whether it can
+   later be made read-only and given a write password (step 5). A 24-word
    backup needs 111 bytes of NDEF space, 12 words need 91. Then choose how many words your phrase has (12, 15, 18,
    21 or 24; lengths the tag can't hold are grayed out), enter them with the in-app keypad (tap a suggestion to
    accept each word), then set a password.
@@ -399,9 +400,20 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    wallet opens empty. A wallet can also look empty when the funds are under another account or address type: check
    its settings before you assume anything is lost. The app and `seedtag.py decrypt` say this next to the words.
 4. Optionally recover once with `seedtag.py` on an offline computer.
-5. Only then use **Make tag read-only** on the Verify tab. It's permanent, and it only works on the tag you last wrote or verified.
-   It stops the backup from being overwritten or erased, but not, on most chips, from being locked against reading
-   by someone who gets hold of the tag (see [Choosing a tag](#choosing-a-tag)).
+5. Only then protect the tag, on the Verify tab, on the tag you last wrote or verified. Two ways:
+   - **Protect from writes** (NTAG213, 215 and 216): gives the tag a write password, so no phone can rewrite,
+     erase or lock it without it. Reading stays open to any phone, as before. It can be undone: **Remove write
+     password**. The password isn't stored anywhere: it's made from your backup's password, so whoever can decrypt
+     the tag can remove it, with SeedTag or with `seedtag.py tag-key` and any NFC app. It takes three taps:
+     storing the password, switching it on, then checking that the tag really refuses writes without it (if it
+     doesn't, SeedTag switches it off again and says so). It also closes the gap below: nobody can set a read
+     password of their own. But it's only 32 bits, and it goes to the tag unencrypted when set and when removed,
+     so do both where nobody could be listening in with a radio receiver nearby. Verify shows the chip and
+     whether a write password is on. Chips from other makers that work like an NTAG21x (*NTAG21x lookalike*)
+     get it too, after a warning: SeedTag doesn't officially support them, and setting one may destroy the tag.
+   - **Make tag read-only**: permanent. It stops the backup from being overwritten or erased, but not, on most
+     chips, from being locked against reading by someone who gets hold of the tag (see
+     [Choosing a tag](#choosing-a-tag)). A tag with a write password has to have it removed first.
 6. **Erase**, the fourth tab, to retire a tag or reuse it. Scan it first (nothing is written): the app
    shows what it holds, a SeedTag backup, other data or nothing, and whether it can be erased at all (a read-only
    tag can't). For a backup you can **Check the password first**: the app decrypts what it just read (no second
@@ -513,13 +525,17 @@ datasheets said 10,000), and a backup or an erase takes a handful.
 ³ Retention and password scheme differ by model: ST25TV02K is rated for 60 y with 32- or 64-bit passwords,
 ST25TV16K/64K for 40 y with 64-bit passwords (ST25TV16K is *not recommended for new designs*).
 
-SeedTag doesn't use any of these write protections yet: the payload is encrypted either way, and **Make tag
-read-only** is the only protection against overwriting. It doesn't protect everything: Android's read-only setting
-freezes the data but, on NTAG21x and on Ultralight C tags formatted without NXP's Lock Control TLV, leaves the
-chip's own password settings open. Someone holding the tag for a few seconds can then set a read password of their
-own, and no phone can read the backup again. Nothing leaks, but that copy is lost. So keep the tag where strangers
+Of these write protections, SeedTag uses only the NTAG21x's 32-bit password, as **Protect from writes**, on
+writes only (the payload is encrypted either way); the Ultralight C's 3DES key will follow once it has been tested on
+a real one. **Make tag read-only** is the other protection against overwriting. It doesn't protect everything:
+Android's read-only setting freezes the data but, on NTAG21x and on Ultralight C tags formatted without NXP's Lock
+Control TLV, leaves the chip's own password settings open. Someone holding the tag for a few seconds can then set a
+read password of their own, and no phone can read the backup again. Nothing leaks, but that copy is lost. A write
+password from **Protect from writes** covers those settings too. Guessing it means trying billions of passwords with
+the tag held to a reader, but it isn't strong: think of it as a lock against strangers with a phone, not against
+someone who keeps the tag. So keep the tag where strangers
 can't reach it (a metal box or a shielding sleeve also stops it being read from a distance), don't carry it
-around, and keep other copies of the seed. Only NTAG213 has been tested with SeedTag: try
+around, and keep other copies of the seed. Only NTAG213 and NTAG215 have been tested with SeedTag: try
 any other tag with your phone (write, verify, restore) before relying on it. **Make tag read-only** uses Android's
 own read-only function, which phones usually only offer for Type 1 and 2 tags (NTAG, MIFARE Ultralight): on the Type 4 and 5 tags
 above (NTAG 424 DNA, DESFire, ICODE, ST25TV) expect it to be refused (untested). If a tag is already read-only, the
@@ -664,12 +680,19 @@ genuine NXP chip from another maker's with the same layout: it says so, and the 
 
 Move the file to the computer and run `python3 -I -S seedtag.py check <FILE>`. It needs no password and takes
 no time. For an NXP NTAG213, 215 or 216 it checks every page:
-the chip's version and serial number (an NXP serial number starts with `04`), the lock bits, the settings (no page behind a password, nothing changed from
-the factory), that the message is exactly a SeedTag backup and nothing else, and that every byte after it is zero.
+the chip's version and serial number (an NXP serial number starts with `04`), the lock bits, the settings (no page
+behind a password but SeedTag's own write password, nothing else changed from the factory), that the message is
+exactly a SeedTag backup and nothing else, and that every byte after it is zero. Chips from other makers with the
+same layout (an NTAG21x lookalike, possibly with one page more) are checked the same way, with a warning.
 It prints a line for each, and *Clean* or *NOT CLEAN* (exit code 1). Lock bits set by **Make tag read-only** are
 only a warning. What no dump can show: the chip's own password and its reply always read as zero (6 bytes), and a
 genuine chip's signature isn't checked (NFC Tools shows it). Other chips aren't supported yet. `decrypt` and
 `verify` take the same dump file in place of the text.
+
+`python3 -I -S seedtag.py tag-key <BASE64 or DUMP>` asks for the backup's password and prints the write password
+**Protect from writes** gives that tag (PWD and its reply, PACK), and how to remove it with any NFC app that sends
+raw commands: `PWD_AUTH` (`1B`) with the PWD, then AUTH0 (byte 3 of page 29h, 83h or E3h) set to `FF`. It reveals
+nothing about the seed or the password, but anyone who has it can change the tag, so don't share it.
 
 **What a clean NTAG213 looks like**, for checking a dump by eye (NFC Tools' *Read memory* shows the same pages).
 Bytes are hex; `..` is a byte that differs from tag to tag.
@@ -684,7 +707,7 @@ Bytes are hex; `..` is a byte that differs from tag to tag.
 | 7 on | `en`, then the Base64 text | `65 6E 41 ..`, then the text's characters |
 | after the text | End marker, then zeros | `FE`, then `00` up to the end of page 39 |
 | 40 | More lock bits, then a fixed byte | `00 00 00 BD` (lock bits set once read-only) |
-| 41–42 | Settings | `04 00 00 FF` and `00 05 00 00` (the last `FF`: no page needs a password) |
+| 41–42 | Settings | `04 00 00 FF` and `00 05 00 00` (the last `FF`: no page needs a password; `03` with **Protect from writes** on) |
 | 43–44 | The chip's password and its reply | always read as `00`: a dump can't show them |
 
 `LL` is the message length and `PP` the text record's: `5B`/`57` for 12 words, `5F`/`5B` for 15, `63`/`5F` for

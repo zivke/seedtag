@@ -230,10 +230,11 @@ report's tests N1–N12, A1–A3, H1).
   - [x] The pure additions: `TagKey`, `UltralightCAuth`, `openForgiving(withTagSecret)`, `TagKeyTest`,
     `tag-key-vectors.tsv` (+ `.license`), `seedtag.py tag-key` and its tests (Python 3.8 syntax), `FORMAT.md`
     section 6 (the derivation only).
-  - [ ] Chip identification and protection state from READs (and GET_VERSION once the size says NTAG), through
+  - [x] Chip identification and protection state from READs (and GET_VERSION once the size says NTAG), through
     `Type2Raw`; Protect / Remove protection as `TagFlow` requests with tests. **NTAG213/215/216 only for now**
-    (owner, 2026-11-24), the Ultralight C later (below).
-  - [ ] **Chips that aren't genuine NXP** (owner, 2026-11-24): supported too, but a warning dialog first, before
+    (owner, 2026-11-24), the Ultralight C later (below). Device-tested on an NXP NTAG215 (2026-11-25); the
+    interruption rows (7.48) still open.
+  - [x] **Chips that aren't genuine NXP** (owner, 2026-11-24): supported too, but a warning dialog first, before
     the password is set. A chip counts as genuine NXP only if its GET_VERSION reply is an NTAG21x's and its serial
     number starts with 04. The warning says what's different: another maker's chip, whose memory layout and
     password handling nobody documents; SeedTag sets the password only where it can check it works, but such a
@@ -241,11 +242,14 @@ report's tests N1–N12, A1–A3, H1).
     advice says). Its settings pages come from the chip's own layout (CC size, page count), never assumed: e.g.
     the 46-page clones (UID 1D) have CFG0 at 29h like an NTAG213 but CFG1 `00 00 00 00` and one page more. Never
     write AUTH0 before a PWD_AUTH with the new password has worked in a fresh session, and say plainly when the
-    chip doesn't enforce the password (the fresh-tap write check is refused or not).
-  - [ ] The design gaps: the fresh-tap check before "Protected" (a read without the key and a refused write), all
+    chip doesn't enforce the password (the fresh-tap write check is refused or not). Done as layout recognition
+    (`NtagIdentity.byLayout`, any maker, GET_VERSION last), one *NTAG21x lookalike* warning that never names the
+    maker or model (owner, 2026-11-25), a readable PACK allowed and cleared on Remove; device-tested on the Feiju
+    (UID 53) and Fudan FM11NT021 (UID 1D) tags, 2026-11-25.
+  - [x] The design gaps: the fresh-tap check before "Protected" (a read without the key and a refused write), all
     of CFG0/CFG1 compared, a NAK after AUTH shown as "wrong password", a torn CFG0 write (mirror bits) caught and
     repaired, Erase and Make read-only aware of protection.
-  - [ ] Docs: README (what it protects and not; the NTAG password and the Ultralight C key go over the air in the
+  - [x] Docs: README (what it protects and not; the NTAG password and the Ultralight C key go over the air in the
     clear when set; `tag-key`), `FORMAT.md` section 6's chip settings, changelog, device rows (N11).
   - [ ] **Later: MIFARE Ultralight C** (owner, 2026-11-24). The derivation (`TagKey.ultralightCKey`) and the 3DES
     handshake (`UltralightCAuth`) are in and tested; the app part waits for a real Ultralight C to test on (none

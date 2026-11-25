@@ -142,8 +142,24 @@ Ultralight C    = 2-key 3DES key K1 | K2 = secret[0..16), as AUTHENTICATE uses i
 ```
 
 Tags protected in the field depend on this: a change is a new label, with the old one still recognised.
-`seedtag.py tag-key` prints both for a backup and its password. Which chip settings SeedTag writes to switch the
-password on and off is described here once the app does it.
+`seedtag.py tag-key` prints both for a backup and its password.
+
+**On an NTAG213/215/216** (settings from page 29h, 83h or E3h: CFG0, CFG1, PWD, PACK; NTAG213/215/216 datasheet,
+section 8.5), SeedTag switches it on in three steps, each in its own session:
+
+1. Write PWD and PACK, and CFG1 with PROT 0 (writes only: reading stays open), CFGLCK 0 and AUTHLIM 0 (wrong tries
+   never lock the tag), the NFC counter bits as they were.
+2. `PWD_AUTH` with PWD must return PACK. Then CFG0 with AUTH0 = `03`, the mirror off (MIRROR_CONF and
+   MIRROR_BYTE 0, MIRROR_PAGE `00`), its other bits as they were.
+3. Without the password, a write to the last free data page and a write of CFG0 with AUTH0 `FF` must both be
+   refused, each checked by reading back after a new session. If either goes through, SeedTag sets AUTH0 back to
+   `FF` and reports that the chip doesn't enforce the password.
+
+A tag has it on when AUTH0 is at or below its last page. To remove it: `PWD_AUTH` with PWD, then CFG0 with AUTH0 =
+`FF`. PWD and PACK stay stored; an NXP chip reads both as `00`. Some lookalikes from other makers (same layout,
+possibly one more page after PACK, NTAG-only settings bytes read as `00`) read PACK back as stored; SeedTag then
+writes `00 00 00 00` to it once AUTH0 is `FF`, if it's this backup's. SeedTag doesn't set the Ultralight C key
+yet.
 
 ## License
 

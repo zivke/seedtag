@@ -11,7 +11,8 @@ sealed interface TagRequest {
     data class Write(val text: String, val overwrite: OverwriteTarget? = null) : TagRequest
     /** Read the tag back and compare with [expected] (second tap after formatting a blank tag). */
     data class CheckWritten(val expected: String) : TagRequest
-    data object Read : TagRequest
+    /** Read the tag's text; with [withInfo], also its chip and write protection ([TagInfo]), for Verify. */
+    data class Read(val withInfo: Boolean = false) : TagRequest
     /** Make the tag read-only, but only if it holds exactly [expected]. */
     data class Lock(val expected: String) : TagRequest
     /** The Erase tab, first tap: what the tag holds and whether it can be erased. Writes nothing. */
@@ -24,6 +25,30 @@ sealed interface TagRequest {
     data class Erase(val target: OverwriteTarget, val text: String? = null) : TagRequest
     /** Finish [Rest.Interrupted]: clear the old data after the backup, if the tag holds exactly [expected]. */
     data class ClearRest(val expected: String) : TagRequest
+    /**
+     * Give the tag its write password ([TagKey]), only if it holds exactly [expected], one [stage] per tap.
+     * [secret] is the view model's array (it zeroes it); tag I/O copies it for each use. [otherMaker]:
+     * the user was warned that the chip isn't NXP's and went on; without it, such a chip only gets
+     * [TagResult.OtherMaker] back.
+     */
+    class Protect(val expected: String, val secret: ByteArray, val stage: ProtectStage, val otherMaker: Boolean = false) : TagRequest {
+        fun next(stage: ProtectStage) = Protect(expected, secret, stage, otherMaker)
+    }
+    /** Switch the write password off again, only if the tag holds exactly [expected]. */
+    class Unprotect(val expected: String, val secret: ByteArray) : TagRequest
+}
+
+/**
+ * Protect takes three taps, each in a new session with the chip, so that every step is on the tag for
+ * good before the next relies on it.
+ */
+enum class ProtectStage {
+    /** Write PWD and PACK, and protection to "writes only"; protection stays off. */
+    Store,
+    /** The chip must accept the new password (PWD_AUTH) before AUTH0 switches protection on. */
+    SwitchOn,
+    /** Without the password: reading works, and a harmless write is refused. */
+    Confirm,
 }
 
 /**
@@ -76,7 +101,8 @@ enum class TagContent {
  * What the Erase tab's scan found. [ndef]: it's NDEF-formatted (a blank tag has nothing to erase).
  * [text]: the first Text record (for a backup, the Base64 blob: not secret, anyone can read it from
  * the tag), so the password check needs no second scan. [target]: the tag and content an erase is
- * bound to, null if it can't be erased.
+ * bound to, null if it can't be erased. [protected]: it has a write password SeedTag set, so it can't
+ * be erased until that's removed ([target] is null then).
  */
 data class EraseCheck(
     val supported: Boolean,
@@ -86,6 +112,7 @@ data class EraseCheck(
     val capacity: Int?,
     val text: String?,
     val target: OverwriteTarget?,
+    val protected: Boolean = false,
 )
 
 /**
@@ -93,7 +120,9 @@ data class EraseCheck(
  * NDEF-formatted; if not, it's blank and gets formatted on the first write. [capacity]: bytes
  * for the NDEF message, null if unknown; for a blank tag it's [estimated] from the chip's memory.
  * [classic]: a MIFARE Classic tag, which many phones can't read at all, so the backup might not be
- * readable when it's needed.
+ * readable when it's needed. [canMakeReadOnly]: whether this phone can make it read-only for good, null
+ * for a blank tag (not known before it's formatted). [chip]: which chip it is, for a write password
+ * ([TagInfo.identity] null: not one SeedTag can protect), null if that couldn't be checked.
  */
 data class TagCheck(
     val supported: Boolean,
@@ -103,11 +132,15 @@ data class TagCheck(
     val writable: Boolean = true,
     val content: TagContent = TagContent.Empty,
     val classic: Boolean = false,
+    val canMakeReadOnly: Boolean? = null,
+    val chip: TagInfo? = null,
 ) {
+    /** It has a write password in force: nothing can be written until it's removed. */
+    val protected: Boolean get() = chip?.identity != null && chip.protection != Protection.Off
     /** Longest backup that fits, null if none does or the size is unknown. */
     val maxWords: Int? get() = capacity?.let(SeedBox::maxWordsFor)
     val tooSmall: Boolean get() = capacity != null && maxWords == null
-    val usable: Boolean get() = supported && writable && !tooSmall
+    val usable: Boolean get() = supported && writable && !tooSmall && !protected
 }
 
 /**
@@ -125,7 +158,7 @@ sealed interface TagResult {
     /** A blank tag was formatted with [text], but couldn't be read back on the same tap. */
     data class WrittenUnchecked(val text: String) : TagResult
     /** [differences]: how the tag's message differs from what SeedTag writes; empty if it doesn't. */
-    data class Read(val text: String, val differences: List<String> = emptyList()) : TagResult
+    data class Read(val text: String, val differences: List<String> = emptyList(), val info: TagInfo? = null) : TagResult
     data object Locked : TagResult
     /** Lock found the tag already not writable: nothing was changed, and it may not be permanent. */
     data object AlreadyReadOnly : TagResult
@@ -145,9 +178,25 @@ sealed interface TagResult {
     data class Erased(val rest: Rest) : TagResult
     /**
      * [changedTag]: the tag may already have been changed (a write or an erase was interrupted), so the
-     * message matters even when it arrives for a canceled scan.
+     * message matters even when it arrives for a canceled scan. [retry]: the scan stays armed with this
+     * request instead of the same one (Protect going back a step).
      */
-    data class Failed(val message: String, val changedTag: Boolean = false) : TagResult
+    data class Failed(val message: String, val changedTag: Boolean = false, val retry: TagRequest? = null) : TagResult
+
+    /** Protect's first tap: the chip isn't NXP's ([NtagIdentity.genuine]); nothing was written, the user decides. */
+    data class OtherMaker(val chip: NtagChip) : TagResult
+    /** Protect, [ProtectStage.Store] done: the password is on the chip, protection still off. */
+    data object ProtectStored : TagResult
+    /** Protect, [ProtectStage.SwitchOn] done: protection is on, not yet checked on a fresh tap. */
+    data object ProtectSwitchedOn : TagResult
+    /** Protect, [ProtectStage.Confirm]: reads work without the password and a write was refused. */
+    data object Protected : TagResult
+    /**
+     * Protect, [ProtectStage.Confirm]: the chip accepted a write without the password, so it doesn't enforce
+     * one. [switchedOff]: SeedTag switched it off again, so the chip is as it was.
+     */
+    data class NotEnforced(val switchedOff: Boolean) : TagResult
+    data object Unprotected : TagResult
 }
 
 /** The record Erase fills a tag's NDEF area with: TNF unknown, no type, no ID, a payload of zeros. */
