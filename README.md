@@ -12,8 +12,8 @@ plus a single-file Python tool to recover it on any computer. Source: <https://g
 - The encrypted backup is decrypted once before it's written, and every write is read back and compared before it's
   reported as success.
 
-> **Beta.** SeedTag is still in development. It has been tested only with NXP NTAG213 tags, on a few phones;
-> other tags (MIFARE Ultralight C, other NTAG models, Type 4, Type 5 and others) haven't been tried yet, and may not behave as described
+> **Beta.** SeedTag is still in development. It has been tested only with NXP NTAG21x tags (NTAG213 and NTAG215), on a few phones;
+> other tags (MIFARE Ultralight C, NTAG216, Type 4, Type 5 and others) haven't been tried yet, and may not behave as described
 > here. Before relying on a tag, back up to it, then Verify and Restore it, ideally also decrypt it with
 > [`seedtag.py`](#recovering-on-a-computer), and keep another copy of your seed. See [Choosing a tag](#choosing-a-tag) for what's known.
 
@@ -474,7 +474,7 @@ when tapped; leaving SeedTag clears everything typed in it.
 Any tag Android can read and write as NDEF works. The app uses the generic NDEF API and listens for NFC-A, -B, -F
 and -V. Back up checks the tag's size before anything is typed, and every write checks it again. A blank (not yet
 NDEF-formatted) Type 2 tag has no size on it, so the app works it out from the chip's memory for MIFARE Ultralight,
-Ultralight C, EV1 and AES, NTAG203 and NTAG21x; for any other blank tag the size is only known once it's formatted. Tested hardware: NXP NTAG213.
+Ultralight C, EV1 and AES, NTAG203 and NTAG21x; for any other blank tag the size is only known once it's formatted. Tested hardware: NXP NTAG21x (NTAG213 and NTAG215).
 
 **Space needed** (the NDEF message: what the app and Android call the tag's NDEF space, and what Back up's size
 check compares; in the chip's raw memory, the TLV wrapper around it takes 3 bytes more):
@@ -540,7 +540,7 @@ password from **Protect from writes** covers those settings too. Guessing it mea
 the tag held to a reader, but it isn't strong: think of it as a lock against strangers with a phone, not against
 someone who keeps the tag. So keep the tag where strangers
 can't reach it (a metal box or a shielding sleeve also stops it being read from a distance), don't carry it
-around, and keep other copies of the seed. Only NTAG213 and NTAG215 have been tested with SeedTag: try
+around, and keep other copies of the seed. Only NXP NTAG21x tags (NTAG213 and NTAG215) have been tested with SeedTag: try
 any other tag with your phone (write, verify, restore) before relying on it. **Make tag read-only** uses Android's
 own read-only function, which phones usually only offer for Type 1 and 2 tags (NTAG, MIFARE Ultralight): on the Type 4 and 5 tags
 above (NTAG 424 DNA, DESFire, ICODE, ST25TV) expect it to be refused (untested). If a tag is already read-only, the
@@ -809,7 +809,7 @@ throwaway mnemonic.
 SeedTag comes **without any warranty**, and its developer is not responsible for any loss or damage from using it,
 including a lost seed or lost funds. You use it at your own risk (see also the [licenses](#license)).
 
-SeedTag is **beta** software, still in development, and has only been tested with NXP NTAG213 tags. Other tag
+SeedTag is **beta** software, still in development, and has only been tested with NXP NTAG21x tags (NTAG213 and NTAG215). Other tag
 brands and types may not work as described: test every tag (write, Verify, Restore) before relying on it, and keep
 another copy of your seed.
 

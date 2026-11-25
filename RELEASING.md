@@ -207,7 +207,7 @@ gh release create vX.Y.Z seedtag.apk seedtag.apk.sha256 --verify-tag --title "Se
 - the changelog section, plus those of any versions that were never published (see below);
 - the SHA-256 of `seedtag.apk`, from `seedtag.apk.sha256`;
 - the release certificate digest above, with "check it with `apksigner verify --print-certs seedtag.apk`";
-- the beta notice: it has been tested only with NXP NTAG213 tags.
+- the beta notice: it has been tested only with NXP NTAG21x tags (NTAG213 and NTAG215).
 
 **Then check what GitHub serves.** Download `seedtag.apk` from the release page and compare its SHA-256 with your
 `seedtag.apk.sha256`. The container has your GitHub credentials, so it could replace a release asset later. The
