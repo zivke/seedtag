@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 zivke
+#
+# Board B38: the same bytes on every checkout, so the release build stays reproducible on a machine whose git
+# would otherwise convert line endings (Windows with core.autocrlf). Text is LF everywhere, except the Windows
+# wrapper script; binaries are never converted.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.jar binary
+*.png binary
+*.apk binary

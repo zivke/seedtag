@@ -96,6 +96,9 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- Reproducible builds: `.gitattributes` keeps text files LF on every checkout (Windows included), and the
+  libraries' `.so` files are packaged as they come even where an NDK is installed. The APK is byte-identical to
+  before. The README says the build is reproducible in the dev container's image (Linux, Docker).
 - The dev container's Gradle cache volume is per project (`gradle-cache-${devcontainerId}`), so another
   project's container can't put an init script or a patched Gradle into SeedTag's builds. The first build after
   the rebuild downloads everything again.

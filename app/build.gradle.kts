@@ -42,6 +42,9 @@ android {
 
     packaging {
         resources { excludes += setOf("META-INF/versions/9/OSGI-INF/MANIFEST.MF") }
+        // Board B38: ship the libraries' .so files exactly as they come. With an NDK installed, AGP would strip
+        // them, and a rebuild outside the dev container image would give a different APK.
+        jniLibs { keepDebugSymbols += "**/*.so" }
     }
 
     // No Google dependency-metadata blob in the APK (keeps builds reproducible / F-Droid friendly)

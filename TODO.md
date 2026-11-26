@@ -330,6 +330,12 @@ report's tests N1–N12, A1–A3, H1).
   (no new actions); tools row 5.21: the first push shows whether it runs.
 - [ ] **B38: reproducible only in this image; nothing durable recorded per release** (`keepDebugSymbols`,
   `.gitattributes`, unsigned hash and `seedtag.py` in the release, README verification section).
+  - [ ] On `develop` (2026-11-26): `keepDebugSymbols += "**/*.so"`, `.gitattributes` (`eol=lf`, `.bat` CRLF),
+    README "Linux, with Docker"; the unsigned APK's SHA-256 is the same before and after (`e83af4f6…` at
+    `3b17f95`). Check: the next CI build of `main` matches `make build` here.
+  - [ ] Per release (needs the host and a decision on what's published): the unsigned SHA-256 and the commit in
+    the release notes, `seedtag.py` with its SHA-256 as a release asset, a README section on verifying a
+    download, the tag-signing public key in the repository.
 - [ ] **B39: licence headers and provenance** (`REUSE.toml`, missing headers, wordlist source and licence).
 - [x] **B40: storage advice** (heat, wireless chargers, bending, refresh every ~5 years).
 - [x] **B41: wording and numbers** (111/91 vs ~114/~94, step order in "Using it", one name for Lock, "Verified"

@@ -218,7 +218,10 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
   reads (`android.jar`, `core-lambda-stubs.jar`) are checked against SHA-256s in the Dockerfile.
 
 - **Independent build:** the release build is reproducible: two clones of the same commit build byte-identical
-  unsigned APKs, wherever they're checked out. The GitHub Actions workflow (`.github/workflows/build.yml`) runs
+  unsigned APKs, wherever they're checked out, as long as they're built in the dev container's image (Linux, with
+  Docker): its JDK, Android SDK and pinned aapt2 are part of what makes the bytes. `.gitattributes` keeps line
+  endings LF on every checkout, and the libraries' `.so` files are packaged unstripped, so an NDK on the building
+  machine changes nothing. The GitHub Actions workflow (`.github/workflows/build.yml`) runs
   `make test build` for every pushed `v*` tag, or when started by hand (the Actions tab's "Run workflow", or
   `gh workflow run build.yml --ref <branch-or-tag>`), in an image built from the same `.devcontainer/Dockerfile`,
   and shows the APK's SHA-256 in the run's summary (the APK is attached too). Pass that hash to
