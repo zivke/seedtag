@@ -76,4 +76,15 @@ class Bip39Test {
         assertEquals(2048, Bip39.wordlist.map { it.take(4) }.toSet().size)
         Bip39.wordlist.forEach { assertEquals(it, Bip39.suggest(it.take(4), 1).single()) }
     }
+
+    @Test
+    fun passwordSuggestionsPutShortWordsFirst() {
+        fun sug(prefix: String) = Bip39.suggestShortestFirst(prefix.toCharArray(), 0, prefix.length, 6)
+        assertEquals(listOf("draw", "draft", "drama", "dragon", "drastic"), sug("dra"))
+        assertEquals(listOf("draw"), sug("draw"))
+        assertEquals("act", sug("act").first())
+        assertEquals(emptyList<String>(), sug("drx"))
+        // Every word is the first suggestion once it's typed out in full (the keyboard row's first chip).
+        for (w in Bip39.wordlist) assertEquals(w, sug(w).first())
+    }
 }

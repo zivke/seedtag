@@ -289,7 +289,8 @@ class SeedTagViewModel : ViewModel() {
         val start = b.lastTokenStart()
         return b.use { chars, n ->
             if (start == n || (start until n).any { chars[it] !in 'a'..'z' }) emptyList()
-            else Bip39.suggest(chars, start, n, 6).filter { it.length != n - start } // not the word already typed
+            // The typed word too: tapping it puts the space after it ([SecretChars.completeWord]).
+            else Bip39.suggestShortestFirst(chars, start, n, 6)
         }
     }
 

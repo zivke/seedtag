@@ -228,6 +228,9 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- The password keyboard never offered some short BIP39 words, such as *draw*, *act* or *day*: they came after
+  the suggestions that fit on screen, and a word typed out in full was left out. Now the shortest words come
+  first and the typed word stays, so tapping it puts the space after it.
 - Typing the generated passphrase back from the written copy could be got around: the Password field's **Show**
   put it on screen while *Repeat password* was typed, and after **Show it again** (or a tap on the field) the next
   key quietly edited the passphrase, which then stopped counting as generated and no longer matched the written

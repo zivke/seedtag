@@ -72,6 +72,15 @@ object Bip39 {
         return out
     }
 
+    /**
+     * Like [suggest], shortest words first (then in list order), and the typed word itself included: for the
+     * password keyboard, whose row of [limit] suggestions doesn't all fit on screen. In list order a short word
+     * can come after the ones that fit, and stays there until it's typed in full: "draw" is the fifth word for
+     * "dra". Shortest first, every word is the first suggestion once it's typed out, and usually well before.
+     */
+    fun suggestShortestFirst(chars: CharArray, from: Int, to: Int, limit: Int = 6): List<String> =
+        suggest(chars, from, to, wordlist.size).sortedBy { it.length }.take(limit)
+
     /** String order of [word] against the char slice, as String.compareTo would give. */
     private fun compare(word: String, chars: CharArray, from: Int, to: Int, lowercase: Boolean): Int {
         val n = to - from

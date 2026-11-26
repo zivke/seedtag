@@ -329,6 +329,7 @@ on hidden data (H…, `TODO.md`). Each change adds its rows here in the same com
 | 7.73 | Password keyboard: on Back up's Password (own password, **Show** on), type `aba`, tap *abandon*, type `ab`, tap *ability*, then type `1` | `abandon` with no space after it until `a` is typed, then `abandon ab`; after the second suggestion `abandon ability`, still no trailing space; `1` attaches: `abandon ability1`. | ✔️ Pass, 2026-11-26 |
 | 7.74 | Password keyboard: tap a suggestion then press the space key, then a letter; tap a suggestion then ⌫ | One space, not two (no "starts or ends with a space…" warning). ⌫ deletes the word's last letter and no space comes after. | ✔️ Pass, 2026-11-26 |
 | 7.75 | Password keyboard: type a generated passphrase back into *Repeat* with suggestions only (no space key), and a Verify / Restore password the same way | Repeat matches (*Strong*, **Encrypt & write tag** enabled). Verify opens the tag with no "only matched once extra spaces were ignored" note. | ✔️ Pass, 2026-11-26 |
+| 7.76 | Password keyboard: type `dra`, then `draw`; type `ac`, then `act` | `dra`: *draw* first (then draft, drama, dragon, drastic). `draw`: *draw* alone; tapping it, then a letter, puts the space in. `act` offered first once typed out. On the seed-word keypad nothing changed. | ⬜ |
 
 ## Short regression check for every release
 
