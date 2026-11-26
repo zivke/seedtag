@@ -341,6 +341,7 @@ on hidden data (H…, `TODO.md`). Each change adds its rows here in the same com
 | 7.84 | B8: a Back up (throwaway backup), then Verify it, then scan it on the Erase tab (Cancel) | Done: *Check code* `xxxx-xxxx` under the fingerprint, and the text "Neither is secret… The check code is the tag's text's: write it on the tag's label…". Verify and the Erase scan show the same *Check code* (Erase without a password). | ⬜ |
 | 7.85 | B8: a copy (B7) and the tag it was copied from | The same check code on both. | ⬜ |
 | 7.86 | B21: the first Back up after starting SeedTag, then a second one without closing it | Progress "Encrypting and checking… (Argon2id runs two or three times…)"; the first takes about one Argon2id run longer, the second doesn't. Both write normally (the self-test passes; a failure would say "This phone's encryption doesn't give the known answer to SeedTag's self-test…"). | ⬜ |
+| 7.87 | B26 (board H1): the largest font size and display size in the phone's settings; Back up a throwaway 24-word phrase with 8-letter words (e.g. `abstract`, `although`, `category`), **Show words**, then on *Check your words*; Restore it | No word is clipped anywhere: the grid has two words to a row (or one), cells taller to fit. Back at the normal font size: three to a row, as before. | ⬜ |
 
 ## Short regression check for every release
 

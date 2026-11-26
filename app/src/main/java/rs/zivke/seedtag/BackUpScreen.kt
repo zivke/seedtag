@@ -9,11 +9,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,8 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import rs.zivke.seedtag.core.Bip39
@@ -411,34 +416,51 @@ internal fun Suggestions(words: List<String>, onPick: (String) -> Unit) {
     }
 }
 
+/**
+ * The seed words, numbered. Three to a row, or fewer when the longest BIP39 word (8 letters, with the typing
+ * cursor) wouldn't fit at the user's font size (board B26): a seed word is never clipped. Cells grow with the font.
+ */
 @Composable
 internal fun WordGrid(words: List<String>, current: String? = null, hidden: Boolean = false, max: Int = 24) {
     // Same mask for every word, so it doesn't give away word lengths.
     val cells = words.mapIndexed { i, w -> Triple(i + 1, if (hidden) "••••••" else w, false) } +
         if (current != null && words.size < max) listOf(Triple(words.size + 1, "$current▏", true)) else emptyList()
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        cells.chunked(3).forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                row.forEach { (n, w, typing) ->
-                    Row(
-                        Modifier.weight(1f)
-                            .height(38.dp)
-                            .clip(MaterialTheme.shapes.small)
-                            .background(MaterialTheme.colorScheme.surfaceContainer)
-                            .then(if (typing) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
-                            .padding(horizontal = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "$n",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.width(20.dp),
-                        )
-                        Text(w, fontFamily = FontFamily.Monospace, fontSize = 14.sp, maxLines = 1)
+    val wordStyle = TextStyle(fontFamily = FontFamily.Monospace, fontSize = 14.sp)
+    val numberStyle = MaterialTheme.typography.labelSmall
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    // Monospace: every 8-letter word is as wide as this one.
+    val wordWidth = with(density) { measurer.measure("abcdefgh▏", wordStyle).size.width.toDp() }
+    val numberWidth = with(density) { maxOf(20.dp, measurer.measure("24", numberStyle).size.width.toDp() + 6.dp) }
+    val gap = 6.dp
+    BoxWithConstraints {
+        val cell = numberWidth + wordWidth + 20.dp // + the horizontal padding
+        val perRow = ((maxWidth + gap) / (cell + gap)).toInt().coerceIn(1, 3)
+        Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+            cells.chunked(perRow).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    row.forEach { (n, w, typing) ->
+                        Row(
+                            Modifier.weight(1f)
+                                .heightIn(min = 38.dp)
+                                .clip(MaterialTheme.shapes.small)
+                                .background(MaterialTheme.colorScheme.surfaceContainer)
+                                .then(if (typing) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
+                                .padding(horizontal = 10.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "$n",
+                                style = numberStyle,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(numberWidth),
+                                maxLines = 1,
+                            )
+                            Text(w, style = wordStyle, maxLines = 1, softWrap = false)
+                        }
                     }
+                    repeat(perRow - row.size) { Spacer(Modifier.weight(1f)) }
                 }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
