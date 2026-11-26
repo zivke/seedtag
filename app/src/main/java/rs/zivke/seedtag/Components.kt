@@ -37,7 +37,6 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -545,21 +544,24 @@ internal enum class Flow { Backup, Verify, Restore }
 @Composable
 internal fun GuardDialogWindow() {
     val view = LocalView.current
-    DisposableEffect(view) {
-        view.rootView.filterTouchesWhenObscured = true
-        val window = (view.parent as? DialogWindowProvider)?.window
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            window?.setHideOverlayWindows(true)
-        }
+    // In composition, not in an effect: done before the dialog's first frame is drawn (board B43).
+    remember(view) {
+        // Loud, not silent: without its window, none of this would hide anything.
+        val window = checkNotNull((view.parent as? DialogWindowProvider)?.window) { "GuardDialogWindow outside a dialog" }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) window.setHideOverlayWindows(true)
         // Android 10–11 can't hide overlays: also drop touches while one covers part of the dialog.
         if (Build.VERSION.SDK_INT in Build.VERSION_CODES.Q..Build.VERSION_CODES.R) {
-            val callback = window?.callback
+            val callback = window.callback
             if (callback != null && callback !is ObscuredTouchFilter) window.callback = ObscuredTouchFilter(callback)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            view.rootView.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
+        // The dialog's own view as well as its root, in case a child doesn't inherit it.
+        for (v in setOf(view, view.rootView)) {
+            v.filterTouchesWhenObscured = true
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                v.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
+            }
+            v.excludeFromCaptureAndAutofill()
         }
-        view.rootView.excludeFromCaptureAndAutofill()
-        onDispose {}
+        true
     }
 }

@@ -329,7 +329,9 @@ report's tests N1–N12, A1–A3, H1).
   for a different seed).
 - [x] **B42: unexpected exceptions in the Argon2 paths crash the app** (one `runKdf` helper; map
   `GeneralSecurityException`).
-- [ ] **B43: dialog guards applied late and to the root view only.**
+- [ ] **B43: dialog guards applied late and to the root view only.** On `develop` (2026-11-26): `GuardDialogWindow`
+  applies them in composition (before the first frame), on `view` and `rootView`, and fails loudly without a
+  dialog window; device row 7.89.
 - [x] **B44: branch hygiene.** Delete `toolchain-update` and `dependency-trim`; merge `main` into `develop`. Done:
   both deleted (fully merged); `main` merged with `develop`'s text kept (its only commit was already here as
   `6391600`).

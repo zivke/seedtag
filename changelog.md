@@ -243,6 +243,9 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- Dialogs (*Overwrite?*, *Erase this tag?*, *Make tag read-only?* and the rest) now hide other apps' overlays and
+  filter obscured taps from their very first frame, on the dialog's own view as well as its root; before, it was
+  done just after the dialog appeared.
 - At a large font size, long seed words could lose their endings in the word grid (Back up, Restore). The grid
   now puts two words to a row, or one, when the longest word wouldn't fit, and its cells grow with the font.
 - A tag that refuses writes (part of it locked, say, though Android calls it writable) got "The tag moved away …
