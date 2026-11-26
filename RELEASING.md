@@ -7,7 +7,7 @@ are made only by the maintainer; nothing here runs automatically.
 | Where | What happens there |
 |---|---|
 | Dev container | Changelog, version, release commit, `make build`, test builds for the phone. Push `main` with VS Code. **No tags, no signing keys.** |
-| GitHub Actions | Builds the unsigned APK of `main` (by hand) and of every pushed `v*` tag, and shows its SHA-256. |
+| GitHub Actions | Builds the unsigned APK of `main` (by hand) and of every pushed `v*` tag, and shows its SHA-256 (`build.yml`). Runs the tests on every branch push (`test.yml`, nothing built). |
 | Release clone on the host (`~/seedtag-release`) | Review, signed tag, push of the tag, signing the CI-built APK, publishing. Cloned once; after that, never `git pull` there: `release-tag.sh` fetches `main` itself and shows it to you before anything is checked out. Never opened in a container. |
 | Your phone | Release-candidate test, then the signed APK over the previous release. |
 

@@ -222,7 +222,9 @@ Everything the build downloads is checked against a pinned checksum, so a tamper
   `make test build` for every pushed `v*` tag, or when started by hand (the Actions tab's "Run workflow", or
   `gh workflow run build.yml --ref <branch-or-tag>`), in an image built from the same `.devcontainer/Dockerfile`,
   and shows the APK's SHA-256 in the run's summary (the APK is attached too). Pass that hash to
-  `sign-release.sh --expect`. Its actions are pinned by commit SHA, which `make check-workflows` (part of
+  `sign-release.sh --expect`. A second workflow, `.github/workflows/test.yml`, runs only the tests (`make test`,
+  `make test-cross`, and `seedtag.py` with the `cryptography` package, on the runner's Python and on the newest one
+  it has) for every branch push; it builds nothing and uploads nothing. Their actions are pinned by commit SHA, which `make check-workflows` (part of
   `make check`) enforces. It can't tell offline whether a SHA is the release named in its comment, so check that
   when updating an action: `git ls-remote https://github.com/actions/checkout refs/tags/v7.0.1` must print the
   pinned SHA (for an annotated tag, the `^{}` line). Both current pins were checked this way on 2026-11-11. You can also run `make build` in a fresh `git clone` on another machine. Build from a

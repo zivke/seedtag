@@ -204,7 +204,9 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B10: `seedtag.py` long-term.**
   - [x] Drop `from __future__ import annotations`; catch any backend exception and fall back to the built-in code;
     `--builtin`; the `-I -S` hint in the failure message; tests run with `-W error` (`make test`, CI).
-  - [ ] CI on the newest Python (needs `actions/setup-python`, pinned by SHA; with B37).
+  - [ ] CI on the newest Python (needs `actions/setup-python`, pinned by SHA; with B37). Partly, 2026-11-26:
+    `test.yml` uses the newest Python in the runner's tool cache, with no new action. A pre-release Python (or a
+    newer one than the runner has) still needs `actions/setup-python`: a new dependency, so ask first.
 - [ ] **B11: the APK-to-tag binding is one person reading a run header.** Build-provenance attestation checked by
   `sign-release.sh`, or a host rebuild from a throwaway clone for `--expect`.
 - [x] **B12: raw empty check and format guard skip non-NXP Type 2 tags** *(device: N4)*. Raw reads through `NfcA`.
@@ -322,7 +324,8 @@ report's tests N1–N12, A1–A3, H1).
 - [x] **B34: RELEASING.md:129-133 stale** ("0.4.3"; add the Dockerfile and the metadata `<configuration>` block).
 - [ ] **B35: one Gradle cache volume shared by every project's container** (`gradle-cache-${devcontainerId}`).
 - [ ] **B36: gaps in `check-apk.sh`, `check-workflows.py` and the metadata `<configuration>` check.**
-- [ ] **B37: no CI on branch pushes** (tests-only workflow).
+- [ ] **B37: no CI on branch pushes** (tests-only workflow). On `develop` (2026-11-26): `.github/workflows/test.yml`
+  (no new actions); tools row 5.21: the first push shows whether it runs.
 - [ ] **B38: reproducible only in this image; nothing durable recorded per release** (`keepDebugSymbols`,
   `.gitattributes`, unsigned hash and `seedtag.py` in the release, README verification section).
 - [ ] **B39: licence headers and provenance** (`REUSE.toml`, missing headers, wordlist source and licence).

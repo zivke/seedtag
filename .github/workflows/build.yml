@@ -6,7 +6,7 @@
 # independent build that tools/sign-release.sh --expect compares against before signing.
 # No secrets are used: nothing here can sign anything.
 # It runs only for release tags (vX.Y.Z) and when started by hand (Actions tab, or
-# `gh workflow run build.yml --ref <branch-or-tag>`).
+# `gh workflow run build.yml --ref <branch-or-tag>`). Branch pushes run test.yml (tests only).
 name: build
 
 on:

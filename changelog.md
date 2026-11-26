@@ -7,6 +7,8 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- A tests-only GitHub Actions workflow (`test.yml`) on every branch push: `make test`, `make test-cross`, and
+  `seedtag.py` with the `cryptography` package on the runner's Python and the newest one it has, with `-W error`.
 - A neutral *Accessibility is on* notice while seed words are on screen (Back up's words and *Check your words*,
   Restore) when the phone's own screen reader or another preinstalled accessibility feature is on: it may read
   the words aloud through a text-to-speech app. The red banner still names installed apps with that access.
