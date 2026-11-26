@@ -25,7 +25,7 @@ GRADLE    := ./gradlew --console=plain
 OUT       := app/build/outputs/apk
 
 .DEFAULT_GOAL := build
-.PHONY: build build-test debug test test-core test-py check check-workflows deps-metadata check-deps wrapper-check \
+.PHONY: build build-test debug test test-core test-py test-cross check check-workflows deps-metadata check-deps wrapper-check \
         connect install install-test install-debug run run-test run-debug stop uninstall logcat clean help
 
 # Every Gradle run first checks the wrapper jar against its pinned SHA-256 (the official wrapper
@@ -67,6 +67,13 @@ test-core: wrapper-check
 ## test-py: seedtag.py against the Trezor and SeedTag v1 vectors
 test-py:
 	python3 -W error tools/test_seedtag.py
+
+## test-cross: live differential test, random backups sealed by seedtag.py and opened by the core, and back
+test-cross: wrapper-check
+	rm -rf build/cross && mkdir -p build/cross
+	python3 -W error tools/cross_test.py seal build/cross/py.tsv
+	SEEDTAG_CROSS_DIR=$(CURDIR)/build/cross $(GRADLE) :core:test --tests '*CrossTest*'
+	python3 -W error tools/cross_test.py open build/cross/kt.tsv
 
 ## check: tests, the workflow check, plus lint on the app
 check: test check-workflows

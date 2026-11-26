@@ -33,7 +33,8 @@ Never install, regenerate or read a signing key, and don't bring one into the
 container. Everything goes through the `Makefile` (`make help` lists targets).
 
 - `make test`: `:core:test` (JUnit, plain JVM) and `tools/test_seedtag.py`
-  against the same vector files. No device, no Android classes.
+  against the same vector files. No device, no Android classes. `make test-cross`:
+  random backups sealed by `seedtag.py` and opened by the core (`CrossTest`), and back.
 - `make debug`: `seedtag-debug.apk`, Android debug key.
 - `make build`: unsigned release `seedtag-unsigned.apk` (R8 on), always a clean
   build, as in CI.

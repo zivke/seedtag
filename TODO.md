@@ -334,12 +334,12 @@ report's tests N1–N12, A1–A3, H1).
   the steps to check, non-BIP39 word positions (`Passphrase.nonWordPositions`, tested), Erase's own variant; the
   password keyboard runs into the gutters (`intoGutter`).
 - [ ] **B46: small screens, contrast, English-only strings.**
-- [ ] **B47: test gaps** (wordlist hash, `NdefText` paths, long and non-BMP password vectors, a differential test).
+- [x] **B47: test gaps** (wordlist hash, `NdefText` paths, long and non-BMP password vectors, a differential test).
   - [x] The wordlist's SHA-256 pinned in both suites; `NdefText.decodePayload`'s UTF-16 (both byte orders) and
     malformed paths; vectors with a 128-character password and one outside the BMP that NFKD changes, checked
     by both suites (Bouncy Castle agrees with `seedtag.py`).
-  - [ ] Optional: a live differential test (`make test-cross`: random entropy and passwords sealed by one side,
-    opened by the other).
+  - [x] Optional: a live differential test (`make test-cross`: random entropy and passwords sealed by one side,
+    opened by the other). Done 2026-11-26: `tools/cross_test.py` and `CrossTest`, 12 cases each way.
 - [ ] **Info I1–I14:** see the report; none needs action before the items above.
 - [ ] **Owner questions** (report, last section): 0.4.2 signed from a CI build with a matching hash? The
   container credential's scope; F-Droid; keystore backups and succession; Lock on unconfirmed chips; blocking

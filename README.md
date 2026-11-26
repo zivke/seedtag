@@ -829,6 +829,9 @@ The safest setup is a spare phone that was factory-reset, has nothing else insta
   phrase lengths (12 to 24 words). The built-in Argon2id is checked against known answers from both packages and
   the built-in AES-GCM against the GCM specification and every vector; `SEEDTAG_SLOW_TESTS=1` (set in CI) also
   decrypts a vector with no package at all, at the real parameters (about a minute).
+- `make test-cross` (not part of `make test`; about half a minute): a live cross-check beyond the fixed vectors.
+  `tools/cross_test.py` seals random backups (every length, passwords with accents and characters outside the BMP)
+  that the core's `CrossTest` opens, and the core seals its own for `seedtag.py` to open.
 
 NFC itself has no automated tests: there's no emulator support. Test on a real phone with a real tag, using a
 throwaway mnemonic.

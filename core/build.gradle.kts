@@ -18,3 +18,10 @@ dependencies {
     implementation(libs.bouncycastle)
     testImplementation(libs.junit)
 }
+
+// `make test-cross` (CrossTest): the directory where seedtag.py and the core swap random backups. Unset otherwise.
+tasks.test {
+    val cross = providers.environmentVariable("SEEDTAG_CROSS_DIR").orElse("")
+    inputs.property("seedtag.cross", cross)
+    systemProperty("seedtag.cross", cross.get())
+}
