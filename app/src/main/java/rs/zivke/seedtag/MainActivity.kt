@@ -97,7 +97,7 @@ class MainActivity : ComponentActivity() {
         }
         // Android 14+: only accessibility *tools* (screen readers such as TalkBack) can see this
         // window's content or act on it; any other accessibility service gets nothing. Children
-        // inherit it from the decor view. Dialogs set it themselves (GuardDialogWindow in Ui.kt).
+        // inherit it from the decor view. Dialogs set it themselves (GuardDialogWindow in Components.kt).
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             window.decorView.setAccessibilityDataSensitive(View.ACCESSIBILITY_DATA_SENSITIVE_YES)
         }
@@ -145,7 +145,7 @@ class MainActivity : ComponentActivity() {
      * window (or, on Android 10–11, while one covers part of ours: [isObscured]) never gets to the
      * UI, and the app says why. If an overlay
      * shows up in the middle of a gesture, what the UI saw so far is canceled, so a tap can't land.
-     * Dialogs are windows of their own; they filter touches in Ui.kt (GuardDialogWindow).
+     * Dialogs are windows of their own; they filter touches in Components.kt (GuardDialogWindow).
      */
     override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
         val obscured = ev.isObscured()
@@ -292,7 +292,7 @@ class MainActivity : ComponentActivity() {
  * Compose reports the text on screen to the system's content-capture service (Android 10+) and
  * registers the window with autofill (Android 8+). FLAG_SECURE should already stop content
  * capture; this doesn't depend on it: the window and everything in it are left out of both.
- * Used for the activity's window and for every dialog (GuardDialogWindow in Ui.kt).
+ * Used for the activity's window and for every dialog (GuardDialogWindow in Components.kt).
  */
 internal fun View.excludeFromCaptureAndAutofill() {
     importantForAutofill = View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS

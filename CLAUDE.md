@@ -128,7 +128,7 @@ Two Gradle modules plus the Python tool:
     (all versions, with a banner). Accessibility: Android 14+ marks the window
     `setAccessibilityDataSensitive(YES)` (only accessibility tools see it), and
     every version shows a banner naming non-system apps with accessibility
-    access. Dialogs are separate windows and use `GuardDialogWindow()` in `Ui.kt`
+    access. Dialogs are separate windows and use `GuardDialogWindow()` in `Components.kt`
     for all of this. Airplane mode is read from `Settings.Global` (no
     permission) for the offline advice; Wi-Fi / Bluetooth state would need
     permissions, so they're only mentioned.
@@ -157,8 +157,13 @@ Two Gradle modules plus the Python tool:
   - `ChipTest.kt`: debug builds only (`src/debug`; `src/release` has a stub without commands): the
     NFC-spot page's chip test, one raw command per tap (GET_VERSION, READs, PWD_AUTH with the factory
     password), to see how an unknown chip answers. Nothing is written.
-  - `Ui.kt`: screens, word keypad, password keyboard, dialogs, theme.
-    `IdleWatch` keeps the screen on while `holdsSecrets` and shows *Still
+  - The UI, one file per part, all in one package (helpers other files use are `internal`):
+    `Ui.kt` (`SeedTagApp`, the header, tabs, banners, `IdleWatch`, haptics), `Theme.kt`,
+    `Components.kt` (notices, buttons, facts, `StepScreen`, `ScrollHints`, the checklist
+    (`Preflight`), `GuardDialogWindow`), `BackUpScreen.kt`, `ReadScreen.kt` (Verify and
+    Restore, chip facts, the write-password section), `EraseScreen.kt`, `Keyboards.kt` (the
+    word keypad, `SecretField`, the password keyboard), `InfoPages.kt` (the NFC-spot page,
+    About) and `Dialogs.kt` (every dialog, *Ready to scan*). `IdleWatch` keeps the screen on while `holdsSecrets` and shows *Still
     there?* (`Dialog.StillThere`); behind it, both Back questions
     (`Dialog.ConfirmBack`), the Settings question (`Dialog.ConfirmSettings`), the progress dialog (`busy`) and *Ready to scan*
     (`scanPrompt`) the screen is blurred on Android 12+ and covered below; `ScrollHints` adds the bottom/top fades and the ↓ button to a

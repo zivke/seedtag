@@ -67,7 +67,9 @@
     one back up and restore on the phone. Moot if the app gets its own Argon2id (dependency-reduction
     report, item 6).
   - [x] CI running `make test`, `make build` and `check-apk` (`.github/workflows/build.yml`).
-  - [ ] Split `Ui.kt` by screen, after `tag-write-password` is merged (it changes `Ui.kt` a lot).
+  - [ ] Split `Ui.kt` by screen, after `tag-write-password` is merged (it changes `Ui.kt` a lot). On branch
+    `ui-split` (2026-11-26): nine files by section, lines moved unchanged (`private` → `internal` where
+    another file needs it); device row 7.64.
   - [x] Move the tag-flow logic into a pure-Kotlin state machine with tests. Done before `tag-write-password`
     after all (board B16; decided 2026-11-22): that branch is re-applied onto it.
   - [x] Clarify the wrapper wording (8.14 jar, 8.11.1 distribution: both were right); remove the unused
