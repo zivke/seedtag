@@ -264,7 +264,7 @@ class SeedTagViewModel : ViewModel() {
      */
     private fun editable(f: PwField): Boolean = !(f == PwField.Password && generatedPassphrase)
 
-    fun typePassword(f: PwField, c: Char) { if (editable(f) && buffer(f).append(c)) passwordChanged(f) }
+    fun typePassword(f: PwField, c: Char) { if (editable(f) && buffer(f).type(c)) passwordChanged(f) }
 
     fun backspacePassword(f: PwField) { if (!editable(f)) return; buffer(f).removeLast(); passwordChanged(f) }
 
@@ -279,7 +279,7 @@ class SeedTagViewModel : ViewModel() {
     fun completePasswordWord(f: PwField, word: String) {
         if (!editable(f)) return
         val b = buffer(f)
-        if (Bip39.isWord(word) && b.replaceFrom(b.lastTokenStart(), word)) passwordChanged(f)
+        if (Bip39.isWord(word) && b.completeWord(word)) passwordChanged(f)
     }
 
     /** BIP39 completions of the word being typed, if it's lower-case letters only. */

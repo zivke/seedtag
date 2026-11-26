@@ -94,4 +94,52 @@ class SecretCharsTest {
             SeedBox.passwordBytes("pässwörd ☃".toCharArray()),
         )
     }
+
+    @Test
+    fun aCompletedWordGetsItsSpaceFromTheNextLetter() {
+        val s = secret("ab")
+        assertTrue(s.completeWord("abandon"))
+        assertEquals("abandon", s.reveal()) // no trailing space if nothing follows
+        assertTrue(s.spaceDue)
+        s.type('a'); s.type('b')
+        assertEquals("abandon ab", s.reveal())
+        // A suggestion after a suggestion replaces the word, still without a space.
+        s.completeWord("ability"); s.completeWord("able")
+        assertEquals("abandon able", s.reveal())
+        // A typed space is that one space, not two.
+        s.type(' '); s.type('z')
+        assertEquals("abandon able z", s.reveal())
+        // A digit or symbol attaches to the word.
+        s.completeWord("zoo"); s.type('1'); s.type('!')
+        assertEquals("abandon able zoo1!", s.reveal())
+        // Backspace cancels the space and deletes as usual.
+        s.completeWord("zoo") // replaces the last token, "zoo1!"
+        s.removeLast()
+        assertFalse(s.spaceDue)
+        s.type('m')
+        assertEquals("abandon able zom", s.reveal())
+        // Clearing or setting cancels it.
+        s.completeWord("zone"); s.clear(); s.type('a')
+        assertEquals("a", s.reveal())
+        s.completeWord("abandon"); s.set(charArrayOf('x')); s.type('y')
+        assertEquals("xy", s.reveal())
+    }
+
+    @Test
+    fun aDueSpaceNeverHalfFits() {
+        val s = SecretChars(capacity = 8)
+        "zo".forEach { s.append(it) }
+        assertTrue(s.completeWord("zoo")) // "zoo"
+        "pqrz".forEach { assertTrue(s.append(it)) } // "zoopqrz", 7 of 8: no completion pending now
+        assertTrue(s.completeWord("zoo")) // last token "zoopqrz" becomes "zoo"
+        "abcd".forEach { s.type(it) } // "zoo abcd": 8, full
+        assertEquals("zoo abcd", s.reveal())
+        val t = SecretChars(capacity = 4)
+        t.completeWord("zoo")
+        assertFalse(t.type('a')) // the space would fit, the letter not: neither goes in
+        assertEquals("zoo", t.reveal())
+        assertTrue(t.spaceDue)
+        assertTrue(t.type('1')) // no space before a digit
+        assertEquals("zoo1", t.reveal())
+    }
 }

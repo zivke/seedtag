@@ -362,7 +362,9 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    generated passphrase can't be edited and its field has no **Show**; **Show it again** clears *Repeat password*,
    to be typed from the copy once more; and **Type my own password instead** clears it (after asking) for a password
    of your own. **Generate a different one** asks before replacing a passphrase you may already have written down. Tap *Encrypt & write*, then hold the tag to the phone.
-   The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
+   The password is typed on the app's own keyboard, which suggests BIP39 words as you type. Tapping one completes
+   the word, and the space after it goes in when you type the next letter (a space you type yourself counts as
+   that one), so the last word never ends with a stray space.
    Only the generated passphrase is rated *Strong*. A password you type yourself always needs a confirmation
    before writing: SeedTag can't recognise a well-known phrase (`correct horse battery staple`, a quote, a name and
    a date), so its estimate is only an upper bound, shown as "≈N bits at most". The generated passphrase counts 11

@@ -79,6 +79,10 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- The password keyboard puts the space after a tapped word suggestion in by itself, when the next letter is
+  typed: no space key between the words of a passphrase, and none at the end of the last one. A space typed
+  anyway counts as that one; a digit or symbol attaches to the word; ⌫ works as before. On Back up, Verify and
+  Restore.
 - **Make tag read-only** on an NTAG213, 215 or 216 (and NTAG21x lookalikes, after a warning) no longer uses
   Android's lock. SeedTag writes the lock itself, as the chip's datasheet gives it: the settings frozen for good
   (so nobody can put a password on the tag, not even one that locks it against reading), the lock bits for every

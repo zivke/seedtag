@@ -16,16 +16,37 @@ class SecretChars(val capacity: Int = 128) {
     var length = 0
         private set
 
+    /**
+     * A word was just completed ([completeWord]): the next letter [type]d gets a space before it. Put in only
+     * then, so a password never ends with one the user didn't type. Any other edit cancels it.
+     */
+    var spaceDue = false
+        private set
+
     fun isEmpty(): Boolean = length == 0
 
     /** Appends [c]; false if the buffer is full. */
     fun append(c: Char): Boolean {
         if (length >= capacity) return false
         buf[length++] = c
+        spaceDue = false
         return true
     }
 
+    /**
+     * A key on the password keyboard: [c], after a completed word ([spaceDue]) a letter with a space before it,
+     * and a typed space as that one space. False, and nothing changed, if it doesn't fit.
+     */
+    fun type(c: Char): Boolean {
+        if (!spaceDue || !c.isLetter()) return append(c)
+        if (length + 2 > capacity) return false
+        append(' ')
+        return append(c)
+    }
+
+    /** ⌫: the last char, and the space a completed word was waiting for. */
     fun removeLast() {
+        spaceDue = false
         if (length > 0) buf[--length] = '\u0000'
     }
 
@@ -40,6 +61,7 @@ class SecretChars(val capacity: Int = 128) {
     fun clear() {
         buf.fill('\u0000')
         length = 0
+        spaceDue = false
     }
 
     /** Index where the last space-separated token starts ([length] if the content ends with a space). */
@@ -56,6 +78,14 @@ class SecretChars(val capacity: Int = 128) {
         buf.fill('\u0000', start, length)
         word.toCharArray(buf, start)
         length = start + word.length
+        spaceDue = false
+        return true
+    }
+
+    /** A tapped suggestion: [word] in place of the last token, then [spaceDue]. False if it doesn't fit. */
+    fun completeWord(word: String): Boolean {
+        if (!replaceFrom(lastTokenStart(), word)) return false
+        spaceDue = true
         return true
     }
 
