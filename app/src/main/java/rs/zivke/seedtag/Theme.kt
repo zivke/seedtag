@@ -81,11 +81,14 @@ private val LightColors = lightColorScheme(
     onErrorContainer = Color(0xFF410E0B),
 )
 
-/** Colors Material has no slot for: a good result, and "fair" in the strength meter. */
+/**
+ * Colors Material has no slot for: a good result, and "fair" in the strength meter. Light "fair" is 5.1:1 on the
+ * background, for its 12sp text (board B46; B06A00 was 4.0:1).
+ */
 internal class ExtraColors(val success: Color, val successContainer: Color, val onSuccessContainer: Color, val fair: Color)
 
 private val DarkExtra = ExtraColors(Color(0xFF7FD3A0), Color(0xFF16291D), Color(0xFFC9EED6), Color(0xFFE5A54B))
-private val LightExtra = ExtraColors(Color(0xFF1E7B45), Color(0xFFE3F3E8), Color(0xFF0B2E18), Color(0xFFB06A00))
+private val LightExtra = ExtraColors(Color(0xFF1E7B45), Color(0xFFE3F3E8), Color(0xFF0B2E18), Color(0xFF9A5C00))
 internal val LocalExtra = staticCompositionLocalOf { DarkExtra }
 
 private val AppTypography = Typography().let { t ->

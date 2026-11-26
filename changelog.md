@@ -96,6 +96,9 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- While the Erase tab checks a backup's password, the tab row is hidden, as on Back up's typing steps: on a small
+  phone the keyboard and buttons left the explanation almost no room. **Don't check the password** brings it back.
+- The password meter's "fair" colour in the light theme is darker, for readable contrast (5.1:1, was 4.0:1).
 - Stricter build checks: `check-apk.sh` also refuses an Application class, a second process or shared user ID,
   intent filters beyond the launcher's, `<queries>`, a declared permission but androidx's own, a lowered min or
   target SDK, cleartext traffic, missing data-extraction rules and unknown native libraries; `check-workflows.py`

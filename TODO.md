@@ -360,7 +360,9 @@ report's tests N1–N12, A1–A3, H1).
 - [x] **B45: "Wrong password, or the tag data is corrupted" is a dead end** (hints). `Dialog.WrongPassword` with
   the steps to check, non-BIP39 word positions (`Passphrase.nonWordPositions`, tested), Erase's own variant; the
   password keyboard runs into the gutters (`intoGutter`).
-- [ ] **B46: small screens, contrast, English-only strings.**
+- [ ] **B46: small screens, contrast, English-only strings.** On `develop` (2026-11-26): no tab row during Erase's
+  password check; light "fair" `9A5C00` (5.1:1); device row 7.93. Still open: the preflight list's small scroll
+  slot, and strings into resources (only before a translation).
 - [x] **B47: test gaps** (wordlist hash, `NdefText` paths, long and non-BMP password vectors, a differential test).
   - [x] The wordlist's SHA-256 pinned in both suites; `NdefText.decodePayload`'s UTF-16 (both byte orders) and
     malformed paths; vectors with a 128-character password and one outside the BMP that NFKD changes, checked

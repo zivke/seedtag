@@ -28,7 +28,7 @@ internal fun EraseScreen(vm: SeedTagViewModel) {
     val c = vm.eraseCheck
     val verified = vm.eraseVerified
     val backup = c?.content == TagContent.Backup && c.target != null
-    val typing = backup && verified == null && vm.eraseWithPassword
+    val typing = vm.typingErasePassword
     StepScreen(
         bottom = {
             when {
@@ -91,6 +91,13 @@ internal fun EraseScreen(vm: SeedTagViewModel) {
         }
     }
 }
+
+/** The Erase tab's password check is up, with its keyboard: the tab row makes room for it (board B46). */
+internal val SeedTagViewModel.typingErasePassword: Boolean
+    get() {
+        val c = eraseCheck
+        return c?.content == TagContent.Backup && c.target != null && eraseVerified == null && eraseWithPassword
+    }
 
 @Composable
 private fun EraseCheckResult(c: EraseCheck, verified: VerifyResult?) {
