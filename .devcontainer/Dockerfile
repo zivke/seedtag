@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 zivke
 # Same devcontainers base family as the other projects (luxtheme).
 # The vscode user, sudo, git, curl and jq come from the base image.
 # Pinned by digest, so a changed tag can't slip in a different image. To update:

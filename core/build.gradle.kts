@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 zivke
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // Pure JVM module: BIP39 + SeedBox crypto. No Android dependency -> `./gradlew :core:test` runs on any machine.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 zivke
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 // AGP 9 compiles Kotlin itself (no org.jetbrains.kotlin.android plugin); it uses the Kotlin

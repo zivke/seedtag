@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 zivke
+
 # SeedTag build helpers.
 #
 # In the devcontainer the Android SDK (ANDROID_HOME), Gradle cache and adb are
