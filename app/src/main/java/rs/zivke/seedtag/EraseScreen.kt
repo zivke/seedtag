@@ -13,6 +13,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import rs.zivke.seedtag.core.EraseCheck
+import rs.zivke.seedtag.core.SeedBox
 import rs.zivke.seedtag.core.TagContent
 
 // ============================================================ erase tag ===
@@ -136,6 +137,8 @@ private fun EraseCheckResult(c: EraseCheck, verified: VerifyResult?) {
                             else -> Fact("State", "Can be erased")
                         },
                     )
+                    // No password needed: a quick check that the tag still reads, unchanged (board B8, I13).
+                    if (c.content == TagContent.Backup) c.text?.let(SeedBox::checkCodeOf)?.let { add(Fact("Check code", it, mono = true)) }
                     verified?.let { v ->
                         add(Fact("Fingerprint", v.fingerprint, mono = true))
                         when (v.matchesBackup) {

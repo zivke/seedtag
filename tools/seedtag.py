@@ -597,6 +597,15 @@ def tag_keys(secret: bytes) -> "dict[str, bytes]":
     }
 
 
+def check_code(blob: bytes) -> str:
+    """The tag's check code (FORMAT.md section 5): of the blob, so the same however its text is written, and
+    different after one mistyped character. Not secret. Printed before the password is asked for: if it isn't the
+    code SeedTag shows for the tag (or that was written down with it), the text was typed wrong, and no password
+    will open it. Same as SeedBox.checkCode in the app."""
+    h = hashlib.sha256(b"seedtag-check" + blob).hexdigest()[:8]
+    return h[:4] + "-" + h[4:]
+
+
 def fingerprint(entropy: bytes) -> str:
     """Short, non-secret-revealing check value (first 4 bytes of SHA-256)."""
     return hashlib.sha256(b"seedtag-fp" + entropy).hexdigest()[:8]
@@ -1197,6 +1206,7 @@ def _check(argv) -> int:
         return 1
     print("\nClean: every page holds only what SeedTag writes, or the chip's defaults.")
     if backup:
+        print(f"Its check code: {check_code(blob_from_text(backup))} (SeedTag shows the same for this tag).")
         print(f"Now check the backup itself: python3 -I -S seedtag.py verify {argv[0]}")
     return 0
 
@@ -1234,11 +1244,15 @@ def main(argv):
                 return 1
             print(base64.b64encode(blob).decode())
             print(f"fingerprint: {fingerprint(entropy)}", file=sys.stderr)
+            print(f"check code: {check_code(blob)}", file=sys.stderr)
         else:
             text = _read_text(rest)
             blob = blob_from_text(text)
             if blob[:1] == bytes([VERSION]) and len(blob) - _OVERHEAD in (16, 20, 24, 28, 32):
                 _say_if_exact(text)  # before the password: it's about the text only
+                # Before the password too (board B8): a code other than the tag's means a typo in the text.
+                print(f"check code: {check_code(blob)} (SeedTag shows the same for this tag; if it doesn't match, "
+                      "the text has a typo and no password will open it)", file=sys.stderr)
             password = getpass.getpass("Password: ")
             if cmd == "tag-key":
                 entropy, fix, key = _open_forgiving_key(blob, password)

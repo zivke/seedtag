@@ -72,6 +72,12 @@ variants, in this order, and say which one worked:
 A variant equal to an earlier one isn't tried. `password-variants.tsv` holds the exact results. Only the typed
 password changes, never the format: the key is always derived as in section 2.
 
+**Check code.** So that a mistyped text can be told from a wrong password before decrypting, SeedTag and
+`seedtag.py` show a check code of the blob (not of the text, so every accepted way of writing it gives the same
+code): the first 4 bytes of SHA-256(ASCII `seedtag-check` || blob), as 8 lower-case hex digits with a `-` after the
+fourth, for example `a2f6-c3c6`. It isn't secret and isn't stored on the tag. `check-codes.tsv` holds the code of
+each v1 vector's text.
+
 ## 4. The envelope every future format keeps
 
 SeedTag v0.4.2 and later, and `seedtag.py` of the same versions, recognise a backup by the following, without
@@ -121,6 +127,7 @@ them.
   for whether the text is exactly what SeedTag writes (`-` for errors).
 - **`password-variants.tsv`**: the typed password (hex), then the variants tried, in order, as pairs of the
   variant's name and the password (hex). A row with only a password has no variants.
+- **`check-codes.tsv`**: the tag's text, its check code (section 3).
 - **`tag-key-vectors.tsv`**: password (hex), the tag's text, then the write password derived from them
   (section 6): the Ultralight C 3DES key, the same as stored in its pages 2Ch-2Fh, the NTAG PWD and PACK, all hex.
 - `bip39-vectors.tsv` (entropy, words) is Trezor's BIP39 reference set, from python-mnemonic (MIT), not part of

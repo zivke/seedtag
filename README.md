@@ -683,8 +683,12 @@ It's ciphertext, so that's safe. Spaces and line breaks in it, missing `=` at th
 and an `en` in front (the record's language, which some apps show) are all accepted, by `seedtag.py` and the app
 alike. A backup's text is 84, 88, 92, 100 or 104 characters long (12, 15, 18, 21 or 24 words), counting the `=` at
 the end, and starts with `A`. If you type it in by hand, a missing or extra character, or a wrong first one, gets
-its own message. A wrong character elsewhere can't be told from a wrong password: both end in "wrong password or
-corrupted blob", so check the text as well as the password.
+its own message. A wrong character elsewhere can't be told from a wrong password by decrypting: both end in "wrong
+password or corrupted blob". That's what the **check code** is for: SeedTag shows it on Done, under a Verify result
+and in the Erase tab's scan (no password needed there), as `1a2b-3c4d`, and `decrypt` and `verify` print it before
+they ask for the password. Write it on the tag's label or next to your written password. If the code printed isn't
+the tag's, the text has a typo and no password will open it. It isn't secret: it's worked out from the text, like
+the fingerprint is from the seed, and tells nothing about either. `encrypt` and `check` print it too.
 
 `decrypt` and `verify` also say, before asking for the password, whether the text is exactly what SeedTag writes:
 the Base64 with its `=` at the end and nothing else, not even a space. Typing it in or copying it through another

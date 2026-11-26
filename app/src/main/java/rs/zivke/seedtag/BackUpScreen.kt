@@ -618,10 +618,18 @@ private fun DoneStep(vm: SeedTagViewModel) {
         }
         vm.backupFingerprint?.let {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Facts(listOf(Fact("Fingerprint", it, mono = true)))
+                Facts(
+                    listOfNotNull(
+                        Fact("Fingerprint", it, mono = true),
+                        vm.writtenText?.let(SeedBox::checkCodeOf)?.let { code -> Fact("Check code", code, mono = true) },
+                    ),
+                )
                 Text(
-                    "This isn't secret. If the backup is intact, Verify (here or in seedtag.py) shows the same value. " +
-                        "It's SeedTag's own: a wallet may show a fingerprint too, but that's a different number.",
+                    "Neither is secret. If the backup is intact, Verify (here or in seedtag.py) shows the same fingerprint. " +
+                        "It's SeedTag's own: a wallet may show a fingerprint too, but that's a different number. The check " +
+                        "code is the tag's text's: write it on the tag's label or with your written password. If someone " +
+                        "ever types the text into seedtag.py, it prints the code before asking for the password, and a " +
+                        "different one means a typo, not a wrong password.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

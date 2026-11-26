@@ -11,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import rs.zivke.seedtag.core.PasswordFix
 import rs.zivke.seedtag.core.Protection
+import rs.zivke.seedtag.core.SeedBox
 import rs.zivke.seedtag.core.TagInfo
 
 // ===================================================== verify / restore ===
@@ -69,6 +70,7 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
         Facts(
             buildList {
                 add(Fact("Fingerprint", result.fingerprint, mono = true))
+                result.tagText?.let(SeedBox::checkCodeOf)?.let { add(Fact("Check code", it, mono = true)) }
                 add(
                     if (result.tagDifferences.isEmpty()) Fact("The tag's message", "Exactly as SeedTag writes it", Tone.Success)
                     else Fact("The tag's message", "Not as SeedTag writes it: see below", Tone.Caution),

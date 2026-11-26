@@ -295,6 +295,26 @@ object SeedBox {
         }
     }
 
+    /**
+     * The tag's check code (board B8, FORMAT.md section 5): of the [blob], so the same however its text is written
+     * (padding, `-_`, the record's `en` in front) and different after one mistyped character. Not secret, like the
+     * text. SeedTag shows it, and seedtag.py prints it before it asks for the password, so a typo in typed-in text
+     * shows as a different code rather than as a wrong password. Eight hex digits in two groups: `1a2b-3c4d`,
+     * grouped so it isn't taken for the [fingerprint]. Same as check_code() in seedtag.py.
+     */
+    fun checkCode(blob: ByteArray): String {
+        val h = Bip39.sha256("seedtag-check".toByteArray() + blob)
+        val hex = h.take(4).joinToString("") { "%02x".format(it) }
+        return hex.substring(0, 4) + "-" + hex.substring(4)
+    }
+
+    /** [checkCode] of a tag's [text], or null if it isn't Base64 at all. */
+    fun checkCodeOf(text: String): String? = try {
+        checkCode(fromBase64(text))
+    } catch (e: SeedTagException) {
+        null
+    }
+
     /** Short non-secret check value for comparing backups (same as seedtag.py `verify`). */
     fun fingerprint(entropy: ByteArray): String {
         val input = "seedtag-fp".toByteArray() + entropy

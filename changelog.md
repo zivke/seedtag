@@ -7,6 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- A **check code** for each backup (`1a2b-3c4d`), shown on Done, under a Verify result and in the Erase tab's scan
+  (no password needed there), and printed by `seedtag.py decrypt` and `verify` before they ask for the password,
+  and by `encrypt` and `check`. If the text was typed in with a mistake, the code differs, so a typo no longer
+  looks like a wrong password. It isn't secret; `FORMAT.md` describes it, `check-codes.tsv` has its vectors.
 - **Write a copy to another tag**, on Back up's Done screen and under a Verify result: the same backup on a
   second tag, without typing the words or the password again (retyping a generated passphrase as your own
   password would also have rated it Weak). It writes the tag's text unchanged, so the same password opens both;

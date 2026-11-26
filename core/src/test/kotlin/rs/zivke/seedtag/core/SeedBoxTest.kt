@@ -153,4 +153,20 @@ class SeedBoxTest {
             assertTrue(e.message!!, e.message!!.contains("newer version of SeedTag"))
         }
     }
+
+    @Test
+    fun checkCodesMatchPython() {
+        val rows = javaClass.getResource("/check-codes.tsv")!!.readText().lines().filter { it.isNotBlank() }.map { it.split("\t") }
+        assertTrue(rows.size >= 5)
+        for ((text, code) in rows) {
+            assertEquals(code, SeedBox.checkCode(SeedBox.fromBase64(text)))
+            // However the text is written: the record's language code in front, URL-safe, no padding.
+            val variant = "en" + text.replace('+', '-').replace('/', '_').trimEnd('=')
+            assertEquals(code, SeedBox.checkCodeOf(variant))
+            // One mistyped character: another code.
+            val typo = (if (text[10] == 'A') 'B' else 'A').let { c -> text.substring(0, 10) + c + text.substring(11) }
+            assertTrue(code != SeedBox.checkCodeOf(typo))
+        }
+        assertEquals(null, SeedBox.checkCodeOf("not base64 at all!"))
+    }
 }

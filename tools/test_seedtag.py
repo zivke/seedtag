@@ -89,6 +89,16 @@ class SeedBoxV1(unittest.TestCase):
             self.assertEqual(ent, got)
             self.assertEqual(fp, seedtag.fingerprint(got))
 
+    def test_check_codes_match_app(self):
+        codes = rows("check-codes.tsv")
+        self.assertGreaterEqual(len(codes), 5)
+        for text, code in codes:
+            self.assertEqual(code, seedtag.check_code(seedtag.blob_from_text(text)))
+            variant = "en" + text.replace("+", "-").replace("/", "_").rstrip("=")
+            self.assertEqual(code, seedtag.check_code(seedtag.blob_from_text(variant)))
+            typo = text[:10] + ("B" if text[10] == "A" else "A") + text[11:]
+            self.assertNotEqual(code, seedtag.check_code(seedtag.blob_from_text(typo)))
+
     def test_wrong_password(self):
         _, _, _, _, b64, _ = self.vecs[0]
         with self.assertRaises(ValueError):
