@@ -149,4 +149,16 @@ class TagModelTest {
         assertTrue(Type2Memory.freePages(full)!!.isEmpty())
         assertNull(Type2Memory.freePages(bytes(0x02, 0x03, 0, 0, 0) + data.copyOfRange(5, 144))) // Memory Control TLV
     }
+
+    @Test
+    fun whatAFailedWriteLeft() {
+        val old = byteArrayOf(1, 2, 3)
+        val new = byteArrayOf(4, 5, 6)
+        assertEquals(AfterWrite.Written, AfterWrite.of(old, new, written = true))
+        assertEquals(AfterWrite.Unchanged, AfterWrite.of(old, old.copyOf(), written = false)) // refused (B32)
+        assertEquals(AfterWrite.Unchanged, AfterWrite.of(null, null, written = false)) // still empty
+        assertEquals(AfterWrite.Changed, AfterWrite.of(old, byteArrayOf(4, 5, 3), written = false)) // part of it
+        assertEquals(AfterWrite.Changed, AfterWrite.of(old, null, written = false))
+        assertEquals(AfterWrite.Changed, AfterWrite.of(null, new, written = false))
+    }
 }

@@ -13,6 +13,7 @@ import android.nfc.tech.Ndef
 import android.nfc.tech.NfcA
 import android.nfc.tech.NdefFormatable
 import android.nfc.tech.NfcV
+import rs.zivke.seedtag.core.AfterWrite
 import rs.zivke.seedtag.core.EraseCheck
 import rs.zivke.seedtag.core.EraseFiller
 import rs.zivke.seedtag.core.NdefText
@@ -146,25 +147,37 @@ object TagIo {
                 }
             }
             val overwriting = existing != null && existing.records.any { r -> r.tnf != NdefRecord.TNF_EMPTY }
+            val wanted = message.toByteArray()
             report(TagStep("Writing the backup", 2, WRITE_STEPS, writes = true))
             try {
                 it.writeNdefMessage(message)
             } catch (e: IOException) {
-                if (!overwriting) throw e
-                // A Type 2 write goes page by page: the old content may already be partly overwritten.
-                return TagResult.Failed(
-                    "The tag moved away while it was being overwritten, so what it held before may already be gone. " +
-                        "Hold the same tag still and tap again to write the new backup.",
-                    changedTag = true,
-                )
+                when (afterFailedWrite(it, existing?.toByteArray()) { m -> m?.toByteArray()?.contentEquals(wanted) == true }) {
+                    AfterWrite.Written -> Unit // it went through after all: read it back as usual
+                    AfterWrite.Unchanged -> return refused(tag, "the backup")
+                    AfterWrite.Changed, AfterWrite.Unknown -> {
+                        if (!overwriting) throw e
+                        // A Type 2 write goes page by page: the old content may already be partly overwritten.
+                        return TagResult.Failed(
+                            "The tag moved away while it was being overwritten, so what it held before may already be gone. " +
+                                "Hold the same tag still and tap again to write the new backup.",
+                            changedTag = true,
+                        )
+                    }
+                }
             }
+            refusedOnce -= uidOf(tag)
             // Read back over the same connection; getNdefMessage() re-reads the tag. Not the
             // cached message: that's what the tag held before this write.
             report(TagStep("Reading it back to check it", 3, WRITE_STEPS, writes = true))
-            val back = it.ndefMessage ?: it.ndefMessage
-                ?: return TagResult.WrittenUnchecked(req.text) // couldn't read: check on the next tap
-            // The whole message, not only the text: nothing else may have ended up on the tag.
-            if (!back.toByteArray().contentEquals(message.toByteArray())) return TagResult.Failed("What was read back doesn't match what was written. The tag may be faulty – don't use it.", changedTag = true)
+            // The whole message, not only the text: nothing else may have ended up on the tag. One read
+            // that doesn't match isn't a faulty tag (board B32): it's read again over a new connection.
+            val first = readBack(it, fresh = false)
+            if (first == null || !first.contentEquals(wanted)) {
+                val second = readBack(it, fresh = true)
+                    ?: return TagResult.WrittenUnchecked(req.text) // couldn't read: check on the next tap
+                if (!second.contentEquals(wanted)) return TagResult.Failed("What was read back, twice, doesn't match what was written. The tag may be faulty – don't use it.", changedTag = true)
+            }
             report(TagStep(CLEARING, 4, WRITE_STEPS, writes = true))
             return TagResult.Written(req.text, clearRest(tag, it))
         }
@@ -270,19 +283,25 @@ object TagIo {
             if (!it.isWritable) return TagResult.Failed("This tag is read-only: it can't be erased.")
             if (isProtected(tag, it)) return TagResult.Failed(PROTECTED + " Verify it, remove the write password, then erase it.")
             val filler = fillerFor(it.maxSize)
+            val zeros = filler.toByteArray()
             report(TagStep("Overwriting it with zeros", 2, ERASE_STEPS, writes = true))
             try {
                 it.writeNdefMessage(filler)
             } catch (e: IOException) {
-                return TagResult.Failed(
-                    "The tag moved away while it was being erased, so part of what it held may already be gone. Nothing " +
-                        "here can tell how much: Cancel, scan the tag again and erase it again.",
-                    changedTag = true,
-                )
+                when (afterFailedWrite(it, current?.toByteArray()) { m -> m?.toByteArray()?.contentEquals(zeros) == true }) {
+                    AfterWrite.Written -> Unit
+                    AfterWrite.Unchanged -> return refused(tag, "the zeros")
+                    AfterWrite.Changed, AfterWrite.Unknown -> return TagResult.Failed(
+                        "The tag moved away while it was being erased, so part of what it held may already be gone. Nothing " +
+                            "here can tell how much: Cancel, scan the tag again and erase it again.",
+                        changedTag = true,
+                    )
+                }
             }
+            refusedOnce -= uidOf(tag)
             report(TagStep("Reading the zeros back", 3, ERASE_STEPS, writes = true))
-            val back = it.ndefMessage
-            if (back == null || !back.toByteArray().contentEquals(filler.toByteArray())) {
+            val back = readBack(it, fresh = false)
+            if ((back == null || !back.contentEquals(zeros)) && readBack(it, fresh = true)?.contentEquals(zeros) != true) {
                 return TagResult.Failed(
                     "Couldn't confirm that the whole tag was overwritten. Hold the same tag still and tap again to finish.",
                     changedTag = true,
@@ -292,7 +311,15 @@ object TagIo {
             try {
                 it.writeNdefMessage(EMPTY)
             } catch (e: IOException) {
-                return TagResult.Failed(
+                val now = afterFailedWrite(it, zeros) { m -> m == null || isEmpty(m) }
+                if (now == AfterWrite.Unchanged) {
+                    return TagResult.Failed(
+                        "The old backup was already overwritten: the zeros were written and read back. But the tag didn't take " +
+                            "the last write, which leaves it empty. Hold the same tag still and tap again to finish.",
+                        changedTag = true,
+                    )
+                }
+                if (now != AfterWrite.Written) return TagResult.Failed(
                     "The old backup was already overwritten: the zeros were written and read back. But the tag moved away before it " +
                         "was left empty. Hold the same tag still and tap again to finish. If the app then says it isn't " +
                         "the tag you scanned, Cancel, scan the tag again and erase it again.",
@@ -300,8 +327,15 @@ object TagIo {
                 )
             }
             report(TagStep("Checking that it's empty", 5, ERASE_STEPS, writes = true))
-            val after = it.ndefMessage
-            if (after != null && !isEmpty(after)) {
+            fun empty(fresh: Boolean): Boolean = try {
+                if (fresh) { it.close(); it.connect() }
+                it.ndefMessage.let { m -> m == null || isEmpty(m) }
+            } catch (e: IOException) {
+                false
+            } catch (e: FormatException) {
+                false
+            }
+            if (!empty(fresh = false) && !empty(fresh = true)) {
                 return TagResult.Failed(
                     "The tag was overwritten with zeros but isn't empty yet. Hold the same tag still and tap again to finish.",
                     changedTag = true,
@@ -315,6 +349,63 @@ object TagIo {
     }
 
     private val EMPTY = NdefMessage(NdefRecord(NdefRecord.TNF_EMPTY, null, null, null))
+
+    /**
+     * Board B32: a tag that refuses a write (a NAK: lock bits, or a password set with another tool) and a tag
+     * pulled away both make the write throw, but only one of them changes anything. So, after a write that
+     * threw, read the tag again over a new connection (a refused write ends the chip's session) and compare
+     * with what it held [before] (null: no message) and with what was being written ([written]).
+     */
+    private fun afterFailedWrite(ndef: Ndef, before: ByteArray?, written: (NdefMessage?) -> Boolean): AfterWrite = try {
+        ndef.close()
+        ndef.connect()
+        val now = ndef.ndefMessage
+        AfterWrite.of(before, now?.toByteArray(), written(now))
+    } catch (e: FormatException) {
+        AfterWrite.Changed
+    } catch (e: IOException) {
+        AfterWrite.Unknown
+    } catch (e: SecurityException) {
+        AfterWrite.Unknown
+    }
+
+    /** Tags (UIDs, not secret) whose last write came back [AfterWrite.Unchanged], for as long as the app runs. */
+    private val refusedOnce: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
+    private fun uidOf(tag: Tag): String = (tag.id ?: ByteArray(0)).joinToString("") { "%02x".format(it) }
+
+    /**
+     * A write of [what] the tag didn't take, nothing on it changed. Once may be a tag pulled away at the start;
+     * the same tag again in a row, held still, refuses writes.
+     */
+    private fun refused(tag: Tag, what: String): TagResult.Failed {
+        val again = !refusedOnce.add(uidOf(tag))
+        return TagResult.Failed(
+            if (again) {
+                "The tag refused the write again: it doesn't accept writes, though Android says it's writable. Part of " +
+                    "it may be read-only, or it may have a write password set with another app. Nothing on it changed. " +
+                    "Use another tag."
+            } else {
+                "The tag didn't take $what: it still reads as before, so nothing on it changed. Hold it still against " +
+                    "the phone and tap again."
+            },
+        )
+    }
+
+    /**
+     * The message as read now, for a read-back: [fresh] over a new connection. Null if it couldn't be read, or
+     * had no message or a malformed one: never throws, since the write itself is done by then.
+     */
+    private fun readBack(ndef: Ndef, fresh: Boolean): ByteArray? = try {
+        if (fresh) { ndef.close(); ndef.connect() }
+        ndef.ndefMessage?.toByteArray()
+    } catch (e: IOException) {
+        null
+    } catch (e: FormatException) {
+        null
+    } catch (e: SecurityException) {
+        null
+    }
 
     /** [EraseFiller]'s record for an NDEF area of [maxSize] bytes. */
     private fun fillerFor(maxSize: Int): NdefMessage =
@@ -336,7 +427,8 @@ object TagIo {
         ndef.use {
             it.connect()
             val msg = readMessage(it) ?: return TagResult.Failed(NOT_READ)
-            if (!msg.toByteArray().contentEquals(messageFor(expected).toByteArray())) {
+            val wanted = messageFor(expected).toByteArray()
+            if (!msg.toByteArray().contentEquals(wanted) && readBack(it, fresh = true)?.contentEquals(wanted) != true) {
                 return TagResult.Failed("This tag doesn't hold what was just written. Hold the same tag to the phone again. If this keeps happening, the tag may be faulty.")
             }
             return TagResult.Written(expected, clearRest(tag, it))

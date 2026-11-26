@@ -228,6 +228,12 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- A tag that refuses writes (part of it locked, say, though Android calls it writable) got "The tag moved away …
+  what it held before may already be gone" on every tap, though nothing had changed. After a failed write SeedTag
+  now reads the tag again: if it reads as before, it says the tag didn't take the write and nothing changed, and
+  the second time in a row that the tag refuses writes; if the write went through after all, it carries on. And a
+  single read-back that doesn't match no longer calls the tag faulty: it's read once more first (Back up, Erase,
+  and the check on the next tap).
 - The password keyboard never offered some short BIP39 words, such as *draw*, *act* or *day*: they came after
   the suggestions that fit on screen, and a word typed out in full was left out. Now the shortest words come
   first and the typed word stays, so tapping it puts the space after it.

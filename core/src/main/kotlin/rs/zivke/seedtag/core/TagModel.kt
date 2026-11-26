@@ -292,3 +292,31 @@ object Type2Memory {
         return null
     }
 }
+
+/**
+ * What a write that threw left on the tag, from a read over a new connection (board B32): a tag that refuses
+ * a write and one pulled away both make it throw, but only one of them changes anything.
+ */
+enum class AfterWrite {
+    /** It holds what was being written: the write went through, only its reply was lost. */
+    Written,
+    /** It reads as before: the tag refused the write, or was pulled away before any of it. */
+    Unchanged,
+    /** Something else, or a malformed message: part of the write is on it. */
+    Changed,
+    /** It couldn't be read again: gone, most likely. */
+    Unknown;
+
+    companion object {
+        /**
+         * [before] and [now]: the message's bytes before the write and after it (null: no message); [written]:
+         * [now] is what was being written.
+         */
+        fun of(before: ByteArray?, now: ByteArray?, written: Boolean): AfterWrite = when {
+            written -> Written
+            now == null || before == null -> if (now == null && before == null) Unchanged else Changed
+            now.contentEquals(before) -> Unchanged
+            else -> Changed
+        }
+    }
+}

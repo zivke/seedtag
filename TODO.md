@@ -305,7 +305,10 @@ report's tests N1–N12, A1–A3, H1).
   it), *Show it again* clears Repeat, *Type my own password instead* behind a question; device rows 7.69-7.72
   passed.
 - [ ] **B31: warning fatigue; idle timeout short for Restore.**
-- [ ] **B32: a refused write reads as "moved away"; one bad read-back calls the tag faulty** *(device: N10)*.
+- [ ] **B32: a refused write reads as "moved away"; one bad read-back calls the tag faulty** *(device: N10)*. On `develop`
+  (2026-11-26): after a failed write the tag is read again (`AfterWrite`): unchanged gives "didn't take", twice in a
+  row "refuses writes"; a write that went through carries on. A bad read-back is read again before "faulty". Device
+  rows 7.77-7.79.
 - [ ] **B33: SDK, JDK and apt not pinned; AGP may download SDK packages.**
 - [x] **B34: RELEASING.md:129-133 stale** ("0.4.3"; add the Dockerfile and the metadata `<configuration>` block).
 - [ ] **B35: one Gradle cache volume shared by every project's container** (`gradle-cache-${devcontainerId}`).
