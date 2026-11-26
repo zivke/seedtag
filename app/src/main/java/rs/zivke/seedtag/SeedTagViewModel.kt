@@ -96,6 +96,8 @@ sealed interface Dialog {
     data class WrongPassword(val nonWords: List<Int>?, val erase: Boolean) : Dialog
     data class Info(val title: String, val message: String) : Dialog
     data class ConfirmOverwrite(val looksLikeSeedTag: Boolean) : Dialog
+    /** A copy of the backup [text] is on another tag ([TagNotice.CopyWritten]); [rest]: its old data after it. */
+    data class CopyWritten(val text: String, val rest: Rest) : Dialog
     /**
      * Make the verified tag read-only. [ntag]: Verify found an NTAG21x layout, which SeedTag locks itself, data
      * and settings; [lookalike]: one not made by NXP, so the question carries a warning.
@@ -235,6 +237,8 @@ class SeedTagViewModel : ViewModel() {
     val backupFingerprint: String? get() = flow.backupFingerprint
     /** The old data after the backup just written (shown on Done). */
     val backupRest: Rest? get() = flow.backupRest
+    /** The backup last written and read back (not secret): what Done's copy writes. */
+    val writtenText: String? get() = flow.writtenText
 
     // ---- passwords ------------------------------------------------------------
     // Zeroable char buffers, edited in place by the app's keyboard: never Strings, which would
@@ -719,6 +723,26 @@ class SeedTagViewModel : ViewModel() {
     /** Done's "Clear old data", after [Rest.Interrupted]: only the tag that holds the backup just written. */
     fun clearRest() = apply(flow.clearRest())
 
+    /**
+     * Board B7: *Write a copy to another tag*, from Done (the backup just written) or from a Verify result (the
+     * tag just decrypted). Only the tag's text: no words or password needed, and the copy opens with the same one.
+     */
+    fun copyBackup() {
+        val verified = verifyResult?.takeIf { tab == Screen.Verify }
+        val sealed = when {
+            verified?.tagText != null -> Sealed(verified.tagText, verified.fingerprint)
+            tab == Screen.Backup && step == BackupStep.Done -> flow.writtenText?.let { Sealed(it, flow.backupFingerprint ?: "") }
+            else -> null
+        } ?: return showError("Write or verify the tag first.")
+        apply(flow.copyTo(sealed))
+    }
+
+    /** *Clear old data* in the copy's dialog. */
+    fun clearCopyRest(text: String) {
+        dialog = null
+        apply(flow.clearCopyRest(text))
+    }
+
     fun cancelScan() = apply(flow.cancel())
 
     // ---- erase ----------------------------------------------------------------
@@ -852,6 +876,7 @@ class SeedTagViewModel : ViewModel() {
     /** The words for a dialog the tag flow asks for. */
     private fun dialogFor(n: TagNotice): Dialog = when (n) {
         is TagNotice.ConfirmOverwrite -> Dialog.ConfirmOverwrite(n.looksLikeSeedTag)
+        is TagNotice.CopyWritten -> Dialog.CopyWritten(n.text, n.rest)
         // Its message may say to tap again, but no scan is waiting any more.
         is TagNotice.LateFailure -> Dialog.Info(
             "The tag may have changed",

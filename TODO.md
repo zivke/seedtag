@@ -191,7 +191,8 @@ report's tests N1–N12, A1–A3, H1).
   step 4 *Check your words* (*They match* only with the words shown, *Fix a word*), and a Restore-and-compare item
   in Done's next steps; device rows 7.65-7.68 passed.
 - [ ] **B7: no path to a second tag; retyping the generated passphrase scores "Weak".** "Write the same backup to
-  another tag" after Done and Verify (ciphertext only); README: identical copies are fine.
+  another tag" after Done and Verify (ciphertext only); README: identical copies are fine. On branch
+  `b7-copy-tag` (2026-11-26): *Write a copy to another tag* (`TagFlow.copyTo`, `Purpose.Copy`); device rows 7.80-7.83.
 - [ ] **B8: one Base64 typo in `seedtag.py` looks like a wrong password.**
   - [x] Plain error messages; re-pad and accept `-_` (and an `en` prefix); accept a file; `py` on Windows; shared
     `blob-text.tsv`.

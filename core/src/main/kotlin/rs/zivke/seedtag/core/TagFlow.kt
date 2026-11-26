@@ -11,7 +11,13 @@ package rs.zivke.seedtag.core
 enum class Haptic { Tick, Success, Failure, Found, Detected }
 
 /** What a scan is for: decides how its result is handled. */
-enum class Purpose { Check, BackupWrite, ClearRest, Verify, Restore, Lock, Inspect, Erase, Protect, Unprotect }
+enum class Purpose {
+    Check, BackupWrite, ClearRest, Verify, Restore, Lock, Inspect, Erase, Protect, Unprotect,
+    /** The same backup, already on a tag, written to another one ([TagFlow.copyTo]). */
+    Copy,
+    /** [ClearRest] on a copy: Done's old-data state is about the first tag. */
+    CopyClearRest,
+}
 
 /**
  * A scan waiting for a tag. [id] tells a result for the current scan from one that arrives after Cancel
@@ -42,6 +48,8 @@ sealed interface TagNotice {
     data class ConfirmOtherMaker(val chip: NtagChip) : TagNotice
     /** The write password is on, and a fresh tap showed reads work and writes are refused. */
     data object Protected : TagNotice
+    /** A copy of the backup [text] was written and read back; [rest] as for a backup ([TagResult.Written]). */
+    data class CopyWritten(val text: String, val rest: Rest) : TagNotice
     /** The chip accepted a write without the password. [switchedOff]: SeedTag switched it off again. */
     data class NotEnforced(val switchedOff: Boolean) : TagNotice
     /** Protect was canceled, or the app left, after the password was switched on but before it was checked. */
@@ -95,6 +103,8 @@ data class TagFlow(
     val tagCheck: TagCheck? = null,
     /** The backup waiting to be written. */
     val toWrite: Sealed? = null,
+    /** [toWrite] is a copy of a backup already on a tag ([copyTo]), not a new one. */
+    val copying: Boolean = false,
     /** The non-empty tag the overwrite question was about: Overwrite applies to it alone. */
     val overwriteTarget: OverwriteTarget? = null,
     /** Fingerprint of the backup last written and read back. */
@@ -124,8 +134,18 @@ data class TagFlow(
     fun checkAnotherTag() = copy(tagCheck = null).next()
 
     /** [sealed] was encrypted and checked: write it to the next tag. */
-    fun write(sealed: Sealed) = copy(toWrite = sealed).arm(
+    fun write(sealed: Sealed) = copy(toWrite = sealed, copying = false).arm(
         TagRequest.Write(sealed.text), Purpose.BackupWrite, "Hold the same tag to the back of the phone to write the backup",
+        fingerprint = sealed.fingerprint,
+    )
+
+    /**
+     * Board B7: write the backup [sealed], already on a tag (just written, or verified), to another tag as well:
+     * the same text, so the same salt and nonce, the same password. Nothing secret is needed for it. Done and
+     * Verify stay as they are.
+     */
+    fun copyTo(sealed: Sealed) = copy(toWrite = sealed, copying = true, overwriteTarget = null).arm(
+        TagRequest.Write(sealed.text), Purpose.Copy, "Hold the other tag to the back of the phone to write the copy",
         fingerprint = sealed.fingerprint,
     )
 
@@ -134,10 +154,14 @@ data class TagFlow(
         val sealed = toWrite ?: return next()
         val target = overwriteTarget ?: return next()
         return arm(
-            TagRequest.Write(sealed.text, target), Purpose.BackupWrite, "Hold the same tag again to overwrite it",
-            fingerprint = sealed.fingerprint,
+            TagRequest.Write(sealed.text, target), if (copying) Purpose.Copy else Purpose.BackupWrite,
+            "Hold the same tag again to overwrite it", fingerprint = sealed.fingerprint,
         )
     }
+
+    /** Clear the old data after the backup on a copy ([TagNotice.CopyWritten] with [Rest.Interrupted]). */
+    fun clearCopyRest(text: String) =
+        arm(TagRequest.ClearRest(text), Purpose.CopyClearRest, "Hold the copy to clear the old data after the backup")
 
     /** Verify, or Restore if [reveal]. Verify also looks at the chip and its write protection. */
     fun scanToRead(reveal: Boolean) = arm(
@@ -195,7 +219,7 @@ data class TagFlow(
 
     /** Back up's "Start over": nothing of the last backup kept. */
     fun startOver() = copy(
-        tagCheck = null, toWrite = null, overwriteTarget = null, backupFingerprint = null, writtenText = null,
+        tagCheck = null, toWrite = null, copying = false, overwriteTarget = null, backupFingerprint = null, writtenText = null,
         backupRest = null, lockTarget = null,
     ).next()
 
@@ -203,7 +227,7 @@ data class TagFlow(
      * The app wiped its secrets (left the foreground, or idle): the scan ends, and so do the backup
      * waiting for it and the Erase tab's scan (nobody picking up the phone later can erase from it).
      */
-    fun wiped() = cancel().flow.copy(toWrite = null, overwriteTarget = null, eraseCheck = null).next()
+    fun wiped() = cancel().flow.copy(toWrite = null, copying = false, overwriteTarget = null, eraseCheck = null).next()
 
     /** The tag's [text] was decrypted (Verify, Restore): Lock now applies to it. */
     fun opened(text: String) = copy(lockTarget = text).next()
@@ -244,7 +268,10 @@ data class TagFlow(
                 // A late failure that may have changed the tag is said, but doesn't arm a scan nobody waits for.
                 if (stale) closed.next(buzz(Haptic.Failure), notify(TagNotice.LateFailure(r.message)))
                 else tapAgain(r.message, r.retry)
-            is TagResult.NotEmpty -> copy(prompt = null, overwriteTarget = r.target).next(
+            // A copy held to a tag with this very backup: the original, or a copy already made.
+            is TagResult.NotEmpty -> if (p.purpose == Purpose.Copy && r.existing != null && r.existing == (p.request as? TagRequest.Write)?.text) {
+                tapAgain(SAME_BACKUP)
+            } else copy(prompt = null, overwriteTarget = r.target).next(
                 buzz(Haptic.Failure),
                 notify(TagNotice.ConfirmOverwrite(SeedBox.kindOf(r.existing) != SeedBox.Kind.NotBackup)),
             )
@@ -252,16 +279,22 @@ data class TagFlow(
                 // Canceled: don't bring the scan prompt back by itself.
                 if (stale) closed.next(buzz(Haptic.Tick), notify(TagNotice.WrittenUnchecked))
                 else arm(
-                    TagRequest.CheckWritten(r.text), Purpose.BackupWrite, "Written. Hold the tag to the phone once more to check it",
+                    TagRequest.CheckWritten(r.text), if (p.purpose == Purpose.Copy) Purpose.Copy else Purpose.BackupWrite,
+                    "Written. Hold the tag to the phone once more to check it",
                     buzz(Haptic.Tick), fingerprint = p.fingerprint,
                 )
-            // The fingerprint comes with the scan: the app may have wiped what was waiting meanwhile.
-            is TagResult.Written -> closed.copy(
+            // A copy: Done and Verify are about the first tag and stay; the copy's own old data is in the notice.
+            is TagResult.Written -> if (p.purpose == Purpose.Copy) {
+                closed.copy(toWrite = null, copying = false, overwriteTarget = null)
+                    .next(buzz(Haptic.Success), notify(TagNotice.CopyWritten(r.text, r.rest)))
+            } else closed.copy(
+                // The fingerprint comes with the scan: the app may have wiped what was waiting meanwhile.
                 backupFingerprint = p.fingerprint, toWrite = null, overwriteTarget = null,
                 lockTarget = r.text, writtenText = r.text, backupRest = r.rest,
             ).next(buzz(Haptic.Success), TagEffect.BackupWritten)
             is TagResult.RestCleared ->
                 if (r.rest == Rest.Interrupted) tapAgain(MOVED_AWAY)
+                else if (p.purpose == Purpose.CopyClearRest) closed.next(buzz(Haptic.Success))
                 else closed.copy(backupRest = r.rest).next(buzz(Haptic.Success))
             is TagResult.Locked -> closed.next(buzz(Haptic.Success), notify(TagNotice.Locked(r.checked)))
             is TagResult.AlreadyReadOnly -> copy(prompt = null).next(notify(TagNotice.AlreadyReadOnly(r.checked)))
@@ -331,6 +364,10 @@ data class TagFlow(
 
     private companion object {
         const val MOVED_AWAY = "The tag moved away too early. Hold it still and try again."
+
+        /** A copy held to a tag that holds this backup already. */
+        const val SAME_BACKUP =
+            "This tag already holds this backup: it's the one you wrote or verified, or a copy. Hold the other tag to the phone."
 
         /** Results that only ask for more input: dropped when they arrive for a canceled or older scan. */
         val TagResult.onlyAsks: Boolean

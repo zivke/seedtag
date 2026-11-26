@@ -442,4 +442,55 @@ class TagFlowTest {
         assertNull(wiped.eraseCheck)
         assertNull(wiped.erase().flow.pending)
     }
+
+    @Test
+    fun aCopyGoesToAnotherTag() {
+        // After a backup: Done's state is about the first tag.
+        val done = TagFlow().write(sealed).tap(TagResult.Written(text, Rest.Interrupted))
+        val armed = done.flow.copyTo(sealed)
+        assertEquals(TagRequest.Write(text), armed.flow.pending!!.request)
+        assertEquals(Purpose.Copy, armed.flow.pending!!.purpose)
+        assertEquals("Hold the other tag to the back of the phone to write the copy", armed.flow.prompt!!.title)
+
+        // The same tag again (it holds this very backup): stays armed, says so.
+        val same = armed.tap(TagResult.NotEmpty(text, target))
+        assertTrue(same.flow.prompt!!.error!!.startsWith("This tag already holds this backup"))
+        assertEquals(armed.flow.pending, same.flow.pending)
+        assertTrue(same.notices.isEmpty())
+
+        // Another tag with other data: asks, then overwrites as a copy.
+        val asks = armed.tap(TagResult.NotEmpty("something else", target))
+        assertEquals(listOf(TagNotice.ConfirmOverwrite(looksLikeSeedTag = false)), asks.notices)
+        val over = asks.flow.overwrite()
+        assertEquals(TagRequest.Write(text, target), over.flow.pending!!.request)
+        assertEquals(Purpose.Copy, over.flow.pending!!.purpose)
+
+        // Written: a notice, no BackupWritten; Done's fingerprint and old-data state are the first tag's.
+        val copied = over.tap(TagResult.Written(text, Rest.Cleared))
+        assertEquals(listOf(TagNotice.CopyWritten(text, Rest.Cleared)), copied.notices)
+        assertTrue(copied.effects.none { it == TagEffect.BackupWritten })
+        assertEquals(Rest.Interrupted, copied.flow.backupRest)
+        assertEquals("297a46bd", copied.flow.backupFingerprint)
+        assertNull(copied.flow.toWrite)
+        assertEquals(Haptic.Success, copied.buzzes.last())
+
+        // Not read back yet: the check on the next tap is still the copy's.
+        val unchecked = armed.tap(TagResult.WrittenUnchecked(text))
+        assertEquals(TagRequest.CheckWritten(text), unchecked.flow.pending!!.request)
+        assertEquals(Purpose.Copy, unchecked.flow.pending!!.purpose)
+        assertEquals(listOf(TagNotice.CopyWritten(text, Rest.Cleared)), unchecked.tap(TagResult.Written(text, Rest.Cleared)).notices)
+
+        // Clearing the copy's old data leaves Done's alone.
+        val clear = copied.flow.clearCopyRest(text)
+        assertEquals(TagRequest.ClearRest(text), clear.flow.pending!!.request)
+        val cleared = clear.tap(TagResult.RestCleared(Rest.Cleared))
+        assertEquals(Rest.Interrupted, cleared.flow.backupRest)
+        assertNull(cleared.flow.prompt)
+
+        // A new backup's write afterwards is a backup again, and a wipe ends a copy waiting for its tag.
+        assertEquals(Purpose.BackupWrite, copied.flow.write(sealed).flow.pending!!.purpose)
+        val wiped = armed.flow.wiped().flow
+        assertNull(wiped.pending)
+        assertNull(wiped.toWrite)
+    }
 }

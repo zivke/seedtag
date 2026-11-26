@@ -53,6 +53,9 @@ import rs.zivke.seedtag.core.TagStep
 
 private const val BACKUP_STEPS = 5
 
+/** Board B7: the same backup to a second tag, from Done and from a Verify result. */
+internal const val COPY_BUTTON = "Write a copy to another tag"
+
 @Composable
 internal fun BackupScreen(vm: SeedTagViewModel) {
     when (vm.step) {
@@ -586,6 +589,7 @@ private fun DoneStep(vm: SeedTagViewModel) {
     StepScreen(
         bottom = {
             PrimaryButton("Verify now", { vm.selectTab(Screen.Verify) })
+            SecondaryButton(COPY_BUTTON, vm::copyBackup, enabled = vm.writtenText != null)
             SecondaryButton("Back up another seed", vm::startOver)
         },
     ) {
@@ -639,6 +643,7 @@ private fun DoneStep(vm: SeedTagViewModel) {
                 "Keep a copy of seedtag.py (printed, or on a USB stick) with your written password: with Python, " +
                     "it's all anyone needs to recover the tag, even if SeedTag and its website are gone.",
                 "Only then make the tag read-only (on the Verify tab – it's permanent) and keep another backup of the seed somewhere else.",
+                "For a second tag kept somewhere else, tap $COPY_BUTTON: the same backup, the same password.",
             ),
         )
         CloseSection(vm)

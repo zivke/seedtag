@@ -426,6 +426,12 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
      SeedTag finishes the rest. On other chips Android locks it, and SeedTag can't check the lock bits: those can
      still be locked against reading by someone who gets hold of the tag (see [Choosing a tag](#choosing-a-tag)).
      A tag with a write password has to have it removed first.
+   - **Write a copy to another tag** (also on Back up's last screen): the same backup on a second tag, to keep
+     somewhere else. It writes the tag's text as it is, so no words or password are needed and the same password
+     opens both. Identical copies are fine: they give away nothing more than one tag does (the salt and nonce
+     only have to differ between different backups, and a copy is the same backup). The copy is read back and
+     cleared after the backup like any backup; Verify it once on its own. A tag that already holds this backup
+     is recognised and left alone.
 6. **Erase**, the fourth tab, to retire a tag or reuse it. Scan it first (nothing is written): the app
    shows what it holds, a SeedTag backup, other data or nothing, and whether it can be erased at all (a read-only
    tag can't). For a backup you can **Check the password first**: the app decrypts what it just read (no second

@@ -119,6 +119,16 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
             val protection = info?.identity?.let { info.protection }
             if (info?.identity != null) WritePasswordSection(vm, info)
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                SectionLabel("A second tag")
+                Text(
+                    "Write this backup to another tag too, to keep somewhere else: the same text, so the same password " +
+                        "opens it. No words or password needed. An identical copy gives away nothing more than one tag does.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                SecondaryButton(COPY_BUTTON, vm::copyBackup)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 SectionLabel("Make it read-only")
                 Text(
                     "Once you're sure, you can make the tag read-only. That's permanent: its data can never be rewritten or " +

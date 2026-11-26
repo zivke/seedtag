@@ -7,6 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- **Write a copy to another tag**, on Back up's Done screen and under a Verify result: the same backup on a
+  second tag, without typing the words or the password again (retyping a generated passphrase as your own
+  password would also have rated it Weak). It writes the tag's text unchanged, so the same password opens both;
+  the copy is read back, its old data cleared, and a tag that already holds this backup is recognised.
 - **Check your words**, a new step in Back up between the words and the password: the whole phrase, to compare
   with your written seed before it's encrypted, then **They match** (only while the words are shown) or **Fix a
   word**. The checksum lets about one wrong word in 16 through with 12 words, and nothing after this step could

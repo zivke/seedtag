@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.delay
 import rs.zivke.seedtag.core.Passphrase
+import rs.zivke.seedtag.core.Rest
 import rs.zivke.seedtag.core.TagContent
 import rs.zivke.seedtag.core.TagStep
 
@@ -266,6 +267,28 @@ internal fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Set
             },
             confirmButton = { TextButton(onClick = vm::confirmNewPassphrase) { DangerText("Replace") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Keep it") } },
+        )
+        is Dialog.CopyWritten -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            title = { Text("Copy written") },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    "The copy was written and read back. Both tags now hold the same backup, and the same password opens " +
+                        "both. Verify the copy once with your written password, and keep the tags in different places." +
+                        when (d.rest) {
+                            Rest.Cleared -> ""
+                            Rest.Interrupted -> "\n\nWhat the copy held before may still be in its memory after the backup: " +
+                                "it was being cleared when the tag moved away. Tap Clear old data and hold the copy still."
+                            Rest.NotPossible -> "\n\nOn this tag SeedTag can't clear what it held before, after the backup. " +
+                                "If it ever held something nobody should read, use a new tag instead."
+                        },
+                )
+            },
+            confirmButton = { TextButton(onClick = { vm.dialog = null }) { Text("OK") } },
+            dismissButton = if (d.rest == Rest.Interrupted) {
+                { TextButton(onClick = { vm.clearCopyRest(d.text) }) { Text("Clear old data") } }
+            } else null,
         )
         Dialog.ConfirmOwnPassword -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
