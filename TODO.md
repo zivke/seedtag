@@ -300,8 +300,10 @@ report's tests N1–N12, A1–A3, H1).
   timer on accessibility actions, README "Accessibility".
 - [x] **B29: settings links wipe secrets without warning, and two of them can crash.** Leave dialog while
   `holdsSecrets`; `runCatching` with `ACTION_SETTINGS` as fallback.
-- [ ] **B30: the typed-back passphrase check can be got around** (Show during Repeat; editing after "Show it
-  again").
+- [x] **B30: the typed-back passphrase check can be got around** (Show during Repeat; editing after "Show it
+  again"). Done 2026-11-26: no Show and no editing on a generated passphrase (the view model ignores keys for
+  it), *Show it again* clears Repeat, *Type my own password instead* behind a question; device rows 7.69-7.72
+  passed.
 - [ ] **B31: warning fatigue; idle timeout short for Restore.**
 - [ ] **B32: a refused write reads as "moved away"; one bad read-back calls the tag faulty** *(device: N10)*.
 - [ ] **B33: SDK, JDK and apt not pinned; AGP may download SDK packages.**

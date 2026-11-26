@@ -224,6 +224,11 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- Typing the generated passphrase back from the written copy could be got around: the Password field's **Show**
+  put it on screen while *Repeat password* was typed, and after **Show it again** (or a tap on the field) the next
+  key quietly edited the passphrase, which then stopped counting as generated and no longer matched the written
+  copy. Now a generated passphrase can't be edited and has no **Show**, **Show it again** clears *Repeat password*,
+  and **Type my own password instead** (after asking) clears it for a password of your own.
 - On an NTAG215 or 216 without NXP's Lock Control TLV, **Make tag read-only** left most of the data writable:
   Android wrote the lock bits for pages 16 on to the wrong page. And a lock cut short (the tag moved away) couldn't
   be finished, while the app said the tag was unchanged, and then that it was already read-only. Both fixed by

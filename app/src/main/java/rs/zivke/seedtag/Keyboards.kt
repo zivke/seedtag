@@ -123,6 +123,7 @@ private fun Key(
 /**
  * Shows a password; it is never an editable text field. Without a text field the system keyboard
  * can't open, so no keyboard app sees what's typed, and there's nothing to copy, paste or autofill.
+ * Without [canReveal] there's no Show / Hide: it's shown exactly when [revealDefault] says.
  */
 @Composable
 internal fun SecretField(
@@ -131,9 +132,11 @@ internal fun SecretField(
     field: PwField,
     revealDefault: Boolean,
     active: Boolean,
+    canReveal: Boolean = true,
     onSelect: () -> Unit,
 ) {
-    var reveal by remember(revealDefault) { mutableStateOf(revealDefault) }
+    var chosen by remember(revealDefault) { mutableStateOf(revealDefault) }
+    val reveal = if (canReveal) chosen else revealDefault
     val c = MaterialTheme.colorScheme
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(label, style = MaterialTheme.typography.labelMedium, color = if (active) c.primary else c.onSurfaceVariant)
@@ -154,7 +157,7 @@ internal fun SecretField(
                 fontSize = 16.sp,
                 modifier = Modifier.weight(1f).padding(vertical = 12.dp),
             )
-            TextButton(onClick = { reveal = !reveal }) { Text(if (reveal) "Hide" else "Show") }
+            if (canReveal) TextButton(onClick = { chosen = !chosen }) { Text(if (reveal) "Hide" else "Show") }
         }
     }
 }

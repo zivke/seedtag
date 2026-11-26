@@ -110,6 +110,8 @@ sealed interface Dialog {
     data class ConfirmErase(val content: TagContent, val checked: Boolean, val fingerprint: String?) : Dialog
     /** Generate a passphrase over a password that's already there; [generated] if that one was generated too. */
     data class ConfirmNewPassphrase(val generated: Boolean) : Dialog
+    /** *Type my own instead*: clears the generated passphrase, which may already be written down. */
+    data object ConfirmOwnPassword : Dialog
     /** Back would drop what was entered: [toReview] for the Password step's Back (clears the passwords), else leaving the app. */
     data class ConfirmBack(val toReview: Boolean) : Dialog
     /**
@@ -256,19 +258,26 @@ class SeedTagViewModel : ViewModel() {
     /** The password as text, only while the user has asked to see it. */
     fun revealPassword(f: PwField): String { passwordEdits; return buffer(f).reveal() }
 
-    fun typePassword(f: PwField, c: Char) { if (buffer(f).append(c)) passwordChanged(f) }
+    /**
+     * A generated passphrase is never edited in place (board B30): a stray key would quietly make it a typed
+     * password that's no longer what the user wrote down. *Type my own instead* clears it first.
+     */
+    private fun editable(f: PwField): Boolean = !(f == PwField.Password && generatedPassphrase)
 
-    fun backspacePassword(f: PwField) { buffer(f).removeLast(); passwordChanged(f) }
+    fun typePassword(f: PwField, c: Char) { if (editable(f) && buffer(f).append(c)) passwordChanged(f) }
+
+    fun backspacePassword(f: PwField) { if (!editable(f)) return; buffer(f).removeLast(); passwordChanged(f) }
 
     /** One repeat of a held ⌫ on the password keyboard: false once the field is empty. */
     fun backspacePasswordHeld(f: PwField): Boolean {
-        if (buffer(f).isEmpty()) return false
+        if (!editable(f) || buffer(f).isEmpty()) return false
         backspacePassword(f)
         return true
     }
 
     /** Replaces the word being typed with [word] (a tapped BIP39 suggestion). */
     fun completePasswordWord(f: PwField, word: String) {
+        if (!editable(f)) return
         val b = buffer(f)
         if (Bip39.isWord(word) && b.replaceFrom(b.lastTokenStart(), word)) passwordChanged(f)
     }
@@ -535,6 +544,24 @@ class SeedTagViewModel : ViewModel() {
             return
         }
         newPassphrase()
+    }
+
+    /**
+     * *Show it again*, while Repeat is typed from the written copy: Repeat is cleared, so it's typed from the copy
+     * again rather than from the screen (board B30).
+     */
+    fun showPassphraseAgain() = clearPasswords(PwField.Repeat)
+
+    /** *Type my own instead*: asks first, since the passphrase may be written down already. */
+    fun requestOwnPassword() {
+        if (generatedPassphrase) dialog = Dialog.ConfirmOwnPassword
+    }
+
+    /** "Clear it" in that dialog: both fields empty, for a password of the user's own. */
+    fun confirmOwnPassword() {
+        dialog = null
+        clearPasswords(PwField.Password, PwField.Repeat)
+        generatedPassphrase = false
     }
 
     /** "Replace" in the new-passphrase dialog. */
@@ -1050,7 +1077,7 @@ class SeedTagViewModel : ViewModel() {
         // Every question goes, so nobody picking up the phone later can answer one. Messages stay.
         idle = false
         val d = below
-        if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
+        if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase || d == Dialog.ConfirmOwnPassword ||
             d is Dialog.ConfirmBack || d is Dialog.ConfirmSettings || d is Dialog.ConfirmTab ||
             d is Dialog.ConfirmClearWords || d is Dialog.ConfirmErase || d is Dialog.ConfirmLock || d is Dialog.ConfirmProtect ||
             d == Dialog.ConfirmClose

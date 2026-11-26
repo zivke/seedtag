@@ -444,9 +444,11 @@ internal fun WordGrid(words: List<String>, current: String? = null, hidden: Bool
 @Composable
 private fun PasswordStep(vm: SeedTagViewModel) {
     var field by remember { mutableStateOf(PwField.Password) }
+    // A generated passphrase can't be edited (board B30): while it's shown, there's nothing to type into.
+    val typing = !(vm.generatedPassphrase && field == PwField.Password)
     StepScreen(
         bottom = {
-            PasswordKeyboard(vm, field)
+            if (typing) PasswordKeyboard(vm, field)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 TextButton(onClick = vm::requestBackToReview) { Text("Back") }
                 Spacer(Modifier.weight(1f))
@@ -470,6 +472,8 @@ private fun PasswordStep(vm: SeedTagViewModel) {
         )
         // A new passphrase is shown, in the password field, until the user says it's written down.
         LaunchedEffect(vm.passphrasesGenerated) { if (vm.passphrasesGenerated > 0) field = PwField.Password }
+        // Type my own instead: the password field, to type one.
+        LaunchedEffect(vm.generatedPassphrase) { if (!vm.generatedPassphrase) field = PwField.Password }
         FilledTonalButton(
             onClick = vm::generatePassphrase,
             modifier = Modifier.fillMaxWidth().height(48.dp),
@@ -487,11 +491,12 @@ private fun PasswordStep(vm: SeedTagViewModel) {
                         Text("Now type it from your written copy", style = MaterialTheme.typography.labelLarge, color = on)
                         Text(
                             "The passphrase is hidden, so that Repeat password checks what you wrote down, not the screen. " +
-                                "If they don't match, your copy has a mistake: correct it before writing the tag.",
+                                "If they don't match, your copy has a mistake: correct it before writing the tag. Show it again " +
+                                "clears what you've typed here, so you type it from your copy once more.",
                             style = MaterialTheme.typography.bodySmall,
                             color = on.copy(alpha = 0.8f),
                         )
-                        Link("Show it again") { field = PwField.Password }
+                        Link("Show it again") { vm.showPassphraseAgain(); field = PwField.Password }
                     } else {
                         Text("Write this down now and label it \"SeedTag password\"", style = MaterialTheme.typography.labelLarge, color = on)
                         Text(
@@ -511,11 +516,21 @@ private fun PasswordStep(vm: SeedTagViewModel) {
                             Text("I've written it down")
                         }
                     }
+                    Link("Type my own password instead", color = on, onClick = vm::requestOwnPassword)
                 }
             }
         }
-        SecretField("Password", vm, PwField.Password, vm.generatedPassphrase && !copying, active = field == PwField.Password) {
-            field = PwField.Password
+        // A generated passphrase: no Show (during Repeat it would put it on screen to copy from), and the
+        // field can't be selected for typing.
+        SecretField(
+            "Password",
+            vm,
+            PwField.Password,
+            revealDefault = vm.generatedPassphrase && !copying,
+            active = field == PwField.Password && !vm.generatedPassphrase,
+            canReveal = !vm.generatedPassphrase,
+        ) {
+            if (!vm.generatedPassphrase) field = PwField.Password
         }
         if (vm.passwordLength(PwField.Password) > 0) StrengthMeter(vm.passwordBits, vm.generatedPassphrase)
         if (vm.passwordHasStraySpaces) {

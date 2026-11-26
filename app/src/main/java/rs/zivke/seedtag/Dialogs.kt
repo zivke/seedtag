@@ -267,6 +267,21 @@ internal fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Set
             confirmButton = { TextButton(onClick = vm::confirmNewPassphrase) { DangerText("Replace") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Keep it") } },
         )
+        Dialog.ConfirmOwnPassword -> AlertDialog(
+            onDismissRequest = { vm.dialog = null },
+            icon = { WarningIcon() },
+            title = { Text("Type your own password?") },
+            text = {
+                GuardDialogWindow()
+                Text(
+                    "This clears the generated passphrase. If you've already written it down, cross that copy out: it " +
+                        "won't open this backup. A password you choose yourself is usually much weaker than a generated one, " +
+                        "and SeedTag can't tell how strong it really is.",
+                )
+            },
+            confirmButton = { TextButton(onClick = vm::confirmOwnPassword) { DangerText("Clear it") } },
+            dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Keep the passphrase") } },
+        )
         is Dialog.ConfirmBack -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },

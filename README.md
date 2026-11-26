@@ -358,8 +358,10 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    **Generate a 7-word passphrase** is recommended (≈77 bits). Write it down and label it *SeedTag password*: it's made of
    the same BIP39 words as a seed phrase, so an unlabeled copy is easy to mistake for one, by you or by your heirs. Then
    tap **I've written it down**: the passphrase is hidden, and you type it into *Repeat password* from your written
-   copy, so a mistake in the copy is caught before anything is written. **Generate a different one** asks before
-   replacing a passphrase you may already have written down. Tap *Encrypt & write*, then hold the tag to the phone.
+   copy, so a mistake in the copy is caught before anything is written. So that the check can't be got around, the
+   generated passphrase can't be edited and its field has no **Show**; **Show it again** clears *Repeat password*,
+   to be typed from the copy once more; and **Type my own password instead** clears it (after asking) for a password
+   of your own. **Generate a different one** asks before replacing a passphrase you may already have written down. Tap *Encrypt & write*, then hold the tag to the phone.
    The password is typed on the app's own keyboard, which suggests BIP39 words as you type.
    Only the generated passphrase is rated *Strong*. A password you type yourself always needs a confirmation
    before writing: SeedTag can't recognise a well-known phrase (`correct horse battery staple`, a quote, a name and
