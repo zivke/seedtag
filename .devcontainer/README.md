@@ -80,7 +80,7 @@ There are no devcontainer features: the GitHub CLI isn't in the image, since
 it's only used on the host to publish a release.
 
 Gradle itself is not in the image: `./gradlew` downloads the version pinned in
-`gradle/wrapper/gradle-wrapper.properties` into the `gradle-cache` volume, and
+`gradle/wrapper/gradle-wrapper.properties` into the `gradle-cache-${devcontainerId}` volume, and
 checks it against `distributionSha256Sum` there.
 post-create warms it up once.
 
@@ -125,12 +125,17 @@ and run `adb kill-server` on the host so the host's adb releases the device.
 |-----------------------------------|-------------------|--------------------------------------|
 | `claude-config-${devcontainerId}` | `~/.claude`       | Claude Code auth, settings, sessions |
 | `android-adb`                     | `~/.android`      | adb key pair, Android debug key      |
-| `gradle-cache`                    | `~/.gradle`       | Gradle distribution and dependencies |
+| `gradle-cache-${devcontainerId}`  | `~/.gradle`       | Gradle distribution and dependencies |
 
-`android-adb` and `gradle-cache` use fixed names on purpose. The adb identity is
-yours, so every Android project of yours shares it, and the Gradle cache only
-holds public artifacts. There's deliberately no volume with signing keys. Claude's volume is
-`${devcontainerId}`-scoped, so sessions stay per project.
+`android-adb` uses a fixed name on purpose: the adb identity is yours, so every Android project of yours shares
+it. The other two are `${devcontainerId}`-scoped, so they stay per project. For the Gradle cache that isn't about
+secrecy (it holds only public artifacts) but about integrity: `~/.gradle` also holds init scripts
+(`init.d/`) and the unpacked distribution, which run with every build, so a shared cache would let any other
+project's container run code in SeedTag's builds. (Dependencies are checked against
+`gradle/verification-metadata.xml` either way; init scripts and the unpacked distribution aren't.) There's
+deliberately no volume with signing keys. After switching from the old shared `gradle-cache`, the first build
+downloads everything again; the old volume can then be removed on the host (`docker volume rm gradle-cache`),
+once no other project uses it.
 
 The shared adb identity means anything that runs in *any* of those containers (build scripts, dependencies, an AI
 agent) can reach every phone that authorized it: install or replace apps, change settings, turn on accessibility

@@ -220,6 +220,7 @@ check the lock read-back after it.
 | 5.19 | Lock: `seedtag.py check` on the dumps from 7.59 and 7.60 | The interrupted one: a WARN naming the missing parts. The finished one: "Read-only for good, as SeedTag's Make tag read-only leaves it…" and *Clean* (with the lookalike WARN). | ⬜ |
 | 5.20 | B8: `seedtag.py verify` with the text of the 7.84 tag typed in by hand, once right, once with one character changed (not the first) | Before *Password:*, "check code: xxxx-xxxx (SeedTag shows the same for this tag…)": the app's code when right, a different one with the typo (which then fails as a wrong password would). `check` on a dump of the tag prints "Its check code: …", the same. | ⬜ |
 | 5.21 | B37: after pushing `develop`, GitHub › Actions › *test* | The run started by the push passes: both seedtag.py steps (the second prints its Python version, newer than the first's, or a warning that it was skipped), then `make test test-cross` in the dev container image. No artifact. A push of a `v*` tag doesn't start it (that's *build*). | ⬜ |
+| 5.22 | B35: on the host, *Dev Containers: Rebuild Container*; then `docker volume ls` on the host | The container comes up; post-create downloads Gradle and the dependencies again (checked as always) and `make test` passes. A new volume `gradle-cache-<id>` is listed; the old `gradle-cache` is no longer mounted (`docker volume rm gradle-cache` once no other project uses it). | ⬜ |
 
 ## 6. Android 8 to 11
 

@@ -37,9 +37,10 @@
     // across rebuilds. Deliberately NOT ${devcontainerId}: the adb identity is
     // yours and shared by every Android project.
     "source=android-adb,target=/home/vscode/.android,type=volume",
-    // Gradle distribution + dependency cache. Shared too: it only holds public
-    // artifacts, and re-downloading AGP/Compose on every rebuild is slow.
-    "source=gradle-cache,target=/home/vscode/.gradle,type=volume"
+    // Gradle distribution + dependency cache, kept across rebuilds. Per project
+    // (board B35): another project's container could write an init script or
+    // patch the unpacked distribution, and SeedTag's next build would run it.
+    "source=gradle-cache-${devcontainerId},target=/home/vscode/.gradle,type=volume"
   ],
 
   // adb over USB instead of over the network: uncomment, rebuild, and stop any

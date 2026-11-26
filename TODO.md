@@ -322,7 +322,9 @@ report's tests N1–N12, A1–A3, H1).
   rows 7.77-7.79.
 - [ ] **B33: SDK, JDK and apt not pinned; AGP may download SDK packages.**
 - [x] **B34: RELEASING.md:129-133 stale** ("0.4.3"; add the Dockerfile and the metadata `<configuration>` block).
-- [ ] **B35: one Gradle cache volume shared by every project's container** (`gradle-cache-${devcontainerId}`).
+- [ ] **B35: one Gradle cache volume shared by every project's container** (`gradle-cache-${devcontainerId}`). On
+  `develop` (2026-11-26): `devcontainer.json`, `.devcontainer/README.md` (integrity, not secrecy); takes effect at the
+  next container rebuild (row 5.22).
 - [ ] **B36: gaps in `check-apk.sh`, `check-workflows.py` and the metadata `<configuration>` check.**
 - [ ] **B37: no CI on branch pushes** (tests-only workflow). On `develop` (2026-11-26): `.github/workflows/test.yml`
   (no new actions); tools row 5.21: the first push shows whether it runs.

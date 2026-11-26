@@ -96,6 +96,9 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- The dev container's Gradle cache volume is per project (`gradle-cache-${devcontainerId}`), so another
+  project's container can't put an init script or a patched Gradle into SeedTag's builds. The first build after
+  the rebuild downloads everything again.
 - The password keyboard puts the space after a tapped word suggestion in by itself, when the next letter is
   typed: no space key between the words of a passphrase, and none at the end of the last one. A space typed
   anyway counts as that one; a digit or symbol attaches to the word; ⌫ works as before. On Back up, Verify and
