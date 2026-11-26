@@ -97,7 +97,10 @@ Two Gradle modules plus the Python tool:
     size, BDh on the dynamic lock page, where READ wraps to page 0; one extra page allowed, as on the
     Fudan FM11NT021). GET_VERSION, asked last, only decides `genuine` (NXP's code in both the UID and the
     reply); lookalikes aren't officially supported and the UI never names their maker or model.
-    `NtagConfig`: CFG0/CFG1 as read, protection state, the values SeedTag writes.
+    `NtagConfig`: CFG0/CFG1 as read, protection state, the values SeedTag writes. `NtagLock`: how far
+    Make tag read-only got (settings frozen with CFGLCK, the datasheet's dynamic lock bytes on the chip's own
+    page, CC 0Fh, static lock bytes, in that order), from READs; lock bits only add up, so a cut-short lock
+    is finished by writing what's missing.
   - `Passphrase.kt`: 7-word generator from the BIP39 list, rough strength estimate.
   - `SecretChars.kt`: zeroable, in-place password buffer.
   - `NdefText.kt`: Text-record payload decode (encode is `NdefRecord.createTextRecord`), and how a
@@ -149,6 +152,8 @@ Two Gradle modules plus the Python tool:
     goes through `NfcA` (`Type2Raw`, any chip with SAK 00h), not `MifareUltralight`,
     which Android offers only for NXP UIDs. Never write past the data area: the lock
     and configuration pages follow it (AUTH0 = 00 would lock the tag behind a password).
+    The only exceptions are Protect (PWD, PACK, CFG0/CFG1, each read back) and Make tag
+    read-only on an NTAG21x layout (`NtagLock`'s pages, each read back).
   - `ChipTest.kt`: debug builds only (`src/debug`; `src/release` has a stub without commands): the
     NFC-spot page's chip test, one raw command per tap (GET_VERSION, READs, PWD_AUTH with the factory
     password), to see how an unknown chip answers. Nothing is written.

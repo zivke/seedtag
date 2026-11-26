@@ -153,4 +153,68 @@ class NtagTest {
         assertFalse(f.settingsAre(hex("040000FF"), hex("00050001")))
         assertFalse(f.settingsAre(hex("440000FF"), hex("00050000")))
     }
+
+    @Test
+    fun lockValuesFollowTheDatasheet() {
+        // NTAG213/215/216 datasheet, figures 10-12: every lock and block-locking bit, the RFUI bits 0.
+        assertArrayEquals(hex("FF0F3F"), NtagChip.Ntag213.dynamicLock)
+        assertArrayEquals(hex("FF000F"), NtagChip.Ntag215.dynamicLock)
+        assertArrayEquals(hex("FF3F7F"), NtagChip.Ntag216.dynamicLock)
+        assertArrayEquals(hex("40050000"), NtagConfig(NtagChip.Ntag213, factory).cfg1Frozen())
+    }
+
+    @Test
+    fun makingAnNtag213ReadOnly() {
+        val dyn = hex("000000BD")
+        val fresh = NtagLock(NtagChip.Ntag213, nxpHead, dyn, NtagConfig(NtagChip.Ntag213, factory))
+        assertEquals(NtagLock.Part.entries, fresh.missing)
+        assertFalse(fresh.started)
+        // What SeedTag writes, page by page; the CC before the static lock bytes, which lock page 3.
+        assertEquals(0x2A, fresh.write(NtagLock.Part.Settings).first)
+        assertArrayEquals(hex("40050000"), fresh.write(NtagLock.Part.Settings).second)
+        assertEquals(0x28, fresh.write(NtagLock.Part.Data).first)
+        assertArrayEquals(hex("FF0F3F00"), fresh.write(NtagLock.Part.Data).second)
+        assertEquals(3, fresh.write(NtagLock.Part.Marked).first)
+        assertArrayEquals(hex("E110120F"), fresh.write(NtagLock.Part.Marked).second)
+        assertEquals(2, fresh.write(NtagLock.Part.Static).first)
+        assertArrayEquals(hex("9B48FFFF"), fresh.write(NtagLock.Part.Static).second)
+
+        // All four done: read-only for good.
+        val head = nxpHead.copyOf().also { it[10] = -1; it[11] = -1; it[15] = 0x0F }
+        val frozen = NtagConfig(NtagChip.Ntag213, hex("04 00 00 FF  40 05 00 00  00 00 00 00  00 00 00 00"))
+        val done = NtagLock(NtagChip.Ntag213, head, hex("FF0F3FBD"), frozen)
+        assertTrue(done.complete)
+        // Android's lock cut short (board B3): only the CC says read-only.
+        val marked = NtagLock(NtagChip.Ntag213, nxpHead.copyOf().also { it[15] = 0x0F }, dyn, NtagConfig(NtagChip.Ntag213, factory))
+        assertEquals(listOf(NtagLock.Part.Settings, NtagLock.Part.Data, NtagLock.Part.Static), marked.missing)
+        assertTrue(marked.started)
+        // Settings frozen, but behind someone's password: not SeedTag's lock.
+        val behind = NtagConfig(NtagChip.Ntag213, hex("04 00 00 03  40 05 00 00  00 00 00 00  00 00 00 00"))
+        assertEquals(listOf(NtagLock.Part.Settings), NtagLock(NtagChip.Ntag213, head, hex("FF0F3FBD"), behind).missing)
+    }
+
+    @Test
+    fun anNtag215LockedOnlyWhereAndroidWritesIt() {
+        // Without a Lock Control TLV, Android writes the dynamic lock bits after the CC's data area (80h), not to
+        // 82h (board B2): 82h stays 00 00 00, so the data isn't locked, even with the static lock and CC set.
+        val head = hex("04 D3 B5 EA  A0 7F 26 81  78 48 FF FF  E1 10 3E 0F")
+        val factory215 = NtagConfig(NtagChip.Ntag215, hex("04 00 00 FF  00 05 00 00  00 00 00 00  00 00 00 00"))
+        val l = NtagLock(NtagChip.Ntag215, head, hex("000000BD"), factory215)
+        assertEquals(listOf(NtagLock.Part.Settings, NtagLock.Part.Data), l.missing)
+        assertArrayEquals(hex("FF000F00"), l.write(NtagLock.Part.Data).second)
+        assertEquals(0x82, l.write(NtagLock.Part.Data).first)
+        assertTrue(NtagLock(NtagChip.Ntag215, head, hex("FF000FBD"), factory215).missing == listOf(NtagLock.Part.Settings))
+        // A lock byte set beyond the datasheet's bits (RFUI) still counts as locked.
+        assertTrue(NtagLock(NtagChip.Ntag215, head, hex("FFFF0FBD"), factory215).dataLocked)
+    }
+
+    @Test
+    fun aLookalikesLock() {
+        // Unused NTAG-only settings bytes (00h): CFGLCK on its own, AUTH0 still FFh.
+        val cfg = NtagConfig(NtagIdentity(NtagChip.Ntag213, genuine = false, extraPage = true), hex("00 00 00 FF  00 00 00 00  00 00 00 00  00 00 00 00"))
+        assertArrayEquals(hex("40000000"), cfg.cfg1Frozen())
+        val l = NtagLock(NtagChip.Ntag213, counterHead, counter28, cfg)
+        assertEquals(NtagLock.Part.entries, l.missing)
+        assertArrayEquals(hex("E110120F"), l.write(NtagLock.Part.Marked).second)
+    }
 }

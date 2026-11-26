@@ -18,6 +18,17 @@ enum class NtagChip(val label: String, val ccSize: Int, val versionSize: Int, va
     val pwdPage: Int get() = cfgPage + 2
     val packPage: Int get() = cfgPage + 3
 
+    /**
+     * Dynamic lock bytes 0-2 with every lock and block-locking bit set and the RFUI bits 0, as the datasheet
+     * asks (section 8.5.3, figures 10-12): pages 16 on, 2 per bit on the NTAG213, 16 on the 215 and 216.
+     */
+    val dynamicLock: ByteArray
+        get() = when (this) {
+            Ntag213 -> byteArrayOf(0xFF.toByte(), 0x0F, 0x3F)
+            Ntag215 -> byteArrayOf(0xFF.toByte(), 0x00, 0x0F)
+            Ntag216 -> byteArrayOf(0xFF.toByte(), 0x3F, 0x7F)
+        }
+
     companion object {
         /**
          * GET_VERSION: an NTAG21x answers 00, its maker's code (04 for NXP), 04 02 01 00, its size byte, 03.
@@ -75,7 +86,7 @@ class NtagConfig(private val lastPage: Int, bytes: ByteArray) {
     /** Protection, when on, covers writes only, and no number of wrong passwords locks anyone out. */
     val writesOnly: Boolean get() = (access and (PROT or AUTHLIM)) == 0
 
-    /** CFG0 and CFG1 can never be changed again (CFGLCK). SeedTag never sets it. */
+    /** CFG0 and CFG1 can never be changed again (CFGLCK). SeedTag sets it only to make a tag read-only ([NtagLock]). */
     val settingsLocked: Boolean get() = (access and CFGLCK) != 0
 
     /**
@@ -102,6 +113,9 @@ class NtagConfig(private val lastPage: Int, bytes: ByteArray) {
 
     /** The same page of the same chip, read again. */
     fun reread(bytes: ByteArray): NtagConfig = NtagConfig(lastPage, bytes)
+
+    /** CFG1 with CFGLCK set, everything else as it is: the settings frozen for good (after the next power cycle). */
+    fun cfg1Frozen(): ByteArray = cfg1.also { it[0] = (access or CFGLCK).toByte() }
 
     /** CFG1 for protection on writes only: PROT and AUTHLIM 0, the NFC counter bits as they were. */
     fun cfg1WritesOnly(): ByteArray = cfg1.also { it[0] = (access and (NFC_CNT_EN or NFC_CNT_PWD_PROT)).toByte() }
@@ -200,3 +214,63 @@ data class NtagIdentity(val chip: NtagChip, val genuine: Boolean, val extraPage:
  */
 data class TagInfo(val identity: NtagIdentity?, val protection: Protection = Protection.Off, val settingsLocked: Boolean = false,
                    val mirrorOn: Boolean = false)
+
+/**
+ * How far an NTAG21x (or a lookalike with its layout) is made read-only, from READs: [head] (pages 0-3:
+ * the static lock bytes are page 2's bytes 2-3, the capability container page 3), [dynLock] (the chip's
+ * dynamic lock page) and [config]. Make tag read-only sets all four parts ([missing]), in [order]; every
+ * bit can only be set, never cleared, so a lock cut short is finished by doing the rest.
+ */
+class NtagLock(private val chip: NtagChip, head: ByteArray, dynLock: ByteArray, val config: NtagConfig) {
+    private val h = head.copyOf(16).also { require(head.size >= 16 && dynLock.size >= 4) }
+    private val d = dynLock.copyOf(4)
+
+    /** The parts of the lock, in the order SeedTag writes them. */
+    enum class Part {
+        /** CFGLCK, with AUTH0 FFh: nobody can ever set a password, for reading or writing. */
+        Settings,
+        /** The dynamic lock bytes: pages 16 on. */
+        Data,
+        /** The capability container's write access byte 0Fh: what NFC apps go by. Before [Static], which locks page 3. */
+        Marked,
+        /** The static lock bytes: pages 3-15. */
+        Static,
+    }
+
+    val settingsFrozen: Boolean get() = config.settingsLocked && config.protection == Protection.Off
+    val dataLocked: Boolean
+        get() = (0 until 3).all {
+            val want = chip.dynamicLock[it].toInt() and 0xFF
+            (d[it].toInt() and 0xFF and want) == want
+        }
+    val marked: Boolean get() = (h[15].toInt() and 0xFF) == CC_READ_ONLY
+    val staticLocked: Boolean get() = (h[10].toInt() and 0xFF) == 0xFF && (h[11].toInt() and 0xFF) == 0xFF
+
+    /** What's still to do, in the order SeedTag writes it. Empty: read-only for good. */
+    val missing: List<Part>
+        get() = buildList {
+            if (!settingsFrozen) add(Part.Settings)
+            if (!dataLocked) add(Part.Data)
+            if (!marked) add(Part.Marked)
+            if (!staticLocked) add(Part.Static)
+        }
+
+    val complete: Boolean get() = missing.isEmpty()
+
+    /** Some of it is done already: an earlier Make tag read-only, cut short, or another app's. */
+    val started: Boolean get() = missing.size < Part.entries.size
+
+    /** The page and the 4 bytes SeedTag writes for [part]. */
+    fun write(part: Part): Pair<Int, ByteArray> = when (part) {
+        Part.Settings -> chip.cfgPage + 1 to config.cfg1Frozen()
+        Part.Data -> chip.dynLockPage to chip.dynamicLock + byteArrayOf(0)
+        Part.Marked -> 3 to h.copyOfRange(12, 16).also { it[3] = CC_READ_ONLY.toByte() }
+        // Page 2's bytes 0-1 (serial number check byte, internal) aren't changed by a WRITE.
+        Part.Static -> 2 to h.copyOfRange(8, 12).also { it[2] = 0xFF.toByte(); it[3] = 0xFF.toByte() }
+    }
+
+    companion object {
+        /** Capability container byte 3: no write access (NFC Forum Type 2 Tag). */
+        const val CC_READ_ONLY = 0x0F
+    }
+}

@@ -19,6 +19,7 @@ import rs.zivke.seedtag.core.NdefText
 import rs.zivke.seedtag.core.NtagChip
 import rs.zivke.seedtag.core.NtagConfig
 import rs.zivke.seedtag.core.NtagIdentity
+import rs.zivke.seedtag.core.NtagLock
 import rs.zivke.seedtag.core.OverwriteTarget
 import rs.zivke.seedtag.core.ProtectStage
 import rs.zivke.seedtag.core.Protection
@@ -53,7 +54,7 @@ object TagIo {
             is TagRequest.Write -> write(tag, request, report)
             is TagRequest.CheckWritten -> checkWritten(tag, request.expected)
             is TagRequest.Read -> read(tag, request.withInfo)
-            is TagRequest.Lock -> lock(tag, request.expected, report)
+            is TagRequest.Lock -> lock(tag, request, report)
             TagRequest.Inspect -> inspect(tag)
             is TagRequest.Erase -> erase(tag, request.target, report)
             is TagRequest.ClearRest -> clearRestOf(tag, request.expected)
@@ -595,30 +596,35 @@ object TagIo {
         return out
     }
 
-    private fun lock(tag: Tag, expected: String, report: (TagStep) -> Unit): TagResult {
+    private fun lock(tag: Tag, req: TagRequest.Lock, report: (TagStep) -> Unit): TagResult {
         val ndef = Ndef.get(tag) ?: return TagResult.Failed(NOT_READ)
         ndef.use {
             it.connect()
             // Locking is permanent: only the tag that was just written or verified.
             val msg = readMessage(it) ?: return TagResult.Failed(NOT_READ)
-            if (firstText(msg) != expected) {
+            if (firstText(msg) != req.expected) {
                 return TagResult.Failed("This isn't the tag you last wrote or verified. Nothing was changed.")
+            }
+            // An NTAG21x, or a lookalike with its layout: SeedTag writes the lock itself and reads it back.
+            Type2Raw.of(tag)?.let { raw ->
+                it.close()
+                lockNtag(raw, req, report)?.let { result -> return result }
+                it.connect() // not one: Android's lock, below
             }
             // Android reports a tag as not writable from its capability container alone, which can be
             // set without the lock bits: SeedTag made no change and can't tell whether it's permanent.
-            if (!it.isWritable) return TagResult.AlreadyReadOnly
+            if (!it.isWritable) return TagResult.AlreadyReadOnly(checked = false)
             if (!it.canMakeReadOnly()) return TagResult.CantMakeReadOnly
-            // The lock bytes (page 2) aren't covered by the password, the capability container is: Android's
-            // makeReadOnly would lock half of it. The password has to go first.
-            if (isProtected(tag, it)) {
-                return TagResult.Failed(
-                    "This tag has a write password. Remove it first (Verify the tag, then Remove write password), " +
-                        "then make it read-only. Nothing was changed.",
-                )
-            }
             report(TagStep("Making it read-only", 2, LOCK_STEPS, writes = true))
             return try {
-                if (it.makeReadOnly()) TagResult.Locked else TagResult.Failed("Making it read-only failed. The tag is unchanged.")
+                if (it.makeReadOnly()) {
+                    TagResult.Locked(checked = false)
+                } else {
+                    TagResult.Failed(
+                        "Android couldn't make it read-only. If an earlier try was cut short, part of it may already be " +
+                            "read-only for good. Reading it works either way.",
+                    )
+                }
             } catch (e: IOException) {
                 // The lock bits and the capability container are separate writes: some may be done, for good.
                 TagResult.Failed(
@@ -629,6 +635,80 @@ object TagIo {
             }
         }
     }
+
+    /**
+     * Make tag read-only on an NTAG21x layout (board B2, B3, #11): the settings frozen (CFGLCK, AUTH0 FFh),
+     * the dynamic lock bytes on the chip's own page (Android's lock puts them after the capability container's
+     * data area, which misses them on an NTAG215/216 without a Lock Control TLV), the capability container's
+     * read-only byte, then the static lock bytes, which also lock page 3. Only what [NtagLock.missing] says is
+     * written: lock bits can only be set, so a lock cut short is finished by the next tap. Everything is read
+     * back after a new session. Null if [raw] isn't an NTAG21x layout: Android's lock then.
+     */
+    private fun lockNtag(raw: Type2Raw, req: TagRequest.Lock, report: (TagStep) -> Unit): TagResult? {
+        var wrote = false
+        try {
+            raw.use { r ->
+                r.connect()
+                // Writes follow: no GET_VERSION here. Verify identified the chip just before.
+                val state = ntagState(r, askVersion = false) ?: return null
+                val chip = state.identity.chip
+                if (state.config.protection != Protection.Off) {
+                    return TagResult.Failed(
+                        "This tag has a write password. Remove it first (Verify the tag, then Remove write password), " +
+                            "then make it read-only. Nothing was changed.",
+                    )
+                }
+                if (!state.identity.genuine && !req.lookalike) {
+                    // Verify didn't show it as a lookalike, but only GET_VERSION there tells NXP's chips apart.
+                    return TagResult.Failed(
+                        "SeedTag couldn't confirm that this is an NXP chip, so it may be an NTAG21x lookalike. Nothing was " +
+                            "changed. Verify the tag again, holding it still, then decide.",
+                    )
+                }
+                fun read() = NtagLock(chip, r.read(0), r.read(chip.dynLockPage), state.config.reread(r.read(chip.cfgPage)))
+                val before = read()
+                if (before.complete) return TagResult.AlreadyReadOnly(checked = true)
+                report(TagStep("Making it read-only", 2, LOCK_STEPS, writes = true))
+                try {
+                    for (part in before.missing) {
+                        val (page, data) = before.write(part)
+                        wrote = true
+                        r.write(page, data)
+                    }
+                } catch (e: TagLostException) {
+                    throw e
+                } catch (e: IOException) {
+                    // Refused: the read-back says what's still missing.
+                }
+                // A fresh session: after a refused write the chip has ended this one.
+                r.close()
+                r.connect()
+                val after = read()
+                if (after.complete) return TagResult.Locked(checked = true)
+                return TagResult.Failed(
+                    "Part of the lock didn't stay on the tag (" + after.missing.joinToString { LOCK_PARTS.getValue(it) } +
+                        "). What's done stays done: hold the same tag still to finish it.",
+                    changedTag = true,
+                )
+            }
+        } catch (e: Exception) {
+            // After a write, whatever broke the session: part of the lock may be on the tag for good.
+            if (!wrote) throw e
+            return TagResult.Failed(
+                "The tag moved away before it was fully read-only. What's done stays done, and the rest can be finished: " +
+                    "hold the same tag still.",
+                changedTag = true,
+            )
+        }
+    }
+
+    /** What each part of [NtagLock] is, for a message. */
+    private val LOCK_PARTS = mapOf(
+        NtagLock.Part.Settings to "its settings",
+        NtagLock.Part.Data to "the data from page 16 on",
+        NtagLock.Part.Marked to "the read-only mark",
+        NtagLock.Part.Static to "the data up to page 15",
+    )
 
     private const val CANT_PROTECT =
         "SeedTag can give a write password only to an NTAG213, NTAG215 or NTAG216, or an NTAG21x lookalike that " +

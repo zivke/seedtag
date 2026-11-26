@@ -96,7 +96,11 @@ sealed interface Dialog {
     data class WrongPassword(val nonWords: List<Int>?, val erase: Boolean) : Dialog
     data class Info(val title: String, val message: String) : Dialog
     data class ConfirmOverwrite(val looksLikeSeedTag: Boolean) : Dialog
-    data object ConfirmLock : Dialog
+    /**
+     * Make the verified tag read-only. [ntag]: Verify found an NTAG21x layout, which SeedTag locks itself, data
+     * and settings; [lookalike]: one not made by NXP, so the question carries a warning.
+     */
+    data class ConfirmLock(val ntag: Boolean, val lookalike: Boolean) : Dialog
     /**
      * Give the verified tag a write password. [otherMaker]: Verify found a chip that answers like [chip] but
      * isn't NXP's, so the question carries a warning.
@@ -663,12 +667,13 @@ class SeedTagViewModel : ViewModel() {
 
     fun requestLock() {
         if (flow.lockTarget == null) return showError("Write or verify the tag first.")
-        dialog = Dialog.ConfirmLock
+        val identity = verifyResult?.tagInfo?.identity
+        dialog = Dialog.ConfirmLock(ntag = identity != null, lookalike = identity?.genuine == false)
     }
 
-    fun confirmLock() {
+    fun confirmLock(lookalike: Boolean) {
         dialog = null
-        apply(flow.lock())
+        apply(flow.lock(lookalike))
     }
 
     /** Done's "Clear old data", after [Rest.Interrupted]: only the tag that holds the backup just written. */
@@ -819,16 +824,34 @@ class SeedTagViewModel : ViewModel() {
                 "Tap Encrypt & write tag again and hold the same tag: the app asks before overwriting it, then " +
                 "writes and checks it.",
         )
-        TagNotice.Locked -> Dialog.Info(
-            "Tag is now read-only",
-            "Its data can never be rewritten or erased. Keep the tag where strangers can't reach it: on many " +
-                "chips, someone holding it could still lock it against reading.",
-        )
-        TagNotice.AlreadyReadOnly -> Dialog.Info(
-            "Already read-only",
-            "This tag was already read-only, so SeedTag didn't change it. It can't tell whether that's permanent: " +
-                "some tags are only marked read-only and can still be rewritten with other tools.",
-        )
+        is TagNotice.Locked -> if (n.checked) {
+            Dialog.Info(
+                "Tag is now read-only",
+                "SeedTag locked the tag's data and its settings, and read them back: nobody can ever rewrite or erase " +
+                    "it, or put a password on it. Reading stays open to any phone. Keep your other backups: a chip can " +
+                    "still fail.",
+            )
+        } else {
+            Dialog.Info(
+                "Tag is now read-only",
+                "Android locked its data, so it can't be rewritten or erased. SeedTag can't check this chip's lock bits " +
+                    "itself. Keep the tag where strangers can't reach it: on many chips, someone holding it could still " +
+                    "lock it against reading.",
+            )
+        }
+        is TagNotice.AlreadyReadOnly -> if (n.checked) {
+            Dialog.Info(
+                "Already read-only",
+                "This tag was already read-only for good: SeedTag read its lock bits and settings, and nothing was left " +
+                    "to lock. It didn't change anything.",
+            )
+        } else {
+            Dialog.Info(
+                "Already read-only",
+                "This tag was already read-only, so SeedTag didn't change it. It can't tell whether that's permanent: " +
+                    "some tags are only marked read-only and can still be rewritten with other tools.",
+            )
+        }
         TagNotice.CantMakeReadOnly -> Dialog.Info(
             "Can't be made read-only",
             "This tag can't be made read-only from this phone. Android usually only offers it for NFC Forum Type 1 " +
@@ -1015,7 +1038,7 @@ class SeedTagViewModel : ViewModel() {
         val d = below
         if (d is Dialog.ConfirmOverwrite || d is Dialog.ConfirmWeakPassword || d is Dialog.ConfirmNewPassphrase ||
             d is Dialog.ConfirmBack || d is Dialog.ConfirmSettings || d is Dialog.ConfirmTab ||
-            d is Dialog.ConfirmClearWords || d is Dialog.ConfirmErase || d == Dialog.ConfirmLock || d is Dialog.ConfirmProtect ||
+            d is Dialog.ConfirmClearWords || d is Dialog.ConfirmErase || d is Dialog.ConfirmLock || d is Dialog.ConfirmProtect ||
             d == Dialog.ConfirmClose
         ) below = null
     }

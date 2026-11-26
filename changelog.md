@@ -75,6 +75,14 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- **Make tag read-only** on an NTAG213, 215 or 216 (and NTAG21x lookalikes, after a warning) no longer uses
+  Android's lock. SeedTag writes the lock itself, as the chip's datasheet gives it: the settings frozen for good
+  (so nobody can put a password on the tag, not even one that locks it against reading), the lock bits for every
+  data page, the read-only mark. Then it reads every part back and says the tag is read-only for good only if it
+  is. A lock cut short is finished by holding the tag again. Verify's *Settings* line then says nobody can put a
+  password on it. On other chips it's Android's lock as before, and the messages no longer claim what SeedTag
+  can't check. `seedtag.py check` calls SeedTag's lock *Read-only for good*, and any other lock bits a warning
+  that says what's missing.
 - The beta notice (README, the disclaimer in the app) and the MIFARE Classic hint say SeedTag has been tested
   with NXP NTAG21x tags, the NTAG213 and the NTAG215, not only the NTAG213.
 - The NFC-spot finder moved from the top bar to a link under the first step's heading on every tab, *Not sure
@@ -212,6 +220,10 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- On an NTAG215 or 216 without NXP's Lock Control TLV, **Make tag read-only** left most of the data writable:
+  Android wrote the lock bits for pages 16 on to the wrong page. And a lock cut short (the tag moved away) couldn't
+  be finished, while the app said the tag was unchanged, and then that it was already read-only. Both fixed by
+  SeedTag's own lock, above.
 - **Make tag read-only** on a tag this phone can't make read-only said so,
   but then kept waiting for another tag, which can't help. It now says so in
   a message and ends the scan.

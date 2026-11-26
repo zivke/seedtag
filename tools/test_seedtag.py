@@ -464,15 +464,15 @@ class BlobText(unittest.TestCase):
 
 
 def ntag213_pages(message: bytes, rest: bytes = b"", cfg0="04 00 00 FF", cfg1="00 05 00 00", lock="00 00",
-                   uid="04 11 22 33 44 55 66") -> "list[bytes]":
+                   uid="04 11 22 33 44 55 66", dyn="00 00 00", cc3=0x00) -> "list[bytes]":
     """The 45 pages of an NTAG213 (made-up serial number) holding [message], then [rest]."""
     uid = bytes.fromhex(uid)
     pages = [uid[:3] + bytes([0x88 ^ uid[0] ^ uid[1] ^ uid[2]]), uid[3:7],
-             bytes([uid[3] ^ uid[4] ^ uid[5] ^ uid[6], 0x48]) + bytes.fromhex(lock), bytes.fromhex("E1 10 12 00")]
+             bytes([uid[3] ^ uid[4] ^ uid[5] ^ uid[6], 0x48]) + bytes.fromhex(lock), bytes.fromhex("E1 10 12") + bytes([cc3])]
     data = bytes.fromhex("01 03 A0 0C 34") + bytes([0x03, len(message)]) + message + b"\xfe" + rest
     data += bytes(144 - len(data))
     pages += [data[i:i + 4] for i in range(0, 144, 4)]
-    pages += [bytes.fromhex("00 00 00 BD"), bytes.fromhex(cfg0), bytes.fromhex(cfg1), bytes(4), bytes(4)]
+    pages += [bytes.fromhex(dyn) + b"\xbd", bytes.fromhex(cfg0), bytes.fromhex(cfg1), bytes(4), bytes(4)]
     return pages
 
 
@@ -559,7 +559,6 @@ class TagDump(unittest.TestCase):
         fails(make_dump(self.message, rest=b"\x00old text"), "bytes after the message aren't zero")
         fails(make_dump(self.message, cfg0="04 00 00 10"), "behind a password for writing")
         fails(make_dump(self.message, cfg0="04 00 00 03", cfg1="80 05 00 00"), "for reading and writing")
-        fails(make_dump(self.message, cfg1="40 05 00 00"), "aren't the factory defaults")
         fails(make_dump(seedtag.seedtag_message(self.text[:50] + " " + self.text[50:])), "isn't exactly")
         two = bytes([0x91]) + self.message[1:] + bytes([0x51, 1, 1]) + b"T\x00"  # a second record
         fails(make_dump(two), "isn't exactly")
@@ -621,9 +620,35 @@ class TagDump(unittest.TestCase):
         self.assertNotIn("FAIL", levels)
 
     def test_lock_bits_are_a_warning(self):
-        levels, _, _ = self.levels(make_dump(self.message, lock="FF FF"))
+        levels, lines, _ = self.levels(make_dump(self.message, lock="FF FF"))
         self.assertIn("WARN", levels)
         self.assertNotIn("FAIL", levels)
+        self.assertIn("missing the dynamic lock bytes", " ".join(m for _, m in lines))
+
+    def test_seedtags_read_only_is_clean(self):
+        # Make tag read-only: static FF FF, the datasheet's dynamic lock bytes, CC 0F, CFGLCK with AUTH0 FF.
+        dump = make_dump(self.message, lock="FF FF", dyn="FF 0F 3F", cc3=0x0F, cfg1="40 05 00 00")
+        levels, lines, backup = self.levels(dump)
+        self.assertNotIn("WARN", levels)
+        self.assertNotIn("FAIL", levels)
+        self.assertIn("Read-only for good", " ".join(m for _, m in lines))
+        self.assertEqual(self.text, backup)
+        # Cut short after the CC (Android's lock, board B3): a warning that names what's missing.
+        levels, lines, _ = self.levels(make_dump(self.message, cc3=0x0F))
+        self.assertIn("WARN", levels)
+        self.assertNotIn("FAIL", levels)
+        text = " ".join(m for _, m in lines)
+        self.assertIn("the static lock bytes", text)
+        self.assertIn("the settings (CFGLCK", text)
+        # A reserved bit set in the dynamic lock bytes: a warning, even with everything else locked.
+        levels, _, _ = self.levels(make_dump(self.message, lock="FF FF", dyn="FF FF 3F", cc3=0x0F, cfg1="40 05 00 00"))
+        self.assertIn("WARN", levels)
+        # Only the settings frozen: the first step of a lock cut short, a warning.
+        levels, lines, _ = self.levels(make_dump(self.message, cfg1="40 05 00 00"))
+        self.assertEqual(["OK", "WARN"], sorted(set(levels) - {"NOTE"}))
+        # CFGLCK with a password behind it isn't SeedTag's.
+        levels, _, _ = self.levels(make_dump(self.message, cfg0="04 00 00 10", cfg1="40 05 00 00"))
+        self.assertIn("FAIL", levels)
 
     def test_only_ntag21x(self):
         with self.assertRaisesRegex(ValueError, "only NTAG213, NTAG215 and NTAG216, and lookalikes"):

@@ -14,7 +14,11 @@ sealed interface TagRequest {
     /** Read the tag's text; with [withInfo], also its chip and write protection ([TagInfo]), for Verify. */
     data class Read(val withInfo: Boolean = false) : TagRequest
     /** Make the tag read-only, but only if it holds exactly [expected]. */
-    data class Lock(val expected: String) : TagRequest
+    /**
+     * Make the tag that holds [expected] read-only. On an NTAG21x layout SeedTag writes the lock itself
+     * ([NtagLock]); [lookalike]: the user accepted the warning for a chip that isn't NXP's.
+     */
+    data class Lock(val expected: String, val lookalike: Boolean = false) : TagRequest
     /** The Erase tab, first tap: what the tag holds and whether it can be erased. Writes nothing. */
     data object Inspect : TagRequest
     /**
@@ -159,9 +163,16 @@ sealed interface TagResult {
     data class WrittenUnchecked(val text: String) : TagResult
     /** [differences]: how the tag's message differs from what SeedTag writes; empty if it doesn't. */
     data class Read(val text: String, val differences: List<String> = emptyList(), val info: TagInfo? = null) : TagResult
-    data object Locked : TagResult
-    /** Lock found the tag already not writable: nothing was changed, and it may not be permanent. */
-    data object AlreadyReadOnly : TagResult
+    /**
+     * Made read-only. [checked]: SeedTag wrote the lock itself and read every part back ([NtagLock]): data and
+     * settings locked for good. Otherwise Android did it, and SeedTag can't check this chip's lock bits.
+     */
+    data class Locked(val checked: Boolean) : TagResult
+    /**
+     * Lock found the tag already not writable: nothing was changed. [checked]: SeedTag read its lock bits and
+     * it's read-only for good; otherwise it can't tell whether that's permanent.
+     */
+    data class AlreadyReadOnly(val checked: Boolean) : TagResult
     /**
      * Lock found the right tag, but this phone can't make it read-only: nothing was changed, and holding
      * it again wouldn't help, so the scan ends.

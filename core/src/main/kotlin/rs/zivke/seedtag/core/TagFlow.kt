@@ -29,10 +29,12 @@ sealed interface TagNotice {
     data class ConfirmOverwrite(val looksLikeSeedTag: Boolean) : TagNotice
     /** A blank tag was written, but the scan was canceled before it was read back. */
     data object WrittenUnchecked : TagNotice
-    data object Locked : TagNotice
+    /** [checked]: as [TagResult.Locked]. */
+    data class Locked(val checked: Boolean) : TagNotice
     /** A scan that was canceled, or the app left, ended in a failure that may have changed the tag. */
     data class LateFailure(val message: String) : TagNotice
-    data object AlreadyReadOnly : TagNotice
+    /** [checked]: as [TagResult.AlreadyReadOnly]. */
+    data class AlreadyReadOnly(val checked: Boolean) : TagNotice
     data object CantMakeReadOnly : TagNotice
     /** [rest]: whether the data area was then checked page by page. */
     data class Erased(val rest: Rest) : TagNotice
@@ -161,10 +163,10 @@ data class TagFlow(
         return arm(TagRequest.Unprotect(target, secret), Purpose.Unprotect, "Hold the same tag to remove its write password")
     }
 
-    /** Lock [lockTarget]; nothing if there's none. */
-    fun lock(): Next {
+    /** Lock [lockTarget]; nothing if there's none. [lookalike]: as [TagRequest.Lock]. */
+    fun lock(lookalike: Boolean = false): Next {
         val target = lockTarget ?: return next()
-        return arm(TagRequest.Lock(target), Purpose.Lock, "Hold the same tag to make it permanently read-only")
+        return arm(TagRequest.Lock(target, lookalike), Purpose.Lock, "Hold the same tag to make it permanently read-only")
     }
 
     /** Done's "Clear old data", after [Rest.Interrupted]: only the tag that holds the backup just written. */
@@ -261,8 +263,8 @@ data class TagFlow(
             is TagResult.RestCleared ->
                 if (r.rest == Rest.Interrupted) tapAgain(MOVED_AWAY)
                 else closed.copy(backupRest = r.rest).next(buzz(Haptic.Success))
-            TagResult.Locked -> closed.next(buzz(Haptic.Success), notify(TagNotice.Locked))
-            TagResult.AlreadyReadOnly -> copy(prompt = null).next(notify(TagNotice.AlreadyReadOnly))
+            is TagResult.Locked -> closed.next(buzz(Haptic.Success), notify(TagNotice.Locked(r.checked)))
+            is TagResult.AlreadyReadOnly -> copy(prompt = null).next(notify(TagNotice.AlreadyReadOnly(r.checked)))
             TagResult.CantMakeReadOnly -> copy(prompt = null).next(buzz(Haptic.Failure), notify(TagNotice.CantMakeReadOnly))
             is TagResult.Inspected -> copy(prompt = null, eraseCheck = r.check).next()
             is TagResult.Erased -> {
@@ -333,14 +335,14 @@ data class TagFlow(
         /** Results that only ask for more input: dropped when they arrive for a canceled or older scan. */
         val TagResult.onlyAsks: Boolean
             get() = when (this) {
-                is TagResult.Checked, is TagResult.NotEmpty, TagResult.AlreadyReadOnly, TagResult.CantMakeReadOnly,
+                is TagResult.Checked, is TagResult.NotEmpty, is TagResult.AlreadyReadOnly, TagResult.CantMakeReadOnly,
                 is TagResult.Inspected, is TagResult.Read, is TagResult.OtherMaker -> true
                 // Only stored: protection is still off, so a canceled Protect leaves nothing to say.
                 TagResult.ProtectStored -> true
                 TagResult.ProtectSwitchedOn, TagResult.Protected, is TagResult.NotEnforced, TagResult.Unprotected -> false
                 is TagResult.Failed -> !changedTag
                 is TagResult.RestCleared -> rest == Rest.Interrupted
-                is TagResult.WrittenUnchecked, is TagResult.Written, TagResult.Locked, is TagResult.Erased -> false
+                is TagResult.WrittenUnchecked, is TagResult.Written, is TagResult.Locked, is TagResult.Erased -> false
             }
     }
 }

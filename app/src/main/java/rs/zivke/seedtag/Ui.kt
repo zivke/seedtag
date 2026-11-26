@@ -1916,8 +1916,14 @@ private fun ReadResultStep(vm: SeedTagViewModel, reveal: Boolean, result: Verify
                 SectionLabel("Make it read-only")
                 Text(
                     "Once you're sure, you can make the tag read-only. That's permanent: its data can never be rewritten or " +
-                        "erased. It doesn't stop someone who gets hold of the tag from locking it against reading with a " +
-                        "password of their own, so keep it where strangers can't reach it, and keep other backups.",
+                        "erased. " +
+                        if (info?.identity != null) {
+                            "On this tag SeedTag also locks its settings, so nobody can put a password on it either, and " +
+                                "it reads the whole lock back. Keep other backups."
+                        } else {
+                            "It doesn't stop someone who gets hold of the tag from locking it against reading with a " +
+                                "password of their own, so keep it where strangers can't reach it, and keep other backups."
+                        },
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -1953,7 +1959,12 @@ private fun chipFacts(info: TagInfo): List<Fact> {
                 Protection.ReadWrite -> Fact("Write password", "On for reading too. SeedTag never sets that: another app did", Tone.Caution)
             },
         )
-        if (info.settingsLocked) add(Fact("Settings", "Locked for good: its write password can't be changed", Tone.Caution))
+        if (info.settingsLocked) {
+            add(
+                if (info.protection == Protection.Off) Fact("Settings", "Locked for good: nobody can put a password on it")
+                else Fact("Settings", "Locked for good: its write password can't be changed", Tone.Caution),
+            )
+        }
     }
 }
 
@@ -2746,20 +2757,37 @@ private fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Sett
             confirmButton = { TextButton(onClick = vm::confirmErase) { DangerText("Erase") } },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
         )
-        Dialog.ConfirmLock -> AlertDialog(
+        is Dialog.ConfirmLock -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },
-            title = { Text("Make tag read-only?") },
+            title = { Text(if (d.lookalike) "Not officially supported" else "Make tag read-only?") },
             text = {
                 GuardDialogWindow()
                 Text(
-                    "This is permanent: the tag's data can never be rewritten or erased. On many chips it doesn't stop " +
-                        "someone who gets hold of the tag from making it unreadable, so keep the tag out of strangers' reach " +
-                        "and keep other backups. " +
+                    (if (d.lookalike) {
+                        "This tag is an NTAG21x lookalike: it works like NXP's NTAG21x chips, but NXP didn't make it, and " +
+                            "SeedTag doesn't officially support it. SeedTag writes its lock bits where an NTAG213 has them " +
+                            "and reads them back, so it says if any part didn't take, but it can't foresee how every " +
+                            "lookalike behaves: one could stay partly writable, or stop working. Go on only if losing this " +
+                            "tag wouldn't matter: you have other backups of the seed.\n\n"
+                    } else "") +
+                        (if (d.ntag) {
+                            "This is permanent: the tag's data and its settings are locked for good. Nobody can ever " +
+                                "rewrite or erase it, or put a password on it, so it can't get a write password either. " +
+                                "Reading stays open to any phone. "
+                        } else {
+                            "This is permanent: the tag's data can never be rewritten or erased. On many chips it doesn't " +
+                                "stop someone who gets hold of the tag from making it unreadable, so keep the tag out of " +
+                                "strangers' reach and keep other backups. "
+                        }) +
                         "Only do this after you've successfully verified the backup with your written password.",
                 )
             },
-            confirmButton = { TextButton(onClick = vm::confirmLock) { DangerText("Make read-only") } },
+            confirmButton = {
+                TextButton(onClick = { vm.confirmLock(d.lookalike) }) {
+                    DangerText(if (d.lookalike) "Make read-only anyway" else "Make read-only")
+                }
+            },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Cancel") } },
         )
         is Dialog.ConfirmProtect -> AlertDialog(

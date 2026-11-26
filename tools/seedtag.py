@@ -827,6 +827,9 @@ _NTAG = {
     231: ("NTAG216", "0004040201001303", 0x6D, 0xE3),
 }
 _NXP_CFG0, _NXP_CFG1 = bytes.fromhex("04 00 00 FF"), bytes.fromhex("00 05 00 00")  # factory settings
+# The dynamic lock bytes 0-2 with every lock and block-locking bit set, RFUI bits 0 (NTAG213/215/216 datasheet,
+# figures 10-12): what SeedTag's Make tag read-only writes, as the static lock bytes FF FF and CC byte 3 0F.
+_DYN_LOCK = {"NTAG213": bytes.fromhex("FF 0F 3F"), "NTAG215": bytes.fromhex("FF 00 0F"), "NTAG216": bytes.fromhex("FF 3F 7F")}
 
 
 # NFC Tools' text export: "[ 04:8D:B4:B5 ] Addr. 00 : DATA", the page number in hex.
@@ -984,19 +987,38 @@ def check_dump(text: str) -> "tuple[list[tuple[str, str]], str | None]":
         fail(f"The capability container (page 3) is {p3.hex(' ')}, not E1 10 {cc_size:02X} 00 (or 0F when "
              "read-only).")
     locked = any(static_lock) or any(dyn_lock) or p3[3] == 0x0F
-    if not locked:
+    want = _DYN_LOCK[chip]
+    # CFGLCK (ACCESS bit 6) with AUTH0 FF: the settings frozen, as Make tag read-only leaves them.
+    frozen = cfg0[3] == 0xFF and cfg1[0] == 0x40
+    parts = {"the static lock bytes (page 2: FF FF)": static_lock == b"\xff\xff",
+             f"the dynamic lock bytes (page {cfg - 1}: {want.hex(' ').upper()})": all(d & w == w for d, w in zip(dyn_lock, want)),
+             "the read-only mark (capability container 0F)": p3[3] == 0x0F,
+             "the settings (CFGLCK, AUTH0 FF)": frozen}
+    reserved = any(d & ~w for d, w in zip(dyn_lock, want))
+    if not locked and not frozen:
         ok("Not read-only: no lock bit is set.")
+    elif all(parts.values()) and not reserved:
+        ok("Read-only for good, as SeedTag's Make tag read-only leaves it: the data, the capability container and "
+           "the settings are locked, so nobody can rewrite the tag or put a password on it.")
     else:
+        missing = [name for name, done in parts.items() if not done]
         warn(f"Lock bits are set (page 2: {static_lock.hex(' ')}, page {cfg - 1}: {dyn_lock.hex(' ')}, "
-             f"capability container {p3[3]:02X}). Expected after Make read-only. If nobody made this tag "
-             "read-only, something else set them, and lock bits can carry a few bits of data.")
+             f"capability container {p3[3]:02X}), but not as SeedTag's Make tag read-only leaves them" +
+             (f": missing {', '.join(missing)}" if missing else "") +
+             (", and bits the datasheet reserves are set" if reserved else "") +
+             ". A lock cut short, or one Android or another app made: pages may still be writable. SeedTag "
+             "finishes it (Verify the tag, then Make tag read-only). If nobody made this tag read-only, "
+             "something else set them, and lock bits can carry a few bits of data.")
     if dyn[3] != 0xBD:
         fail(f"Page {cfg - 1}, byte 3 is {dyn[3]:02X}, not the chip's fixed BD.")
     # The bytes besides AUTH0 and ACCESS as at the factory: NXP's values, or on a lookalike 00 (unused).
     rest_ok = (cfg0[:3] == _NXP_CFG0[:3] or (lookalike and not any(cfg0[:3]))) and \
         (cfg1[1:] == _NXP_CFG1[1:] or (lookalike and not any(cfg1[1:])))
     write_password = rest_ok and cfg0[3] == 0x03 and cfg1[0] == 0x00
-    if rest_ok and cfg0[3] == 0xFF and cfg1[0] == 0x00:
+    if rest_ok and frozen:
+        ok("Settings locked for good (CFGLCK), with no page behind a password (AUTH0 FF), as Make tag "
+           "read-only leaves them: nobody can ever set one.")
+    elif rest_ok and cfg0[3] == 0xFF and cfg1[0] == 0x00:
         ok("Settings at the factory defaults: no page is behind a password (AUTH0 FF), and the settings "
            "aren't locked.")
     elif write_password:
@@ -1015,7 +1037,8 @@ def check_dump(text: str) -> "tuple[list[tuple[str, str]], str | None]":
             fail(f"The settings (pages {cfg}-{cfg + 1}: {cfg0.hex(' ')} / {cfg1.hex(' ')}) aren't the "
                  "factory defaults (04 00 00 FF / 00 05 00 00" + (", or 00 in place of 04 and 05 on a lookalike"
                                                                   if lookalike else "") +
-                 "), nor what SeedTag's write password sets (the same with AUTH0 03 in place of FF).")
+                 "), nor what SeedTag sets (the same with AUTH0 03 in place of FF for a write password, or "
+                 "40 in place of the ACCESS byte's 00 once read-only).")
     if any(pwd) or (any(pack[:2]) and not lookalike):
         fail(f"Pages {cfg + 2}-{cfg + 3} (password and its reply) don't read as zero, which a real chip "
              "always returns for them.")

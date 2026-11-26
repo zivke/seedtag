@@ -14,11 +14,14 @@
   - Publish each release APK's SHA-256.
 - [ ] **#11 (Medium): a "read-only" tag can still be locked against reading by a stranger.** Options are
   in [the tag write-protection report](reports/2026-11-07-tag-write-protection.md). In order:
-  - [ ] After locking, read the lock and settings bytes back, and warn if the settings are still open.
+  - [ ] After locking, read the lock and settings bytes back, and warn if the settings are still open. On
+    branch `lock-readback` (2026-11-26): on NTAG21x layouts SeedTag writes the lock itself and reads it back
+    (`NtagLock`); device rows 7.59-7.63.
   - [x] Correct the README's claim that locking protects the tag. Recommend a metal box or shielding
     sleeve, and not carrying the tag around.
   - [ ] Proper lock (settings frozen too) or a write password, on a separate branch, tested with spare
-    tags.
+    tags. The write password is B17's Protect from writes; the proper lock (CFGLCK with AUTH0 FF, the owner's
+    choice on 2026-11-26) is on `lock-readback`.
   - [ ] Rescue for Ultralight C tags already locked with `FF 0F` (none known: the tested tag turned out to be an
     NTAG213).
 
