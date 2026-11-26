@@ -96,6 +96,11 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- Stricter build checks: `check-apk.sh` also refuses an Application class, a second process or shared user ID,
+  intent filters beyond the launcher's, `<queries>`, a declared permission but androidx's own, a lowered min or
+  target SDK, cleartext traffic, missing data-extraction rules and unknown native libraries; `check-workflows.py`
+  refuses other triggers, write permissions, other runners, `container` and `services`; and every build first
+  checks that `verification-metadata.xml`'s `<configuration>` block trusts nothing new.
 - Reproducible builds: `.gitattributes` keeps text files LF on every checkout (Windows included), and the
   libraries' `.so` files are packaged as they come even where an NDK is installed. The APK is byte-identical to
   before. The README says the build is reproducible in the dev container's image (Linux, Docker).

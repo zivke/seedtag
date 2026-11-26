@@ -6,7 +6,9 @@
 There's no way to run a workflow in the dev container, so this catches what can be caught
 offline: each file under .github/workflows must be valid YAML with triggers and jobs, declare
 `permissions`, and pin every action to a full commit SHA (a tag like @v4 can be moved to
-other code).
+other code). And (board B36): only the triggers allowed below (none that runs with secrets on
+someone else's code, like pull_request_target), no write permission anywhere, only GitHub's own
+Ubuntu runners, and no `container` or `services` (an image from outside, unpinned).
 
     python3 tools/check-workflows.py    # exits 1 on any problem
 """
@@ -19,6 +21,17 @@ import yaml
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 PINNED = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
+TRIGGERS = {"push", "workflow_dispatch", "pull_request"}
+RUNNER = re.compile(r"^ubuntu-[0-9.]+$")
+
+
+def permission_problems(where, perms):
+    """`permissions` may only read: `read-all`, `{}` or scopes set to read or none."""
+    if perms in ("read-all", {}):
+        return []
+    if not isinstance(perms, dict):
+        return [f"{where}: `permissions: {perms}` (only read-all, {{}}, or scopes set to read or none)"]
+    return [f"{where}: `permissions` gives {k}: {v}" for k, v in perms.items() if v not in ("read", "none")]
 
 
 def check(path):
@@ -34,8 +47,14 @@ def check(path):
     triggers = wf.get("on", wf.get(True))
     if not triggers:
         problems.append("no triggers (`on:`)")
+    else:
+        names = {triggers} if isinstance(triggers, str) else set(triggers)
+        for t in sorted(names - TRIGGERS):
+            problems.append(f"trigger `{t}` isn't allowed (only {', '.join(sorted(TRIGGERS))})")
     if "permissions" not in wf:
         problems.append("no top-level `permissions:`")
+    else:
+        problems += permission_problems("top level", wf["permissions"])
     jobs = wf.get("jobs")
     if not isinstance(jobs, dict) or not jobs:
         return problems + ["no jobs"]
@@ -44,6 +63,13 @@ def check(path):
             problems.append(f"job {name}: not a mapping")
             continue
         uses = [job["uses"]] if "uses" in job else []
+        if "permissions" in job:
+            problems += permission_problems(f"job {name}", job["permissions"])
+        if "uses" not in job and not (isinstance(job.get("runs-on"), str) and RUNNER.match(job["runs-on"])):
+            problems.append(f"job {name}: `runs-on: {job.get('runs-on')}` (only GitHub's ubuntu-<version> runners)")
+        for key in ("container", "services"):
+            if key in job:
+                problems.append(f"job {name}: `{key}` isn't allowed")
         steps = job.get("steps", [])
         if not uses and not steps:
             problems.append(f"job {name}: no steps")

@@ -60,6 +60,13 @@ A library that adds one fails the build until it's been looked at (and removed i
 script). The same goes for shared libraries the system would load into the app: only `androidx.window`'s two
 optional ones, which Compose uses to ask the phone's own window extensions about folds (they're part of the system
 image, and only some phones have them). `--debug` (for `make debug`) allows what debug builds have: debuggable.
+It also fails on an Application class, a second process or a shared user ID, any intent filter but the
+launcher's, a `<queries>` element, a declared permission other than androidx's own signature one, a minSdk below
+26 or a targetSdk below 36, cleartext traffic or a network security config, missing data-extraction rules, and
+native libraries other than the four known `libandroidx.graphics.path.so`. `make check-workflows` also allows only
+push, manual and pull-request triggers, read-only permissions, GitHub's Ubuntu runners and no `container` or
+`services`; and before every Gradle build, `tools/check-deps.py --config` makes sure
+`gradle/verification-metadata.xml`'s `<configuration>` block trusts nothing new.
 (`HIDE_OVERLAY_WINDOWS` and `VIBRATE` are granted at install without a prompt and give no access to anything: one
 only lets SeedTag hide other apps' overlays, the other only runs the vibration motor.)
 

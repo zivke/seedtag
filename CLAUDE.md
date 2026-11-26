@@ -46,7 +46,11 @@ container. Everything goes through the `Makefile` (`make help` lists targets).
   (overlay hiding on Android 12+, and the NFC-spot finder's buzz; neither
   gives access to anything). It also fails a release APK that is debuggable,
   test-only, allows backups, or declares a component outside its allowlist
-  (`--debug` for debug builds).
+  (`--debug` for debug builds), and any APK with an Application class, another
+  process, an intent filter but the launcher's, `<queries>`, a lower min/target
+  SDK, cleartext traffic or an unknown native library. `make` checks the
+  verification metadata's `<configuration>` block before every Gradle build
+  (`check-deps.py --config`).
 - `tools/sign-release.sh (--expect <sha256> | --no-expect) [--no-verify-tag] [--no-remote-check] [--remote <name>] <keystore>`
   runs outside the container, in the release clone at the release tag: refuses an
   unsigned APK that doesn't match the independent build (`--expect`, the

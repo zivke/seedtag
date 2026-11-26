@@ -2,8 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Copyright (C) 2026 zivke
 # Checks a built APK: valid signature, no permission except NFC, HIDE_OVERLAY_WINDOWS and VIBRATE, not
-# debuggable or test-only, backups off, and no app components but the known ones. Prints the signing
-# certificate and the APK's SHA-256.
+# debuggable or test-only, backups off, and no app components but the known ones. Also (board B36): no
+# Application class, shared user ID or other process, no intent filter but the launcher's, no <queries>, no
+# permission it declares but androidx's own signature one, minSdk/targetSdk not lowered, no cleartext traffic
+# or network security config, the data-extraction rules in place, and only the known native libraries.
+# Prints the signing certificate and the APK's SHA-256.
 #
 #   tools/check-apk.sh seedtag.apk
 #   tools/check-apk.sh --unsigned seedtag-unsigned.apk   # no signature to check
@@ -73,14 +76,63 @@ fi
 # The manifest: the <application> element's own attributes, and every component it declares.
 manifest="$("$AAPT2" dump xmltree --file AndroidManifest.xml "$APK")"
 app_attrs="$(printf '%s\n' "$manifest" | awk '/^ *E: application /{f=1; next} f && /^ *E: /{exit} f')"
+manifest_attrs="$(printf '%s\n' "$manifest" | awk '/^ *E: manifest /{f=1; next} f && /^ *E: /{exit} f')"
 has_attr() { printf '%s\n' "$app_attrs" | grep -q ":$1(0x[0-9a-f]*)=$2\$"; }
+# Set at all, to any value: a resource reference (@0x7f...) counts, since it can resolve to true.
+sets_attr() { printf '%s\n' "$app_attrs" | grep -q ":$1(0x[0-9a-f]*)="; }
 problems=""
-if has_attr debuggable true && [ "$DEBUG" = 0 ]; then problems="$problems
-android:debuggable is true (a debug build?)"; fi
-if has_attr testOnly true; then problems="$problems
-android:testOnly is true"; fi
+if sets_attr debuggable && ! has_attr debuggable false && [ "$DEBUG" = 0 ]; then problems="$problems
+android:debuggable is set, not to false (a debug build?)"; fi
+if sets_attr testOnly && ! has_attr testOnly false; then problems="$problems
+android:testOnly is set, not to false"; fi
 if ! has_attr allowBackup false; then problems="$problems
 android:allowBackup isn't false"; fi
+if ! has_attr fullBackupContent false; then problems="$problems
+android:fullBackupContent isn't false"; fi
+if ! sets_attr dataExtractionRules; then problems="$problems
+no android:dataExtractionRules (Android 12+ device-to-device transfer would copy the app's data)"; fi
+# The app's own code only: no Application class (code that runs before MainActivity), one process.
+if printf '%s\n' "$app_attrs" | grep -q ':name(0x01010003)='; then problems="$problems
+android:name on <application> (an Application class)"; fi
+if printf '%s\n' "$manifest" | grep -q ':process(0x[0-9a-f]*)='; then problems="$problems
+android:process is set (a second process)"; fi
+if printf '%s\n' "$manifest_attrs" | grep -q ':sharedUserId(0x[0-9a-f]*)='; then problems="$problems
+android:sharedUserId is set"; fi
+# No network: no cleartext permission, no network security config (there's no INTERNET to use them anyway).
+if sets_attr usesCleartextTraffic && ! has_attr usesCleartextTraffic false; then problems="$problems
+android:usesCleartextTraffic is set"; fi
+if sets_attr networkSecurityConfig; then problems="$problems
+android:networkSecurityConfig is set"; fi
+# Package visibility: SeedTag needs to see no other app.
+if printf '%s\n' "$manifest" | grep -qE '^ *E: queries '; then problems="$problems
+a <queries> element (asks to see other apps)"; fi
+# The only permission it declares is androidx.core's own, signature-level (protectionLevel 0x2).
+declared="$(printf '%s\n' "$manifest" | awk '
+    /^ *E: (permission|permission-group|permission-tree) /{ want = $2; name = ""; next }
+    want && /^ *E: /{ print want, name, level; want = "" }
+    want && /:name\(0x01010003\)="/{ match($0, /="[^"]*"/); name = substr($0, RSTART + 2, RLENGTH - 3) }
+    want && /:protectionLevel\(/{ sub(/.*=/, ""); level = $0 }
+    END { if (want) print want, name, level }')"
+unknown="$(printf '%s\n' "$declared" | sed '/^$/d' | grep -vxF "permission $pkg.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION 0x00000002" || true)"
+if [ -n "$unknown" ]; then problems="$problems
+$(printf '%s\n' "$unknown" | sed 's/^/declares: /')"; fi
+# SDK levels: never below what SeedTag is made for (a lower targetSdk drops platform protections).
+min_sdk="$(printf '%s\n' "$manifest" | sed -n 's/.*:minSdkVersion(0x[0-9a-f]*)=\([0-9]*\)$/\1/p')"
+target_sdk="$(printf '%s\n' "$manifest" | sed -n 's/.*:targetSdkVersion(0x[0-9a-f]*)=\([0-9]*\)$/\1/p')"
+if [ -z "$min_sdk" ] || [ "$min_sdk" -lt 26 ]; then problems="$problems
+minSdkVersion is ${min_sdk:-unreadable}, expected 26 or more"; fi
+if [ -z "$target_sdk" ] || [ "$target_sdk" -lt 36 ]; then problems="$problems
+targetSdkVersion is ${target_sdk:-unreadable}, expected 36 or more"; fi
+# Intent filters: the launcher's MAIN/LAUNCHER and nothing else (no NFC dispatch, no links, no share target).
+filters="$(printf '%s\n' "$manifest" | awk '
+    /^ *E: (action|category|data) /{ if (want) print want, "(unnamed)"; want = $2; next }
+    want && /^ *E: /{ print want, "(unnamed)"; want = "" }
+    want && /:name\(0x01010003\)="/{ match($0, /="[^"]*"/); print want, substr($0, RSTART + 2, RLENGTH - 3); want = "" }
+    END { if (want) print want, "(unnamed)" }')"
+unknown="$(printf '%s\n' "$filters" | sed '/^$/d' | grep -vxF -e "action android.intent.action.MAIN" \
+    -e "category android.intent.category.LAUNCHER" || true)"
+if [ -n "$unknown" ]; then problems="$problems
+$(printf '%s\n' "$unknown" | sed 's/^/intent filter it must not have: /')"; fi
 # No library code may run before SeedTag's own: no component factory, which would create every
 # component (androidx.core's is removed in the manifest).
 if printf '%s\n' "$app_attrs" | grep -q ':appComponentFactory('; then problems="$problems
@@ -110,6 +162,19 @@ if [ -n "$unknown" ]; then problems="$problems
 $(printf '%s\n' "$unknown" | sed 's/^/library it must not load: /')"; fi
 if ! printf '%s\n' "$components" | grep -qxF "activity rs.zivke.seedtag.MainActivity"; then problems="$problems
 no rs.zivke.seedtag.MainActivity (couldn't read the manifest?)"; fi
+# Native code: only androidx.graphics.path's small library (Compose's path drawing), for the four ABIs.
+if command -v unzip >/dev/null 2>&1; then entries="$(unzip -Z1 "$APK")"
+elif command -v python3 >/dev/null 2>&1; then
+    entries="$(python3 -c 'import sys, zipfile; print("\n".join(zipfile.ZipFile(sys.argv[1]).namelist()))' "$APK")"
+else echo "Missing: unzip or python3 (to list the APK's native libraries)" >&2; exit 1
+fi
+allowed_so="lib/arm64-v8a/libandroidx.graphics.path.so
+lib/armeabi-v7a/libandroidx.graphics.path.so
+lib/x86/libandroidx.graphics.path.so
+lib/x86_64/libandroidx.graphics.path.so"
+unknown="$(printf '%s\n' "$entries" | grep '^lib/' | grep -vxF "$allowed_so" || true)"
+if [ -n "$unknown" ]; then problems="$problems
+$(printf '%s\n' "$unknown" | sed 's/^/native library it must not have: /')"; fi
 if [ -n "$problems" ]; then
     echo "!! $APK:" >&2
     printf '%s\n' "$problems" | sed '/^$/d; s/^/!!   /' >&2
@@ -120,6 +185,7 @@ if [ "$UNSIGNED" = 1 ]; then state="unsigned"; else state="signed"; fi
 if [ "$DEBUG" = 1 ]; then state="$state debug build"; fi
 echo ">> $APK: $state, permissions OK (NFC, HIDE_OVERLAY_WINDOWS and VIBRATE only, no network)"
 echo ">> manifest OK: $(if [ "$DEBUG" = 1 ]; then echo "debuggable (debug build)"; else echo "not debuggable"; fi), not test-only, no backups, only MainActivity, no component factory, known libraries only"
+echo ">> also OK: no Application class, process or shared user, launcher intent filter only, no <queries>, no declared permission but androidx's, minSdk $min_sdk, targetSdk $target_sdk, no cleartext, known native libraries"
 if command -v sha256sum >/dev/null 2>&1; then sum="$(sha256sum "$APK")"; else sum="$(shasum -a 256 "$APK")"; fi
 echo ">> SHA-256: ${sum%% *}"
 ls -l "$APK"

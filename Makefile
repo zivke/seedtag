@@ -34,6 +34,7 @@ OUT       := app/build/outputs/apk
 # and Gradle checks every dependency (gradle/verification-metadata.xml).
 wrapper-check:
 	@sha256sum --quiet -c gradle/wrapper/gradle-wrapper.jar.sha256
+	@python3 tools/check-deps.py --config >/dev/null
 
 ## build: unsigned release seedtag-unsigned.apk (R8 on); sign it outside the container with tools/sign-release.sh
 # Always from scratch, as in CI: an incremental build on top of output from another Gradle home once

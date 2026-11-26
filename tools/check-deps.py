@@ -8,7 +8,11 @@ it trusts whatever was downloaded first. This checks each of those files against
 repository publishes (the .sha1 next to it, or the file itself when there's no .sha1), so a
 poisoned cache or a bad download is caught before the checksums are committed.
 
-    python3 tools/check-deps.py     # needs network access; exits 1 on any mismatch
+    python3 tools/check-deps.py            # needs network access; exits 1 on any mismatch
+    python3 tools/check-deps.py --config   # offline: only the <configuration> block (before every build)
+
+The <configuration> block decides what isn't checked at all, so a <trust> or a key added there could hide in a
+long diff (board B36): it must be exactly what's allowed below, and every artifact must have a SHA-256.
 
 It reads the cache in $GRADLE_USER_HOME (default ~/.gradle), like Gradle.
 """
@@ -83,9 +87,49 @@ def check(job):
     return ("NOT FOUND", job, None)
 
 
+# The whole <configuration> block as allowed: metadata verified, signatures not used, and only IDE-only source and
+# javadoc jars trusted without a checksum. Anything else (another <trust>, trusted or ignored keys, key servers)
+# fails until it's been looked at and added here.
+ALLOWED_CONFIG = [
+    ("verify-metadata", (), "true"),
+    ("verify-signatures", (), "false"),
+    ("trusted-artifacts", (
+        ("trust", (("file", ".*-javadoc[.]jar"), ("regex", "true"))),
+        ("trust", (("file", ".*-sources[.]jar"), ("regex", "true"))),
+    ), ""),
+]
+
+
+def config_problems(root):
+    problems = []
+    configs = root.findall(NS + "configuration")
+    if len(configs) != 1:
+        return [f"{len(configs)} <configuration> blocks, expected 1"]
+    found = []
+    for child in configs[0]:
+        tag = child.tag.replace(NS, "")
+        trusts = tuple((t.tag.replace(NS, ""), tuple(sorted(t.attrib.items()))) for t in child)
+        found.append((tag, trusts, (child.text or "").strip() if not trusts else ""))
+    if found != ALLOWED_CONFIG:
+        problems.append("the <configuration> block isn't the allowed one (tools/check-deps.py, ALLOWED_CONFIG)")
+    for c in root.iter(NS + "component"):
+        for a in c.iter(NS + "artifact"):
+            if a.find(NS + "sha256") is None:
+                problems.append(f"{c.get('group')}:{c.get('name')}:{c.get('version')} {a.get('name')} has no sha256")
+    return problems
+
+
 def main():
+    root = ET.parse(META).getroot()
+    problems = config_problems(root)
+    for p in problems:
+        print(f"!! gradle/verification-metadata.xml: {p}", file=sys.stderr)
+    if problems or sys.argv[1:] == ["--config"]:
+        if not problems:
+            print(">> gradle/verification-metadata.xml: configuration OK")
+        return 1 if problems else 0
     jobs = []
-    for c in ET.parse(META).getroot().iter(NS + "component"):
+    for c in root.iter(NS + "component"):
         for a in c.iter(NS + "artifact"):
             jobs.append((c.get("group"), c.get("name"), c.get("version"), a.get("name"), a.find(NS + "sha256").get("value")))
     with ThreadPoolExecutor(6) as ex:
