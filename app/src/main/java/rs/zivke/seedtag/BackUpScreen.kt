@@ -51,7 +51,7 @@ import rs.zivke.seedtag.core.TagStep
 
 // ============================================================= back up ===
 
-private const val BACKUP_STEPS = 4
+private const val BACKUP_STEPS = 5
 
 @Composable
 internal fun BackupScreen(vm: SeedTagViewModel) {
@@ -59,6 +59,7 @@ internal fun BackupScreen(vm: SeedTagViewModel) {
         BackupStep.Tag -> TagStep(vm)
         BackupStep.Length -> LengthStep(vm)
         BackupStep.Words -> WordsStep(vm)
+        BackupStep.Review -> ReviewStep(vm)
         BackupStep.Password -> PasswordStep(vm)
         BackupStep.Done -> DoneStep(vm)
     }
@@ -310,7 +311,7 @@ private fun WordsStep(vm: SeedTagViewModel) {
                 TextButton(onClick = vm::backToLength) { Text("Back") }
                 TextButton(onClick = vm::requestClearWords, enabled = vm.words.isNotEmpty()) { Text("Clear") }
                 Spacer(Modifier.weight(1f))
-                Button(onClick = vm::toPasswordStep, enabled = vm.mnemonicStatus is MnemonicStatus.Valid, modifier = Modifier.height(48.dp)) {
+                Button(onClick = vm::toReviewStep, enabled = vm.mnemonicStatus is MnemonicStatus.Valid, modifier = Modifier.height(48.dp)) {
                     Text("Next")
                 }
             }
@@ -339,6 +340,51 @@ private fun WordsStep(vm: SeedTagViewModel) {
                 color = LocalExtra.current.success,
             )
         }
+    }
+}
+
+/**
+ * Check your words (board B6): the whole phrase, to compare with the written seed before it's encrypted. The
+ * checksum can't catch a wrong word that's another BIP39 word, and nothing after this step can either: Verify
+ * and Restore check the tag against what was entered here. *They match* needs the words shown.
+ */
+@Composable
+private fun ReviewStep(vm: SeedTagViewModel) {
+    StepScreen(
+        bottom = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = vm::backToWords) { Text("Fix a word") }
+                Spacer(Modifier.weight(1f))
+                Button(onClick = vm::toPasswordStep, enabled = !vm.hideWords, modifier = Modifier.height(48.dp)) {
+                    Text("They match")
+                }
+            }
+        },
+    ) {
+        StepHeader(
+            4, BACKUP_STEPS, "Check your words",
+            "Compare every word with your written seed, one by one and in order, before it's encrypted.",
+            compact = true,
+        ) {
+            Link(if (vm.hideWords) "Show words" else "Hide words") { vm.hideWords = !vm.hideWords }
+        }
+        WordGrid(vm.words, hidden = vm.hideWords, max = vm.wordCount)
+        if (vm.hideWords) {
+            Text(
+                "Tap Show words to compare them: They match needs them shown. Make sure nobody can see the screen.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Notice(
+            Tone.Info,
+            "Why check them?",
+            "The phrase's checksum catches most typos, but not all: a wrong word that's another BIP39 word gets " +
+                "through about once in 16 times with 12 words, once in 256 with 24.",
+            "If one does, the backup holds a different seed. Every check after this would still pass, because Verify " +
+                "and Restore compare the tag with what you entered here, so you'd only find out when you need the seed. " +
+                "Fix a word goes back to the keypad with every word kept: Backspace removes the last one.",
+        )
     }
 }
 
@@ -402,7 +448,7 @@ private fun PasswordStep(vm: SeedTagViewModel) {
         bottom = {
             PasswordKeyboard(vm, field)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = vm::requestBackToWords) { Text("Back") }
+                TextButton(onClick = vm::requestBackToReview) { Text("Back") }
                 Spacer(Modifier.weight(1f))
                 Button(
                     onClick = vm::encryptAndWrite,
@@ -412,7 +458,7 @@ private fun PasswordStep(vm: SeedTagViewModel) {
             }
         },
     ) {
-        StepHeader(4, BACKUP_STEPS, "Set a password", compact = true)
+        StepHeader(5, BACKUP_STEPS, "Set a password", compact = true)
         Notice(
             Tone.Caution,
             "This password is the only key",
@@ -572,6 +618,8 @@ private fun DoneStep(vm: SeedTagViewModel) {
         Steps(
             listOf(
                 "Go to Verify and decrypt the tag by typing the password from your written copy.",
+                "Once, on the Restore tab, show the words and compare them with your written seed again: that checks " +
+                    "the whole round trip, tag included.",
                 "Optionally, recover it on an offline computer with seedtag.py.",
                 "Keep a copy of seedtag.py (printed, or on a USB stick) with your written password: with Python, " +
                     "it's all anyone needs to recover the tag, even if SeedTag and its website are gone.",

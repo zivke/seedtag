@@ -7,6 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- **Check your words**, a new step in Back up between the words and the password: the whole phrase, to compare
+  with your written seed before it's encrypted, then **They match** (only while the words are shown) or **Fix a
+  word**. The checksum lets about one wrong word in 16 through with 12 words, and nothing after this step could
+  catch it. Back up now has five steps; Done also suggests comparing the words once on the Restore tab.
 - **Close SeedTag**: the ✕ at the top right, on every screen, and a button at the end of Back up, Verify and
   Restore. Leaving SeedTag clears what was typed or decrypted, but some copies an app can't clear (the password as
   text while Show is on, text already drawn, the memory Argon2id used, copies of the key) stay in memory until

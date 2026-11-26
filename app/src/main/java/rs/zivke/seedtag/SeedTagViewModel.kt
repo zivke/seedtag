@@ -52,7 +52,7 @@ enum class Page(val title: String) {
 /** What the NFC-spot finder saw, from the tag's discovery info only: nothing is read from its memory. */
 data class ProbeResult(val count: Int, val ndef: Boolean, val formatable: Boolean, val ndefSize: Int?, val writable: Boolean?)
 /** [Tag]: scan the tag first, to see whether it can take a backup, and how many words. */
-enum class BackupStep { Tag, Length, Words, Password, Done }
+enum class BackupStep { Tag, Length, Words, Review, Password, Done }
 /** The password fields: the new password and its repeat (Back up), Verify / Restore, and the Erase tag check. */
 enum class PwField { Password, Repeat, Read, Erase }
 
@@ -110,8 +110,8 @@ sealed interface Dialog {
     data class ConfirmErase(val content: TagContent, val checked: Boolean, val fingerprint: String?) : Dialog
     /** Generate a passphrase over a password that's already there; [generated] if that one was generated too. */
     data class ConfirmNewPassphrase(val generated: Boolean) : Dialog
-    /** Back would drop what was entered: [toWords] for the Password step's Back (clears the passwords), else leaving the app. */
-    data class ConfirmBack(val toWords: Boolean) : Dialog
+    /** Back would drop what was entered: [toReview] for the Password step's Back (clears the passwords), else leaving the app. */
+    data class ConfirmBack(val toReview: Boolean) : Dialog
     /**
      * Close SeedTag: clear everything and end the process, so the copies [wipeAll] can't zero go with it
      * (board B4). MainActivity does the closing; this only asks.
@@ -197,7 +197,7 @@ class SeedTagViewModel : ViewModel() {
             Screen.Erase -> resetErase()
             Screen.Backup -> {
                 wipeBackup()
-                if (step == BackupStep.Words || step == BackupStep.Password) step = BackupStep.Length
+                if (step == BackupStep.Words || step == BackupStep.Review || step == BackupStep.Password) step = BackupStep.Length
             }
         }
         tab = to
@@ -501,15 +501,27 @@ class SeedTagViewModel : ViewModel() {
 
     fun backToLength() { clearPrefix(); step = BackupStep.Length }
 
-    fun toPasswordStep() {
-        if (mnemonicStatus is MnemonicStatus.Valid) { clearPrefix(); step = BackupStep.Password }
+    /** The Words step's Next: a valid phrase goes to Check your words, where the user compares it (board B6). */
+    fun toReviewStep() {
+        if (mnemonicStatus is MnemonicStatus.Valid) { clearPrefix(); step = BackupStep.Review }
     }
 
-    fun backToWords() { step = BackupStep.Words; clearPasswords(PwField.Password, PwField.Repeat); generatedPassphrase = false }
+    /**
+     * Check your words' *They match*. Only while the words are shown: a wrong word can be another valid word
+     * and still pass the checksum (1 in 16 for 12 words), so only comparing them catches it.
+     */
+    fun toPasswordStep() {
+        if (step == BackupStep.Review && !hideWords && mnemonicStatus is MnemonicStatus.Valid) step = BackupStep.Password
+    }
+
+    /** Check your words' *Fix a word*: back to the keypad, every word kept. */
+    fun backToWords() { step = BackupStep.Words }
+
+    fun backToReview() { step = BackupStep.Review; clearPasswords(PwField.Password, PwField.Repeat); generatedPassphrase = false }
 
     /** The Password step's Back: asks first if that would clear a password. */
-    fun requestBackToWords() {
-        if (password.isEmpty() && passwordRepeat.isEmpty()) backToWords() else dialog = Dialog.ConfirmBack(toWords = true)
+    fun requestBackToReview() {
+        if (password.isEmpty() && passwordRepeat.isEmpty()) backToReview() else dialog = Dialog.ConfirmBack(toReview = true)
     }
 
     /**
@@ -956,6 +968,7 @@ class SeedTagViewModel : ViewModel() {
         get() = BackAction.of(
             pageOpen = page != null,
             onWordsStep = tab == Screen.Backup && step == BackupStep.Words,
+            onReviewStep = tab == Screen.Backup && step == BackupStep.Review,
             onPasswordStep = tab == Screen.Backup && step == BackupStep.Password,
             holdsSecrets = holdsSecrets,
         )
@@ -971,8 +984,9 @@ class SeedTagViewModel : ViewModel() {
         when (backAction) {
             BackAction.ClosePage -> page = null
             BackAction.BackToLength -> backToLength()
-            BackAction.BackToWords -> requestBackToWords()
-            BackAction.AskToLeave -> dialog = Dialog.ConfirmBack(toWords = false)
+            BackAction.BackToWords -> backToWords()
+            BackAction.BackToReview -> requestBackToReview()
+            BackAction.AskToLeave -> dialog = Dialog.ConfirmBack(toReview = false)
             null -> Unit
         }
     }

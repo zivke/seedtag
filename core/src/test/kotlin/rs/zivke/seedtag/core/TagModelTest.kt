@@ -98,11 +98,12 @@ class TagModelTest {
 
     @Test
     fun backAction() {
-        assertEquals(BackAction.ClosePage, BackAction.of(pageOpen = true, onWordsStep = true, onPasswordStep = false, holdsSecrets = true))
-        assertEquals(BackAction.BackToLength, BackAction.of(false, onWordsStep = true, onPasswordStep = false, holdsSecrets = true))
-        assertEquals(BackAction.BackToWords, BackAction.of(false, false, onPasswordStep = true, holdsSecrets = false))
-        assertEquals(BackAction.AskToLeave, BackAction.of(false, false, false, holdsSecrets = true))
-        assertNull(BackAction.of(false, false, false, false))
+        assertEquals(BackAction.ClosePage, BackAction.of(pageOpen = true, onWordsStep = true, onReviewStep = false, onPasswordStep = false, holdsSecrets = true))
+        assertEquals(BackAction.BackToLength, BackAction.of(false, onWordsStep = true, onReviewStep = false, onPasswordStep = false, holdsSecrets = true))
+        assertEquals(BackAction.BackToWords, BackAction.of(false, false, onReviewStep = true, onPasswordStep = false, holdsSecrets = true))
+        assertEquals(BackAction.BackToReview, BackAction.of(false, false, false, onPasswordStep = true, holdsSecrets = false))
+        assertEquals(BackAction.AskToLeave, BackAction.of(false, false, false, false, holdsSecrets = true))
+        assertNull(BackAction.of(false, false, false, false, false))
     }
 
     @Test

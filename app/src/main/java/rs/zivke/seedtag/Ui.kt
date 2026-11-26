@@ -136,8 +136,8 @@ fun SeedTagApp(
     val backStaysInApp by remember(vm) { derivedStateOf { vm.backStaysInApp } } // not every keystroke
     BackHandler(enabled = backStaysInApp) { vm.back() }
     IdleWatch(vm)
-    // While words or a password are being typed, the mode switch is hidden: one task on screen.
-    val typing = vm.tab == Screen.Backup && (vm.step == BackupStep.Words || vm.step == BackupStep.Password)
+    // While words or a password are being typed or checked, the mode switch is hidden: one task on screen.
+    val typing = vm.tab == Screen.Backup && vm.step in setOf(BackupStep.Words, BackupStep.Review, BackupStep.Password)
     // Each time the last prompt or dialog closes, the screen behind it scrolls back to the top, so
     // what changed (a tag check result, an error's context) is in view.
     val prompting = vm.busy != null || vm.scanPrompt != null || vm.dialog != null

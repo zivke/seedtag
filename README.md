@@ -347,9 +347,12 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    later be made read-only and given a write password (step 5). A 24-word
    backup needs 111 bytes of NDEF space, 12 words need 91. Then choose how many words your phrase has (12, 15, 18,
    21 or 24; lengths the tag can't hold are grayed out), enter them with the in-app keypad (tap a suggestion to
-   accept each word), then set a password.
+   accept each word), check them, then set a password.
    Words already entered are hidden by default; tap **Show words** to check them. **Clear** asks before removing them
-   all. Only English BIP39 phrases are
+   all. **Check your words** then shows the whole phrase: compare every word with your written seed, in order, and
+   tap **They match** (it needs the words shown) or **Fix a word**. The checksum catches most typos, but a wrong word
+   that's another BIP39 word gets through about once in 16 times with 12 words (once in 256 with 24), and nothing
+   after this step would notice: Verify and Restore check the tag against what you entered. Only English BIP39 phrases are
    supported (not Electrum, SLIP-39 (Shamir) or Monero phrases), and only the words are stored: if your wallet also uses a **BIP39 passphrase** (a "25th word", set in
    the wallet), SeedTag doesn't store it, so back it up separately. It has nothing to do with SeedTag's own password.
    **Generate a 7-word passphrase** is recommended (≈77 bits). Write it down and label it *SeedTag password*: it's made of

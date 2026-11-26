@@ -186,8 +186,10 @@ report's tests N1–N12, A1–A3, H1).
     out for a malicious app even then (the report, "What it doesn't close").
   - The other places to hide data, around the blob and elsewhere on the tag, are under
     [Hidden data outside the blob](#hidden-data-outside-the-blob-outside-remarks-2026-11-20) below.
-- [ ] **B6: the app never has the user compare the words it encrypts.** A review step before Password, or at least
-  "Restore once and compare every word" in the Done steps and the Verify checklist.
+- [x] **B6: the app never has the user compare the words it encrypts.** A review step before Password, or at least
+  "Restore once and compare every word" in the Done steps and the Verify checklist. Done 2026-11-26: Back up's
+  step 4 *Check your words* (*They match* only with the words shown, *Fix a word*), and a Restore-and-compare item
+  in Done's next steps; device rows 7.65-7.68 passed.
 - [ ] **B7: no path to a second tag; retyping the generated passphrase scores "Weak".** "Write the same backup to
   another tag" after Done and Verify (ciphertext only); README: identical copies are fine.
 - [ ] **B8: one Base64 typo in `seedtag.py` looks like a wrong password.**

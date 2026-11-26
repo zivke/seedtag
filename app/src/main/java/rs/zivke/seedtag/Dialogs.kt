@@ -270,11 +270,11 @@ internal fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Set
         is Dialog.ConfirmBack -> AlertDialog(
             onDismissRequest = { vm.dialog = null },
             icon = { WarningIcon() },
-            title = { Text(if (d.toWords) "Clear the password?" else "Leave SeedTag?") },
+            title = { Text(if (d.toReview) "Clear the password?" else "Leave SeedTag?") },
             text = {
                 GuardDialogWindow()
                 Text(
-                    if (d.toWords) {
+                    if (d.toReview) {
                         "Going back to the words clears the password. If you've written a generated passphrase down, " +
                             "cross that copy out: the next one will be different."
                     } else {
@@ -283,8 +283,8 @@ internal fun Dialogs(vm: SeedTagViewModel, leave: () -> Unit, openSettings: (Set
                 )
             },
             confirmButton = {
-                TextButton(onClick = { vm.dialog = null; if (d.toWords) vm.backToWords() else leave() }) {
-                    DangerText(if (d.toWords) "Clear and go back" else "Leave")
+                TextButton(onClick = { vm.dialog = null; if (d.toReview) vm.backToReview() else leave() }) {
+                    DangerText(if (d.toReview) "Clear and go back" else "Leave")
                 }
             },
             dismissButton = { TextButton(onClick = { vm.dialog = null }) { Text("Stay") } },

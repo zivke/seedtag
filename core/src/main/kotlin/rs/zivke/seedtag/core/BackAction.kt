@@ -9,17 +9,26 @@ enum class BackAction {
     ClosePage,
     /** The Words step's own Back: to the word count. */
     BackToLength,
-    /** The Password step's own Back: to the words (it asks first if that clears a password). */
+    /** The Check-your-words step's own Back: to the words, all of them kept. */
     BackToWords,
+    /** The Password step's own Back: to Check your words (it asks first if that clears a password). */
+    BackToReview,
     /** Ask before leaving the app, which would wipe what's in memory. */
     AskToLeave;
 
     companion object {
         /** Null: Back leaves the app, since nothing would be lost. */
-        fun of(pageOpen: Boolean, onWordsStep: Boolean, onPasswordStep: Boolean, holdsSecrets: Boolean): BackAction? = when {
+        fun of(
+            pageOpen: Boolean,
+            onWordsStep: Boolean,
+            onReviewStep: Boolean,
+            onPasswordStep: Boolean,
+            holdsSecrets: Boolean,
+        ): BackAction? = when {
             pageOpen -> ClosePage
             onWordsStep -> BackToLength
-            onPasswordStep -> BackToWords
+            onReviewStep -> BackToWords
+            onPasswordStep -> BackToReview
             holdsSecrets -> AskToLeave
             else -> null
         }
