@@ -256,6 +256,9 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- Erase: when the tag moved away during the zero fill, tapping it again said "This isn't the tag you scanned" on
+  the very tag, since it no longer held anything. On a Type 2 tag with a fixed UID, a tap of the same tag that
+  holds no message now finishes the erase.
 - On a tablet or foldable with Android 16, which may rotate SeedTag despite its portrait lock, rotating while a
   generated passphrase was hidden for typing it back showed it again. Which password field is being typed now
   survives a rotation.

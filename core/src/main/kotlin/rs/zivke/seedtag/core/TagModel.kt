@@ -78,11 +78,20 @@ class OverwriteTarget(private val uid: ByteArray, private val message: ByteArray
      * Whether the tag with [uid] that holds [current] (its NDEF message's bytes; null if it holds
      * none, which matches a target that held none either) is this one.
      */
-    fun matches(uid: ByteArray?, current: ByteArray?): Boolean {
-        // Random UIDs (ISO 14443-3 NUIDs start with 08h) change on every tap: only the content can tell.
-        val uidStable = this.uid.isNotEmpty() && !(this.uid.size == 4 && this.uid[0] == 0x08.toByte())
-        return (current ?: ByteArray(0)).contentEquals(message) && (!uidStable || (uid ?: ByteArray(0)).contentEquals(this.uid))
-    }
+    fun matches(uid: ByteArray?, current: ByteArray?): Boolean =
+        (current ?: ByteArray(0)).contentEquals(message) && (!uidStable || sameUid(uid))
+
+    /**
+     * Whether a tag with [uid] is certainly this tag, whatever it holds now: its UID is a fixed one and the same.
+     * Erase uses it to finish an erase whose zero fill was cut short (board B20): the tag then holds no message
+     * (the NDEF length is written as 0 first), which no longer matches what it held.
+     */
+    fun isSameTag(uid: ByteArray?): Boolean = uidStable && sameUid(uid)
+
+    // Random UIDs (ISO 14443-3 NUIDs start with 08h) change on every tap: only the content can tell.
+    private val uidStable = uid.isNotEmpty() && !(uid.size == 4 && uid[0] == 0x08.toByte())
+
+    private fun sameUid(other: ByteArray?) = (other ?: ByteArray(0)).contentEquals(uid)
 }
 
 enum class TagContent {

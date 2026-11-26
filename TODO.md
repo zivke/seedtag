@@ -278,7 +278,8 @@ report's tests N1–N12, A1–A3, H1).
 
 - [ ] **B20: Erase edge cases** *(device: N5, N6)*.
   - [x] (a) Shared probe for `check()` and `inspect()`.
-  - [ ] (b) Continue an interrupted erase (no message, raw length 0, same UID).
+  - [ ] (b) Continue an interrupted erase (no message, raw length 0, same UID). On `develop` (2026-11-26):
+    `OverwriteTarget.isSameTag`, `TagIo.erase`; device row 7.92 (board N5).
   - [x] (c) Wrap the final empty write.
   - [ ] (d) Erasing an Empty-scanned tag takes two rounds on current AOSP.
   - [ ] (e) Confirmed re-format for CC E1h without an NDEF TLV.

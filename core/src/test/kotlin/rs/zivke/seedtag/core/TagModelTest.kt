@@ -33,6 +33,12 @@ class TagModelTest {
         // No message now matches a target that had none.
         assertTrue(OverwriteTarget(uid, ByteArray(0)).matches(uid, null))
         assertFalse(t.matches(uid, null))
+        // Certainly the same tag, whatever it holds (an interrupted erase): only with a fixed UID.
+        assertTrue(t.isSameTag(uid.copyOf()))
+        assertFalse(t.isSameTag(bytes(0x04, 0x11, 0x22, 0x33, 0x44, 0x55, 0x67)))
+        assertFalse(t.isSameTag(null))
+        assertFalse(random.isSameTag(bytes(0x08, 1, 2, 3)))
+        assertFalse(OverwriteTarget(ByteArray(0), msg).isSameTag(ByteArray(0)))
     }
 
     @Test

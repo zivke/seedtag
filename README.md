@@ -451,7 +451,9 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
    tag can't). For a backup you can **Check the password first**: the app decrypts what it just read (no second
    scan), shows the fingerprint and whether it's the backup from this session, so you know it's the one you mean.
    Or **Erase without checking**. Either way it asks, then you hold the same tag to the phone again: another tag,
-   or this one with different content, is refused. Erasing first overwrites the tag's whole NDEF area with zeros
+   or this one with different content, is refused. If the tag moves away while it's being overwritten, tap the
+   same tag again to finish: on a Type 2 tag with a fixed UID the app can tell it's the same tag even though what
+   it held is already partly gone (elsewhere, Cancel and scan it again). Erasing first overwrites the tag's whole NDEF area with zeros
    and reads that back, then leaves the tag empty. Writing an empty message alone wouldn't do: on NTAG and MIFARE
    Ultralight tags it only rewrites the first few bytes, and the rest of the old ciphertext stays in the chip,
    readable by any app that reads its memory directly. On Type 2 tags the app then also reads the data area page by

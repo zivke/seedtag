@@ -272,10 +272,14 @@ object TagIo {
         ndef.use {
             it.connect()
             val current = readMessage(it)
-            if (current == null && type2HoldsData(tag, it)) return TagResult.Failed(NOT_READ)
+            val rawLength = if (current == null) type2NdefLength(tag, it) else null
+            if (current == null && (rawLength ?: 0) > 0) return TagResult.Failed(NOT_READ)
             // Only the tag that was scanned, with what it held then. A tag already holding the zeros
-            // is one whose erase was interrupted: it holds nothing any more, so it may be finished.
-            if (!target.matches(tag.id, current?.toByteArray()) && !(current != null && isFiller(current))) {
+            // is one whose erase was interrupted: it holds nothing any more, so it may be finished. So is
+            // this very tag (a fixed UID) holding no message at all, raw length 0 on a Type 2 tag: the zero
+            // fill was cut short after its length was set to 0 (board B20).
+            val interrupted = current == null && rawLength == 0 && target.isSameTag(tag.id)
+            if (!target.matches(tag.id, current?.toByteArray()) && !(current != null && isFiller(current)) && !interrupted) {
                 return TagResult.Failed(
                     "This isn't the tag you scanned, or what it holds has changed since. Nothing was changed. Cancel and scan it again.",
                 )
@@ -292,8 +296,9 @@ object TagIo {
                     AfterWrite.Written -> Unit
                     AfterWrite.Unchanged -> return refused(tag, "the zeros")
                     AfterWrite.Changed, AfterWrite.Unknown -> return TagResult.Failed(
-                        "The tag moved away while it was being erased, so part of what it held may already be gone. Nothing " +
-                            "here can tell how much: Cancel, scan the tag again and erase it again.",
+                        "The tag moved away while it was being erased, so part of what it held may already be gone. Hold " +
+                            "the same tag still and tap again to finish. If the app then says it isn't the tag you " +
+                            "scanned, Cancel, scan the tag again and erase it again.",
                         changedTag = true,
                     )
                 }
@@ -1051,12 +1056,15 @@ object TagIo {
      * and TLVs too odd to tell, count as empty, as before. [ndef] is closed for the raw read (one
      * technology at a time) and connected again afterwards.
      */
-    private fun type2HoldsData(tag: Tag, ndef: Ndef): Boolean {
-        val raw = Type2Raw.of(tag) ?: return false
+    private fun type2HoldsData(tag: Tag, ndef: Ndef): Boolean = (type2NdefLength(tag, ndef) ?: 0) > 0
+
+    /** The NDEF TLV's length in a Type 2 tag's raw data area; null if it isn't one or the TLVs can't be read. */
+    private fun type2NdefLength(tag: Tag, ndef: Ndef): Int? {
+        val raw = Type2Raw.of(tag) ?: return null
         ndef.close()
         try {
             val data = raw.use { it.connect(); it.read(4) + it.read(8) } // pages 4 to 11
-            return (Type2Tlv.ndefLength(data) ?: 0) > 0
+            return Type2Tlv.ndefLength(data)
         } finally {
             ndef.connect()
         }
