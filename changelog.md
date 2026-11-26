@@ -243,6 +243,11 @@ All notable user-visible changes to SeedTag. The format follows
   the pager and runs from any folder of the clone.
 
 ### Fixed
+- On a tablet or foldable with Android 16, which may rotate SeedTag despite its portrait lock, rotating while a
+  generated passphrase was hidden for typing it back showed it again. Which password field is being typed now
+  survives a rotation.
+- While SeedTag is paused but still partly visible, under another app's window, its screen is hidden behind
+  *SeedTag is in the background* if it holds words or a password.
 - Dialogs (*Overwrite?*, *Erase this tag?*, *Make tag read-only?* and the rest) now hide other apps' overlays and
   filter obscured taps from their very first frame, on the dialog's own view as well as its root; before, it was
   done just after the dialog appeared.

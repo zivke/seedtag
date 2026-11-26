@@ -123,6 +123,7 @@ fun SeedTagApp(
     debugging: Boolean = false,
     accessibilityApps: List<String> = emptyList(),
     accessibilityOn: Boolean = false,
+    paused: Boolean = false,
     hideAccessibilityBanner: () -> Unit = {},
     leave: () -> Unit = {},
     close: () -> Unit = {},
@@ -148,7 +149,9 @@ fun SeedTagApp(
     // is watching the screen, which is kept on), the two Back questions, the Settings, tab-switch and
     // clear-words questions, the progress dialog and "Ready to scan" (the phone is held to a tag, often in view of
     // others). Blur needs Android 12; before that, it's covered.
-    val veiled = vm.busy != null || vm.scanPrompt != null ||
+    // And while SeedTag is paused but may still be seen, with words or a password in it (board B25).
+    val pausedVeil = paused && vm.holdsSecrets
+    val veiled = pausedVeil || vm.busy != null || vm.scanPrompt != null ||
         vm.dialog.let {
             it == Dialog.StillThere || it is Dialog.ConfirmBack || it is Dialog.ConfirmSettings || it is Dialog.ConfirmTab ||
                 it is Dialog.ConfirmClearWords
@@ -200,6 +203,16 @@ fun SeedTagApp(
             }
         }
         if (veiled && !blurs) Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background))
+    }
+    if (pausedVeil) {
+        Box(Modifier.fillMaxSize().padding(Gutter), contentAlignment = Alignment.Center) {
+            Notice(
+                Tone.Info,
+                "SeedTag is in the background",
+                "Another window is in front of SeedTag, so its screen is hidden and it doesn't read tags. Go back to " +
+                    "SeedTag to continue. If nothing is touched, what you entered is cleared after a few minutes.",
+            )
+        }
     }
     Dialogs(vm, leave, openSettings, close)
 }

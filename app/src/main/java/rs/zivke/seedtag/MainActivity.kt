@@ -70,6 +70,12 @@ class MainActivity : ComponentActivity() {
      */
     private val accessibilityOn = mutableStateOf(false)
 
+    /**
+     * Paused but maybe still visible, e.g. under another app's translucent window (board B25): what's on screen is
+     * veiled. Not stopped, so nothing is wiped yet (the idle timeout still runs), and reader mode is off.
+     */
+    private val paused = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // No screenshots, no screen recording, blank thumbnail in Recents. Set before anything else
         // runs, so the window is never shown or captured without it.
@@ -96,6 +102,7 @@ class MainActivity : ComponentActivity() {
                     openSettings = ::openSettings,
                     accessibilityApps = if (apps == accessibilityHidden.value) emptyList() else apps,
                     accessibilityOn = accessibilityOn.value,
+                    paused = paused.value,
                     hideAccessibilityBanner = { accessibilityHidden.value = apps },
                     leave = { finish() },
                     close = ::closeSeedTag,
@@ -127,6 +134,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        paused.value = false
         refreshRadios()
         refreshAccessibility()
         watchAccessibility(true)
@@ -272,6 +280,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onPause() {
+        paused.value = true
         watchAccessibility(false)
         adapter?.disableReaderMode(this)
         super.onPause()

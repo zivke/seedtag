@@ -297,7 +297,9 @@ report's tests N1–N12, A1–A3, H1).
   (preview), secure displays could not be created with shell permissions anymore"); the notice adds it only there.
   Device row 7.41.
 - [ ] **B25: Android 16 ignores the portrait lock on large screens** *(device: A2)*. `field` into the view model;
-  veil on `onPause` without focus.
+  veil on `onPause` without focus. On `develop` (2026-11-26): `vm.passwordField` (reset by `generatedPassphrase`'s
+  setter, not by effects that a recreated screen would rerun); *SeedTag is in the background* while paused with
+  secrets; device rows 7.90-7.91 (and 1.35 on a large screen).
 - [ ] **B26: seed words may be clipped at large font sizes** *(device: H1)*. Two columns when needed. On `develop`
   (2026-11-26): `WordGrid` measures an 8-letter word at the current font and puts 3, 2 or 1 to a row; device
   row 7.87.

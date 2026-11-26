@@ -464,7 +464,10 @@ When a screen goes on below what's visible, for example above the word keypad or
 edge fades out and a small round **↓** button scrolls further; the top edge fades when there's more above.
 
 Leaving the app (home button, Recents, screen off) clears everything typed or decrypted from the app; nothing is
-ever saved on the phone. Some copies stay in the phone's memory until Android ends SeedTag's process, which can take
+ever saved on the phone. When another app's window only partly covers SeedTag (an assistant, say), SeedTag is
+paused rather than left: while it holds words or a password, its screen is hidden behind *SeedTag is in the
+background*, it doesn't read tags (a tag tapped then goes to the phone's other apps), and the idle timeout still
+clears everything after four minutes. Some copies stay in the phone's memory until Android ends SeedTag's process, which can take
 days ([Security notes](#security-notes), *What's wiped from memory*). **Close SeedTag** ends it: the ✕ at the top
 right, on every screen, and a button at the end of Back up (*Backup written*), Verify and Restore. It asks first
 (**Close SeedTag** / **Stay**), saying what goes with it, such as the fingerprint of the backup you just wrote, so
