@@ -7,6 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- A known-answer self-test before the first backup of each run: a fixed test backup is sealed and must come out
+  exactly as `seedtag.py` makes it, then open again. A fault in this phone's Argon2id or AES that's the same both
+  ways would pass the decrypt-before-write check and give a tag that opens nowhere else; now SeedTag refuses to
+  write and says not to make backups on this phone. The first backup takes one more Argon2id run.
 - A **check code** for each backup (`1a2b-3c4d`), shown on Done, under a Verify result and in the Erase tab's scan
   (no password needed there), and printed by `seedtag.py decrypt` and `verify` before they ask for the password,
   and by `encrypt` and `check`. If the text was typed in with a mistake, the code differs, so a typo no longer

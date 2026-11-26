@@ -621,8 +621,10 @@ class SeedTagViewModel : ViewModel() {
         val snapshot = words.toList()
         val pw = password.copy()
         runKdf(
-            "Encrypting and checking… (Argon2id runs twice; this takes a few seconds)", pw,
+            "Encrypting and checking… (Argon2id runs two or three times; this takes a few seconds)", pw,
             work = {
+                // Once per run, before the first seal: a known answer for Argon2id and AES-GCM (board B21).
+                if (!SeedBox.selfTest()) throw SeedTagException.SelfTestFailed()
                 val entropy = Bip39.wordsToEntropy(snapshot)
                 try {
                     val text = SeedBox.toBase64(SeedBox.seal(entropy, pw))

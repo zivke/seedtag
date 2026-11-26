@@ -340,6 +340,7 @@ on hidden data (H…, `TODO.md`). Each change adds its rows here in the same com
 | 7.83 | B7: a copy cut short while its old data is cleared (pull the tag away during *Clearing the old data*), if it can be timed | *Copy written* adds "What the copy held before may still be in its memory…", with **Clear old data**: hold the copy still, done. Done's own old-data notice doesn't change. | ⬜ |
 | 7.84 | B8: a Back up (throwaway backup), then Verify it, then scan it on the Erase tab (Cancel) | Done: *Check code* `xxxx-xxxx` under the fingerprint, and the text "Neither is secret… The check code is the tag's text's: write it on the tag's label…". Verify and the Erase scan show the same *Check code* (Erase without a password). | ⬜ |
 | 7.85 | B8: a copy (B7) and the tag it was copied from | The same check code on both. | ⬜ |
+| 7.86 | B21: the first Back up after starting SeedTag, then a second one without closing it | Progress "Encrypting and checking… (Argon2id runs two or three times…)"; the first takes about one Argon2id run longer, the second doesn't. Both write normally (the self-test passes; a failure would say "This phone's encryption doesn't give the known answer to SeedTag's self-test…"). | ⬜ |
 
 ## Short regression check for every release
 

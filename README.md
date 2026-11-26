@@ -9,7 +9,9 @@ plus a single-file Python tool to recover it on any computer. Source: <https://g
   content capture. No library starts by itself: the app declares only its own screen.
 - **Other apps' overlays are hidden** (Android 12+), and taps that come through another app's window are ignored.
 - **No system keyboard.** Seed words and passwords are typed on the app's own keyboards, so no keyboard app ever sees them.
-- The encrypted backup is decrypted once before it's written, and every write is read back and compared before it's
+- Before the first backup of a run, SeedTag checks its Argon2id and AES-GCM against a known answer (a fixed test
+  backup, which must come out exactly as `seedtag.py` makes it), and refuses to write if they don't match. The
+  encrypted backup is decrypted once before it's written, and every write is read back and compared before it's
   reported as success.
 
 > **Beta.** SeedTag is still in development. It has been tested only with NXP NTAG21x tags (NTAG213 and NTAG215), on a few phones;

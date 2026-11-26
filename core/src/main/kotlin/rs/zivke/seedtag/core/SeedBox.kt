@@ -52,6 +52,45 @@ object SeedBox {
         return seal(entropy, password, salt, nonce)
     }
 
+    /**
+     * Board B21: a known-answer test of Argon2id (at the v1 parameters) and AES-GCM together, before the first seal.
+     * The decrypt-before-write check can't catch a fault that's the same both ways on this phone (in Bouncy Castle
+     * or the platform's AES): the tag would open here and nowhere else. Sealing a fixed vector must give exactly
+     * the text seedtag.py gives for it (`seedtag-v1-vectors.tsv`, second row, a test password and seed), and
+     * opening that text must give the entropy back. One Argon2id run more, once per process ([selfTested]).
+     */
+    fun selfTest(): Boolean {
+        if (selfTested) return true
+        val password = KAT_PASSWORD.toCharArray()
+        val entropy = ByteArray(16) { 0x7f }
+        try {
+            val sealed = seal(entropy, password, hexBytes(KAT_SALT), hexBytes(KAT_NONCE))
+            if (!toBase64(sealed).contentEquals(KAT_TEXT)) return false
+            val back = open(sealed, password)
+            try {
+                if (!back.contentEquals(entropy)) return false
+            } finally {
+                back.fill(0)
+            }
+        } catch (e: SeedTagException) {
+            return false
+        } finally {
+            password.fill(' ')
+        }
+        selfTested = true
+        return true
+    }
+
+    @Volatile private var selfTested = false
+
+    // The known answer: test data, not a secret ("hunter2", entropy 7f ×16), from seedtag-v1-vectors.tsv.
+    private const val KAT_PASSWORD = "hunter2"
+    private const val KAT_SALT = "dc90cf07de907ccc64636ceddb38e552"
+    private const val KAT_NONCE = "0a78009591722cc84825ca95"
+    private const val KAT_TEXT = "AdyQzwfekHzMZGNs7ds45VIKeACVkXIsyEglypWU/2ob4X/ACbRlegHDqJFXnOt6zvIIRwDeEFENs4MR5w=="
+
+    private fun hexBytes(s: String) = ByteArray(s.length / 2) { s.substring(2 * it, 2 * it + 2).toInt(16).toByte() }
+
     /** Deterministic variant – tests only. Never reuse a salt/nonce pair for real data. */
     fun seal(entropy: ByteArray, password: CharArray, salt: ByteArray, nonce: ByteArray): ByteArray {
         require(entropy.size in Bip39.validEntropyLengths) { "bad entropy length ${entropy.size}" }

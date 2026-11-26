@@ -169,4 +169,18 @@ class SeedBoxTest {
         }
         assertEquals(null, SeedBox.checkCodeOf("not base64 at all!"))
     }
+
+    @Test
+    fun selfTestUsesAVectorRow() {
+        // The constants in SeedBox are the second vector row: if a row changes, the self-test must too.
+        val row = javaClass.getResource("/seedtag-v1-vectors.tsv")!!.readText().lines()[1].split("\t")
+        assertEquals("hunter2", String(hex(row[0]), Charsets.UTF_8))
+        assertEquals("7f".repeat(16), row[1])
+        val f = { name: String -> SeedBox::class.java.getDeclaredField(name).apply { isAccessible = true }.get(null) as String }
+        assertEquals(row[2], f("KAT_SALT"))
+        assertEquals(row[3], f("KAT_NONCE"))
+        assertEquals(row[4], f("KAT_TEXT"))
+        assertTrue(SeedBox.selfTest())
+        assertTrue(SeedBox.selfTest()) // once per process: the second call is free
+    }
 }
