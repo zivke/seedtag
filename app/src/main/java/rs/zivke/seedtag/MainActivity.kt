@@ -64,6 +64,12 @@ class MainActivity : ComponentActivity() {
     /** The list the user tapped Hide on; the banner comes back if it changes. */
     private val accessibilityHidden = mutableStateOf<List<String>>(emptyList())
 
+    /**
+     * Any accessibility service is on, preinstalled ones too (TalkBack, Select to Speak), or touch exploration
+     * (board B23): they may speak what's on screen, words included, through a text-to-speech app.
+     */
+    private val accessibilityOn = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // No screenshots, no screen recording, blank thumbnail in Recents. Set before anything else
         // runs, so the window is never shown or captured without it.
@@ -89,6 +95,7 @@ class MainActivity : ComponentActivity() {
                     overlayDetected = overlayDetected.value,
                     openSettings = ::openSettings,
                     accessibilityApps = if (apps == accessibilityHidden.value) emptyList() else apps,
+                    accessibilityOn = accessibilityOn.value,
                     hideAccessibilityBanner = { accessibilityHidden.value = apps },
                     leave = { finish() },
                     close = ::closeSeedTag,
@@ -121,7 +128,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         refreshRadios()
-        accessibilityApps.value = enabledAccessibilityApps()
+        refreshAccessibility()
         watchAccessibility(true)
         enableReader()
     }
@@ -181,8 +188,19 @@ class MainActivity : ComponentActivity() {
             .sorted()
     }
 
-    private val accessibilityChanged = AccessibilityManager.AccessibilityStateChangeListener {
+    private fun refreshAccessibility() {
         accessibilityApps.value = enabledAccessibilityApps()
+        val am = getSystemService(AccessibilityManager::class.java)
+        accessibilityOn.value = am != null && (
+            am.isTouchExplorationEnabled ||
+                am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK).isNotEmpty()
+            )
+    }
+
+    private val touchExplorationChanged = AccessibilityManager.TouchExplorationStateChangeListener { refreshAccessibility() }
+
+    private val accessibilityChanged = AccessibilityManager.AccessibilityStateChangeListener {
+        refreshAccessibility()
     }
     private var servicesChanged: Any? = null // AccessibilityServicesStateChangeListener, API 33+
 
@@ -195,15 +213,15 @@ class MainActivity : ComponentActivity() {
         val am = getSystemService(AccessibilityManager::class.java) ?: return
         if (on) {
             am.addAccessibilityStateChangeListener(accessibilityChanged)
+            am.addTouchExplorationStateChangeListener(touchExplorationChanged)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                val l = AccessibilityManager.AccessibilityServicesStateChangeListener {
-                    accessibilityApps.value = enabledAccessibilityApps()
-                }
+                val l = AccessibilityManager.AccessibilityServicesStateChangeListener { refreshAccessibility() }
                 am.addAccessibilityServicesStateChangeListener(mainExecutor, l)
                 servicesChanged = l
             }
         } else {
             am.removeAccessibilityStateChangeListener(accessibilityChanged)
+            am.removeTouchExplorationStateChangeListener(touchExplorationChanged)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 (servicesChanged as? AccessibilityManager.AccessibilityServicesStateChangeListener)
                     ?.let(am::removeAccessibilityServicesStateChangeListener)

@@ -774,6 +774,10 @@ SeedTag can only protect you from what happens inside its own window, and only f
   Google Play can claim to be one. On **Android 8–13 it can't hide anything.** On every version, SeedTag shows a red
   banner naming the installed apps that have accessibility access (preinstalled system services aren't listed).
   Open *Settings › Accessibility* and turn off any you don't recognize or don't need before entering your seed.
+  The phone's own screen reader or Select to Speak, when on, can read the words aloud and hands what it reads to
+  a text-to-speech app, which may be another company's: while words are on screen (Back up's words and their
+  check, Restore), SeedTag says so in a neutral notice. And an accessibility service's own overlay isn't hidden
+  by overlay hiding, nor does it make SeedTag ignore taps.
 - **Fake SeedTag apps.** Nothing inside SeedTag can protect you from a different app that looks like it. Install
   only an APK you built yourself or got from a source you trust, and check its signing certificate with
   `apksigner verify --print-certs seedtag.apk`.

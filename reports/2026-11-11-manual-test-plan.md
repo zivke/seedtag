@@ -342,6 +342,7 @@ on hidden data (H…, `TODO.md`). Each change adds its rows here in the same com
 | 7.85 | B8: a copy (B7) and the tag it was copied from | The same check code on both. | ⬜ |
 | 7.86 | B21: the first Back up after starting SeedTag, then a second one without closing it | Progress "Encrypting and checking… (Argon2id runs two or three times…)"; the first takes about one Argon2id run longer, the second doesn't. Both write normally (the self-test passes; a failure would say "This phone's encryption doesn't give the known answer to SeedTag's self-test…"). | ⬜ |
 | 7.87 | B26 (board H1): the largest font size and display size in the phone's settings; Back up a throwaway 24-word phrase with 8-letter words (e.g. `abstract`, `although`, `category`), **Show words**, then on *Check your words*; Restore it | No word is clipped anywhere: the grid has two words to a row (or one), cells taller to fit. Back at the normal font size: three to a row, as before. | ⬜ |
+| 7.88 | B23: turn on Select to Speak (or TalkBack) in Settings › Accessibility; open Back up's words step, *Check your words*, Restore, then Verify and Erase; turn it off again | On the words step, *Check your words* and Restore: *Accessibility is on* (blue): "A screen reader or another accessibility feature of this phone is on (TalkBack or Select to Speak, say)…", **Open settings**. Not on Verify or Erase, and gone once it's off again. With an installed app's service on instead, only the red banner, as before. | ⬜ |
 
 ## Short regression check for every release
 

@@ -290,7 +290,8 @@ report's tests N1–N12, A1–A3, H1).
   vector files, README and CLAUDE.md link to it; `kindOf`'s size limits tested. The board's "45-200 bytes" is
   wrong: 45 is the overhead, the smallest blob is 61.
 - [ ] **B23: system screen readers and accessibility overlays are outside every warning.** Neutral notice when any
-  service or touch exploration is on; README line on accessibility overlays.
+  service or touch exploration is on; README line on accessibility overlays. On `develop` (2026-11-26):
+  *Accessibility is on* on Words, Check your words and Restore; README (Accessibility services); device row 7.88.
 - [x] **B24: adb can probably mirror secure windows on Android ≤ 11.** Say so in the debugging notice and README. Done: scrcpy's
   `ScreenCapture.createDisplay()` creates a *secure* display with shell permissions below API 31 ("Since Android 12
   (preview), secure displays could not be created with shell permissions anymore"); the notice adds it only there.

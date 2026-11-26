@@ -7,6 +7,9 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- A neutral *Accessibility is on* notice while seed words are on screen (Back up's words and *Check your words*,
+  Restore) when the phone's own screen reader or another preinstalled accessibility feature is on: it may read
+  the words aloud through a text-to-speech app. The red banner still names installed apps with that access.
 - A known-answer self-test before the first backup of each run: a fixed test backup is sealed and must come out
   exactly as `seedtag.py` makes it, then open again. A fault in this phone's Argon2id or AES that's the same both
   ways would pass the decrypt-before-write check and give a tag that opens nowhere else; now SeedTag refuses to

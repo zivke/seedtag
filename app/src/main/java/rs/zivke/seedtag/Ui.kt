@@ -122,6 +122,7 @@ fun SeedTagApp(
     openSettings: (SettingsPage) -> Unit,
     debugging: Boolean = false,
     accessibilityApps: List<String> = emptyList(),
+    accessibilityOn: Boolean = false,
     hideAccessibilityBanner: () -> Unit = {},
     leave: () -> Unit = {},
     close: () -> Unit = {},
@@ -175,9 +176,15 @@ fun SeedTagApp(
                 Column(Modifier.padding(pad).fillMaxSize()) {
                     if (page == null && !typing) ModeSwitch(vm)
                     // The NFC spot page says it itself, as its first step.
+                    // Where the words are on screen: entered, checked, or restored (board B23).
+                    val wordsOnScreen = page == null && (
+                        vm.tab == Screen.Restore ||
+                            (vm.tab == Screen.Backup && (vm.step == BackupStep.Words || vm.step == BackupStep.Review))
+                        )
                     Banners(
                         if (page == Page.Antenna) NfcState.Ready else nfcState, openNfcSettings, overlayDetected, accessibilityApps,
                         { settings(SettingsPage.Accessibility) }, hideAccessibilityBanner,
+                        speaking = accessibilityOn && accessibilityApps.isEmpty() && wordsOnScreen,
                     )
                     when (page) {
                         Page.Antenna -> AntennaPage(vm, nfcState, openNfcSettings)
@@ -320,8 +327,9 @@ private fun Banners(
     accessibilityApps: List<String>,
     openAccessibilitySettings: () -> Unit,
     hideAccessibilityBanner: () -> Unit,
+    speaking: Boolean = false,
 ) {
-    val any = nfcState != NfcState.Ready || overlayDetected || accessibilityApps.isNotEmpty()
+    val any = nfcState != NfcState.Ready || overlayDetected || accessibilityApps.isNotEmpty() || speaking
     if (!any) return
     Column(Modifier.padding(horizontal = Gutter, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (nfcState != NfcState.Ready) {
@@ -342,6 +350,18 @@ private fun Banners(
             )
         }
         if (accessibilityApps.isNotEmpty()) AccessibilityBanner(accessibilityApps, openAccessibilitySettings, hideAccessibilityBanner)
+        // Preinstalled services the banner above leaves out: neutral, since they're the phone's own (board B23).
+        if (speaking) {
+            Notice(
+                Tone.Info,
+                "Accessibility is on",
+                "A screen reader or another accessibility feature of this phone is on (TalkBack or Select to Speak, " +
+                    "say). It may read the words aloud, and passes what it reads to a text-to-speech app. If you don't " +
+                    "need it now, turn it off before you enter or restore a seed.",
+            ) {
+                Link("Open settings", onClick = openAccessibilitySettings)
+            }
+        }
     }
 }
 
