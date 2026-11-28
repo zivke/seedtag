@@ -207,7 +207,8 @@ report's tests N1–N12, A1–A3, H1).
     `--builtin`; the `-I -S` hint in the failure message; tests run with `-W error` (`make test`, CI).
   - [ ] CI on the newest Python (needs `actions/setup-python`, pinned by SHA; with B37). Partly, 2026-11-26:
     `test.yml` uses the newest Python in the runner's tool cache, with no new action. A pre-release Python (or a
-    newer one than the runner has) still needs `actions/setup-python`: a new dependency, so ask first.
+    newer one than the runner has) still needs `actions/setup-python`: a new dependency, so ask first. Owner,
+    2026-11-28: keep the tool cache's Python, no `setup-python` for now.
 - [ ] **B11: the APK-to-tag binding is one person reading a run header.** Build-provenance attestation checked by
   `sign-release.sh`, or a host rebuild from a throwaway clone for `--expect`.
 - [x] **B12: raw empty check and format guard skip non-NXP Type 2 tags** *(device: N4)*. Raw reads through `NfcA`.
@@ -369,7 +370,7 @@ report's tests N1–N12, A1–A3, H1).
   password keyboard runs into the gutters (`intoGutter`).
 - [ ] **B46: small screens, contrast, English-only strings.** On `develop` (2026-11-26): no tab row during Erase's
   password check; light "fair" `9A5C00` (5.1:1); device row 7.93. Still open: the preflight list's small scroll
-  slot, and strings into resources (only before a translation).
+  slot, and strings into resources: postponed by the owner (2026-11-28) until a translation is planned.
 - [x] **B47: test gaps** (wordlist hash, `NdefText` paths, long and non-BMP password vectors, a differential test).
   - [x] The wordlist's SHA-256 pinned in both suites; `NdefText.decodePayload`'s UTF-16 (both byte orders) and
     malformed paths; vectors with a 128-character password and one outside the BMP that NFKD changes, checked
