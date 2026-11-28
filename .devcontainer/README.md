@@ -74,7 +74,16 @@ how to look up the digest. The two SDK files the compiler reads,
 `sdkmanager` installs them: if Google publishes a new revision of the
 platform, the image build fails until the checksum is updated (run
 `sha256sum` on the new file and compare it with a second, independent
-install, such as the CI build's).
+install, such as the CI build's). So are `aapt2` and `apksigner` (the script and
+`lib/apksigner.jar`), which `tools/check-apk.sh` checks every APK with; the image sets
+`BUILD_TOOLS` so that it uses those, whatever else is in the SDK. AGP can't add SDK
+packages (`android.builder.sdkDownload=false` in `gradle.properties`): one it lacks fails
+the build.
+
+The apt packages (the JDK, Python and its libraries) aren't pinned: the digest fixes only
+what's in the base image, and `apt-get` installs Ubuntu's current versions when the image
+is built. They're signed by Ubuntu; to fix them to a date, the Dockerfile's comment shows
+how.
 
 There are no devcontainer features: the GitHub CLI isn't in the image, since
 it's only used on the host to publish a release.
@@ -174,5 +183,9 @@ services. That's fine for a test phone, and the reason a phone that holds real s
   The app has no network access; the build does.
 - **Kotlin extension shows red everywhere**: it needs one successful Gradle sync.
   Run `make test` once, then reload the window.
-- **Different SDK package versions**: change the `ARG`s in the Dockerfile and
-  rebuild, or install extra packages in a running container with `sdkmanager`.
+- **Different SDK package versions**: change the `ARG`s in the Dockerfile, with the new
+  checksums, and rebuild. A package installed by hand with `sdkmanager` in a running
+  container isn't hashed, and `check-apk.sh` keeps using the `BUILD_TOOLS` version.
+- **"Failed to find Build Tools revision …" (or another SDK package) from AGP**: it wants a package the image
+  doesn't have, and isn't allowed to download it. Add it to the Dockerfile's `sdkmanager`
+  line (a new AGP's default build-tools, for example) and rebuild.

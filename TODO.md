@@ -342,7 +342,12 @@ report's tests N1–N12, A1–A3, H1).
   (2026-11-26): after a failed write the tag is read again (`AfterWrite`): unchanged gives "didn't take", twice in a
   row "refuses writes"; a write that went through carries on. A bad read-back is read again before "faulty". Device
   rows 7.77-7.79.
-- [ ] **B33: SDK, JDK and apt not pinned; AGP may download SDK packages.**
+- [ ] **B33: SDK, JDK and apt not pinned; AGP may download SDK packages.** Owner, 2026-11-28: don't pin apt
+  package versions. On `develop`: `android.builder.sdkDownload=false` (a missing package fails the build: checked,
+  "Failed to find Build Tools revision 37.0.0", nothing downloaded); the Dockerfile hashes `aapt2`, `apksigner` and
+  its jar too and sets `BUILD_TOOLS`, so `check-apk.sh` uses those; apt stays unpinned, said in the Dockerfile and
+  `.devcontainer/README.md` (with the snapshot option). The hashes are this container's SDK, which sdkmanager checked;
+  the next image build (CI, on push) confirms them (tools row 5.25). Not done, as overkill: hashing the whole SDK, a read-only SDK.
 - [x] **B34: RELEASING.md:129-133 stale** ("0.4.3"; add the Dockerfile and the metadata `<configuration>` block).
 - [ ] **B35: one Gradle cache volume shared by every project's container** (`gradle-cache-${devcontainerId}`). On
   `develop` (2026-11-26): `devcontainer.json`, `.devcontainer/README.md` (integrity, not secrecy); takes effect at the

@@ -148,7 +148,8 @@ them, so check them yourself:
   release tag and for the release commit. Today it holds `verify-metadata` true, `verify-signatures` false, and
   trusts only `-javadoc` and `-sources` jars, which are never built into the APK.
 - **`.devcontainer/Dockerfile`**: a changed base image digest (`FROM …@sha256:`), or a changed
-  `CMDLINE_TOOLS_SHA256`, `ANDROID_JAR_SHA256` or `LAMBDA_STUBS_SHA256`. The commit that changed one should say
+  `CMDLINE_TOOLS_SHA256`, `ANDROID_JAR_SHA256`, `LAMBDA_STUBS_SHA256`, `AAPT2_SHA256`, `APKSIGNER_SHA256` or
+  `APKSIGNER_JAR_SHA256`. The commit that changed one should say
   where the new value came from; check that it does. A new tools checksum should come with a new
   `CMDLINE_TOOLS_BUILD`, `ANDROID_PLATFORM` or `ANDROID_BUILD_TOOLS`: a checksum that changed on its own is a red
   flag.
