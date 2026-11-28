@@ -42,6 +42,11 @@ android {
 
     buildFeatures { compose = true }
 
+    // AGP 9.5 registers a Compose Preview task for every Compose app, and creating it fails unless the
+    // unit tests include Android resources. Only an IDE creates it (the VS Code Gradle extension lists every
+    // task); make never does. The app has no unit tests and the APK doesn't change.
+    testOptions { unitTests { isIncludeAndroidResources = true } }
+
     packaging {
         resources { excludes += setOf("META-INF/versions/9/OSGI-INF/MANIFEST.MF") }
         // Board B38: ship the libraries' .so files exactly as they come. With an NDK installed, AGP would strip
