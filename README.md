@@ -339,6 +339,31 @@ The safest way to use SeedTag, from start to finish:
    its memory. If the phone is ever going to go online or be given away, factory-reset it first. Every five years or
    so, use it to write a fresh set of tags.
 
+### What the tag is for: keeping, losing, inheriting
+
+A tag holds your seed, encrypted. **The tag and its password are two halves:** either alone gives nothing, both
+together are the seed, for you or for whoever has them. A tag isn't a replacement for your seed's own copy on paper
+or metal; it's a second way to get the seed back, one that a thief can't use without the password.
+
+| If this is lost or destroyed | What happens | What to do |
+|---|---|---|
+| One tag | The other tags, or the seed's copy, still work. Nobody can open it without the password. | Write a new tag from another one (Verify, *Write a copy to another tag*). |
+| One tag, stolen | The thief can try passwords offline, without limit. A generated 7-word passphrase is out of reach; a password of your own may not be. | With a generated passphrase, make a new tag. With your own password, move the funds to a new seed. |
+| The written password, every copy | **Every tag is useless at once**, since they share the password. | Keep **two copies of the password in two places, never with a tag.** If both are gone, make new tags with a new password from the seed's copy. |
+| The written password, seen or stolen | With any tag, that's the seed. | Move the funds to a new seed. |
+| The seed's paper or metal copy | The tags and the password still give the seed back. If someone found it, they have the seed. | Found by someone: move the funds. Lost: write a new copy from Restore. |
+| A whole place (fire, flood, burglary) | Whatever was kept there. | Spread the pieces so no place holds a tag and the password, and losing any one place loses nothing: say, two tags and two copies of the password, each somewhere else. |
+| You | Your heirs need a tag, the password, the app or `seedtag.py`, and to know what all this is. | Fill in the [heir sheet](HEIR-SHEET.md) (below). |
+
+**For your heirs:** an unlabelled piece of plastic means nothing to anyone. Print [HEIR-SHEET.md](HEIR-SHEET.md) and
+fill it in by hand: what the tag is, where the tags and the password copies are, the fingerprint and check codes,
+the wallet and its passphrase (a "25th word", if any, which isn't on the tag), the `seedtag.py` SHA-256 and the exact
+commands. It holds no secret (never write the password or the words on it), but it says where the pieces are, so
+keep it where your heirs will find it and strangers won't: with your will, or with someone you trust.
+
+**What it doesn't do:** nothing here helps against someone who forces you to open the tag. SeedTag has no decoy
+or duress password.
+
 ## Using it
 
 **Read every instruction on screen carefully before you actually do anything**, including the *Learn more*

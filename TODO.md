@@ -199,7 +199,8 @@ report's tests N1–N12, A1–A3, H1).
   - [ ] A non-secret check value of the text in the app (Done, Verify, Erase scan) and the tool, printed before
     the password is asked for. On `develop` (2026-11-26): the check code (`SeedBox.checkCode`, `check_code`,
     FORMAT.md section 3, `check-codes.tsv`); device rows 7.84-7.85, tools 5.20.
-- [ ] **B9: custody model and heir instructions not written down.** README "What the tag is for" with a loss
+- [ ] **B9: custody model and heir instructions not written down.** On `develop` (2026-11-28): README *What the tag
+  is for* (loss table, coercion) and `HEIR-SHEET.md`; for the owner to review the wording (tools row 5.23). README "What the tag is for" with a loss
   table; two password copies, never with a tag; a printable heir sheet.
 - [ ] **B10: `seedtag.py` long-term.**
   - [x] Drop `from __future__ import annotations`; catch any backend exception and fall back to the built-in code;

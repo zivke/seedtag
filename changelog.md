@@ -7,6 +7,10 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- README, *What the tag is for*: what losing a tag, the password, the seed's copy or a whole place means and what
+  to do (two copies of the password, never with a tag), and that nothing helps against coercion. A printable
+  `HEIR-SHEET.md` to fill in by hand: what the tag is, where the pieces are, the fingerprint and check codes, the
+  wallet and its passphrase, and the exact recovery steps, with no secret on it.
 - *About › Open-source licences*: what SeedTag includes by others (AndroidX, Compose, Kotlin, Material Symbols
   icons under Apache-2.0; Bouncy Castle and the BIP39 wordlist under MIT), and the full text of each licence and of
   the GPL, as those licences ask. In the repository: `LICENSES/` and `THIRD-PARTY.md`.
