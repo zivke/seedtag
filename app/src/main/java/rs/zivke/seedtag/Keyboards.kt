@@ -35,6 +35,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -52,7 +57,7 @@ internal fun Keypad(onLetter: (Char) -> Unit, onBackspace: () -> Unit, onBackspa
                 if (i == 2) Spacer(Modifier.weight(1.5f))
                 r.forEach { c -> Key(c.toString(), Modifier.weight(1f)) { onLetter(c) } }
                 if (i == 1) Spacer(Modifier.weight(0.5f))
-                if (i == 2) Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, onHold = onBackspaceHeld, onClick = onBackspace)
+                if (i == 2) Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, spoken = "Delete", onHold = onBackspaceHeld, onClick = onBackspace)
             }
         }
     }
@@ -68,12 +73,17 @@ private const val KEY_REPEAT_MS = 60L
  * One keyboard key. A tap runs [onClick] on release. With [onHold], holding the key runs it after
  * [KEY_HOLD_MS] and then every [KEY_REPEAT_MS] for as long as it returns true; a release after that
  * isn't also a tap.
+ *
+ * A screen reader calls it a button and reads [spoken] (a function key's name, instead of its
+ * symbol) or else the label, the character the key types; [state] is read after it (Shift).
  */
 @Composable
 private fun Key(
     label: String,
     modifier: Modifier,
     kind: KeyKind = KeyKind.Char,
+    spoken: String? = null,
+    state: String? = null,
     onHold: (() -> Boolean)? = null,
     onClick: () -> Unit,
 ) {
@@ -106,7 +116,11 @@ private fun Key(
             .height(46.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(bg)
-            .clickable(interactionSource = interaction, indication = LocalIndication.current) {
+            .semantics {
+                spoken?.let { contentDescription = it }
+                state?.let { stateDescription = it }
+            }
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, role = Role.Button) {
                 if (repeated) {
                     repeated = false
                     return@clickable
@@ -116,7 +130,14 @@ private fun Key(
             },
         contentAlignment = Alignment.Center,
     ) {
-        Text(label, fontSize = if (label.length > 1 && kind != KeyKind.Char) 14.sp else 18.sp, color = fg, maxLines = 1)
+        Text(
+            label,
+            // A named key's symbol isn't read as well.
+            modifier = if (spoken != null) Modifier.clearAndSetSemantics {} else Modifier,
+            fontSize = if (label.length > 1 && kind != KeyKind.Char) 14.sp else 18.sp,
+            color = fg,
+            maxLines = 1,
+        )
     }
 }
 
@@ -145,7 +166,8 @@ internal fun SecretField(
                 .clip(MaterialTheme.shapes.small)
                 .background(c.surfaceContainer)
                 .border(if (active) 1.5.dp else 1.dp, if (active) c.primary else c.outlineVariant, MaterialTheme.shapes.small)
-                .clickable(onClick = onSelect)
+                .semantics { if (active) stateDescription = "typing here" }
+                .clickable(onClickLabel = "type here", onClick = onSelect)
                 .padding(start = 14.dp, end = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -155,11 +177,20 @@ internal fun SecretField(
                 shown + if (active) "▏" else "",
                 fontFamily = FontFamily.Monospace,
                 fontSize = 16.sp,
-                modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+                modifier = Modifier.weight(1f).padding(vertical = 12.dp)
+                    // A screen reader hears what the screen shows: while it's hidden, only how long it is (board B28).
+                    .then(if (reveal) Modifier else Modifier.clearAndSetSemantics { contentDescription = hiddenLength(vm.passwordLength(field)) }),
             )
             if (canReveal) TextButton(onClick = { chosen = !chosen }) { Text(if (reveal) "Hide" else "Show") }
         }
     }
+}
+
+/** What a screen reader says for a hidden password or word: its length, never its letters. */
+internal fun hiddenLength(n: Int): String = when (n) {
+    0 -> "empty"
+    1 -> "1 character, hidden"
+    else -> "$n characters, hidden"
 }
 
 /**
@@ -221,13 +252,25 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit, onBack
     }
     @Composable
     fun ShiftKey(modifier: Modifier) {
-        Key(if (shift == Shift.Locked) "⇪" else "⇧", modifier, kind = if (shift != Shift.Off) KeyKind.Active else KeyKind.Function) {
+        Key(
+            if (shift == Shift.Locked) "⇪" else "⇧",
+            modifier,
+            kind = if (shift != Shift.Off) KeyKind.Active else KeyKind.Function,
+            spoken = "Shift",
+            state = when (shift) { Shift.Off -> "off"; Shift.Once -> "on, for the next letter"; Shift.Locked -> "caps lock" },
+        ) {
             shift = when (shift) { Shift.Off -> Shift.Once; Shift.Once -> Shift.Locked; Shift.Locked -> Shift.Off }
         }
     }
     @Composable
     fun LayerKey(label: String, target: KeyLayer, modifier: Modifier) {
-        Key(label, modifier, kind = KeyKind.Function) { layer = target }
+        val spoken = when (target) {
+            KeyLayer.Letters -> "Letters"
+            KeyLayer.Symbols -> "Digits and symbols"
+            KeyLayer.More -> "More symbols"
+            KeyLayer.Accents -> "Accented letters"
+        }
+        Key(label, modifier, kind = KeyKind.Function, spoken = spoken) { layer = target }
     }
 
     Column(Modifier.intoGutter(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -255,8 +298,8 @@ private fun TextKeyboard(onChar: (Char) -> Unit, onBackspace: () -> Unit, onBack
             else LayerKey("ABC", KeyLayer.Letters, Modifier.weight(1.5f))
             if (layer == KeyLayer.Accents) LayerKey("?123", KeyLayer.Symbols, Modifier.weight(1.5f))
             else LayerKey("àé", KeyLayer.Accents, Modifier.weight(1.5f))
-            Key("space", Modifier.weight(5f), kind = KeyKind.Function) { onChar(' ') }
-            Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, onHold = onBackspaceHeld, onClick = onBackspace)
+            Key("space", Modifier.weight(5f), kind = KeyKind.Function, spoken = "Space") { onChar(' ') }
+            Key("⌫", Modifier.weight(1.5f), kind = KeyKind.Function, spoken = "Delete", onHold = onBackspaceHeld, onClick = onBackspace)
         }
     }
 }

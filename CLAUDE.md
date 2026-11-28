@@ -130,7 +130,8 @@ Two Gradle modules plus the Python tool:
     foreground (no other app sees the tag), `vm.wipeAll()` in `onStop`.
     Overlay defense: `setHideOverlayWindows` (Android 12+) and
     `dispatchTouchEvent` drops touches flagged `FLAG_WINDOW_IS_OBSCURED`
-    (all versions, with a banner). Accessibility: Android 14+ marks the window
+    (all versions, with a banner). Touches and touch exploration's hover enter/exit
+    (`dispatchGenericMotionEvent`) restart the idle timer; an action a service performs never does. Accessibility: Android 14+ marks the window
     `setAccessibilityDataSensitive(YES)` (only accessibility tools see it), and
     every version shows a banner naming non-system apps with accessibility
     access. Dialogs are separate windows and use `GuardDialogWindow()` in `Components.kt`
@@ -215,6 +216,9 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
   The only permissions are NFC, `HIDE_OVERLAY_WINDOWS` and `VIBRATE`. Don't add permissions, analytics, crash reporting or anything that phones home.
 - Never log, toast, persist or put on the clipboard any seed word, password,
   entropy, key or decrypted output. No `Log.*` with user data at all.
+- Screen readers hear what the screen shows and nothing more: a hidden password or word is described by its
+  length only, and nothing announced (a live region, `Hero`) ever carries a word, a password or a code, since
+  announcements go to every accessibility service.
 - Keep `allowBackup="false"` and the data-extraction rules; store nothing on disk.
 - Secrets live in `ByteArray` / `CharArray` and are zeroed in `finally`.
   Passwords live in `SecretChars` buffers in the view model, edited in place

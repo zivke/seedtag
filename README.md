@@ -535,6 +535,27 @@ encrypting, for example), the screen is blurred as well (covered before Android 
 encryption used and the license, with links to the source code and to donate. Links open in the browser, and only
 when tapped; leaving SeedTag clears everything typed in it.
 
+### With a screen reader
+
+SeedTag works with TalkBack. Every key on its keypads is a button with a name (*Delete*, *Shift* and whether it's
+on, *Digits and symbols*, *Space*, …), and a result is announced when it appears (*Verified*, *Backup written*, how
+many words are entered). What's spoken is what the screen shows, nothing more:
+
+- A hidden password is read only as its length (*12 characters, hidden*), and a hidden seed word as *Word 3,
+  hidden*. Shown, they're read out, as is every restored word and every key you touch to type them.
+- Announcements never contain a seed word, a password or a code. They go to every accessibility service that's on,
+  not only the screen reader.
+- While a question is open (*Still there?*, the Back questions, *Ready to scan*), only the question can be read.
+
+**Use headphones.** Anyone near the phone can hear the words. And whatever TalkBack reads goes through the phone's
+text-to-speech engine, which may be another company's app: use the phone's own, check under *Settings ›
+Accessibility › Text-to-speech output*, and keep the phone offline.
+
+Moving a finger over the screen to explore it keeps SeedTag's timeout from running out, as a touch does. A
+double-tap that TalkBack turns into a button press doesn't, and neither do swipes between items or a keyboard: an
+accessibility app could send those by itself, and keep your words in memory. So if you only swipe and double-tap,
+*Still there?* can come up while you work; answer **Keep** and carry on.
+
 ## Choosing a tag
 
 Any tag Android can read and write as NDEF works. The app uses the generic NDEF API and listens for NFC-A, -B, -F

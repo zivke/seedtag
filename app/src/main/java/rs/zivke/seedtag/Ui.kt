@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.LineHeightStyle
@@ -159,7 +160,8 @@ fun SeedTagApp(
                 it is Dialog.ConfirmClearWords
         }
     val blurs = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-    Box(if (veiled && blurs) Modifier.blur(20.dp) else Modifier) {
+    // Veiled, it's out of a screen reader's reach as well: only the question in front of it is read (board B28).
+    Box(if (veiled) Modifier.clearAndSetSemantics {}.then(if (blurs) Modifier.blur(20.dp) else Modifier) else Modifier) {
         CompositionLocalProvider(
             LocalAirplaneMode provides airplaneMode,
             LocalDebugging provides debugging,

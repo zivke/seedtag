@@ -52,6 +52,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -375,7 +379,13 @@ internal fun DangerButton(text: String, onClick: () -> Unit) {
 internal fun Hero(tone: Tone, title: String, subtitle: String) {
     val t = colorsOf(tone)
     Column(
-        Modifier.fillMaxWidth().padding(top = 8.dp),
+        Modifier.fillMaxWidth().padding(top = 8.dp)
+            // A result: a screen reader announces it when it appears (board B28). Never put a secret in
+            // [title] or [subtitle]; announcements go to every accessibility service.
+            .semantics(mergeDescendants = true) {
+                heading()
+                liveRegion = LiveRegionMode.Polite
+            },
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {

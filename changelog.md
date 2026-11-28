@@ -7,6 +7,11 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- Screen-reader support (TalkBack): every keypad key is a named button (*Delete*, *Shift* with its state, *Digits
+  and symbols*, …), a result (*Verified*, *Backup written*) and the word count are announced, and the idle
+  timeout restarts while you explore the screen by touch. A hidden password is read only as its length and a
+  hidden word as *hidden*; announcements never carry a word, a password or a code; behind a question, nothing
+  else can be read. README, *With a screen reader*: use headphones, and what the speech engine hears.
 - `seedtag.py verify` says whether a tag's salt and nonce are the ones worked out from the seed and password
   (*worked out*: nothing can be hidden in them) or random (a tag from 0.4.2 or earlier), and fails if only the
   nonce is, which no honest writer makes. `derived-vectors.tsv` has the vectors.

@@ -37,6 +37,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -332,16 +337,24 @@ private fun WordsStep(vm: SeedTagViewModel) {
         val current = if (vm.hideWords) "•".repeat(vm.prefixLength) else vm.revealPrefix()
         WordGrid(vm.words, current = current, hidden = vm.hideWords, max = vm.wordCount)
         when (val s = vm.mnemonicStatus) {
+            // Announced as it changes (board B28). None of these names a word: an unknown one is given by its number.
             is MnemonicStatus.Incomplete -> Text(
                 "${s.count} of ${vm.wordCount} words",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
-            is MnemonicStatus.Invalid -> Text(s.reason, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+            is MnemonicStatus.Invalid -> Text(
+                s.reason,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
+            )
             is MnemonicStatus.Valid -> Text(
                 "Valid ${s.count}-word phrase",
                 style = MaterialTheme.typography.bodyMedium,
                 color = LocalExtra.current.success,
+                modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite },
             )
         }
     }
@@ -412,6 +425,14 @@ internal fun Suggestions(words: List<String>, onPick: (String) -> Unit) {
     }
 }
 
+/** What a screen reader says for one cell of [WordGrid]: a hidden word or hidden letters only by count. */
+private fun wordCellSpoken(n: Int, shown: String, typing: Boolean, hidden: Boolean, current: String?): String = when {
+    typing && hidden -> "Word $n, " + hiddenLength(current.orEmpty().length).replace("character", "letter")
+    typing -> if (current.isNullOrEmpty()) "Word $n, nothing typed yet" else "Word $n, typed so far: $current"
+    hidden -> "Word $n, hidden"
+    else -> "Word $n, $shown"
+}
+
 /**
  * The seed words, numbered. Three to a row, or fewer when the longest BIP39 word (8 letters, with the typing
  * cursor) wouldn't fit at the user's font size (board B26): a seed word is never clipped. Cells grow with the font.
@@ -442,6 +463,8 @@ internal fun WordGrid(words: List<String>, current: String? = null, hidden: Bool
                                 .clip(MaterialTheme.shapes.small)
                                 .background(MaterialTheme.colorScheme.surfaceContainer)
                                 .then(if (typing) Modifier.border(1.5.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
+                                // Read as one, and only what's shown: a hidden word isn't spelled out by its dots (board B28).
+                                .clearAndSetSemantics { contentDescription = wordCellSpoken(n, w, typing, hidden, current) }
                                 .padding(horizontal = 10.dp, vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {

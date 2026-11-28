@@ -316,7 +316,13 @@ report's tests N1–N12, A1–A3, H1).
 - [x] **B27: Restore and `decrypt` end at the words.** "BIP39 words only, no wallet passphrase or account"; a
   better checksum message for non-BIP39 phrases; "not your wallet's fingerprint".
 - [ ] **B28: not ready for screen readers** *(device: A3)*. Content descriptions and roles, announcements, idle
-  timer on accessibility actions, README "Accessibility".
+  timer on accessibility actions, README "Accessibility". Owner, 2026-11-28: option (a), with three rules: no secret
+  in any announcement; the idle timer restarts on real input only (touch exploration's hover events), never on an
+  action a service performs; a hidden password is read as its length. On `develop`: named keys (`Key`'s
+  `spoken`/`state`), `SecretField` and `WordGrid` read hidden values by length only, `Hero` and the word count as
+  polite live regions, the veiled screen cleared from semantics, `dispatchGenericMotionEvent` for hover; README
+  *With a screen reader*. Limit, said in the README: swipe-and-double-tap alone doesn't restart the timer, and a
+  service allowed to perform gestures can still fake touches (as before). Device rows 7.97-7.98.
 - [x] **B29: settings links wipe secrets without warning, and two of them can crash.** Leave dialog while
   `holdsSecrets`; `runCatching` with `ACTION_SETTINGS` as fallback.
 - [x] **B30: the typed-back passphrase check can be got around** (Show during Repeat; editing after "Show it

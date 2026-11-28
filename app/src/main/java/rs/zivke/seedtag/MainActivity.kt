@@ -182,6 +182,21 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
+     * A screen reader's touch exploration: a finger moving over the screen reaches the app as hover
+     * events, not touches. Each exploring touch (its enter and exit) restarts the idle timeout, as a
+     * touch does, so a TalkBack user isn't asked "Still there?" while working. An action a service
+     * performs on a button (TalkBack's double-tap, or any other accessibility app's) doesn't restart
+     * it, and neither do keys, which services can send too: none of that is a finger on the screen
+     * (board B28). A service allowed to perform gestures can fake touches as well; that was already so.
+     */
+    override fun dispatchGenericMotionEvent(ev: MotionEvent): Boolean {
+        val action = ev.actionMasked
+        // Any pointer: a mouse or a stylus moved over the screen is someone there too.
+        if ((action == MotionEvent.ACTION_HOVER_ENTER || action == MotionEvent.ACTION_HOVER_EXIT) && !ev.isObscured()) vm.touched()
+        return super.dispatchGenericMotionEvent(ev)
+    }
+
+    /**
      * Enabled accessibility services, other than preinstalled system ones: they can read the
      * screen and see every tap (on Android 14+ only if they declare themselves accessibility
      * tools). Needs no permission. Checked on every resume, e.g. after a visit to Settings.
