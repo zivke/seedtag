@@ -15,13 +15,14 @@
 - [ ] **#11 (Medium): a "read-only" tag can still be locked against reading by a stranger.** Options are
   in [the tag write-protection report](reports/2026-11-07-tag-write-protection.md). In order:
   - [ ] After locking, read the lock and settings bytes back, and warn if the settings are still open. On
-    branch `lock-readback` (2026-11-26): on NTAG21x layouts SeedTag writes the lock itself and reads it back
-    (`NtagLock`); device rows 7.59-7.63.
+    `develop` (`864c78d`, 2026-11-26; the `lock-readback` branch is merged and gone): on NTAG21x layouts SeedTag
+    writes the lock itself and reads it back (`NtagLock`). Device rows 7.59-7.62 passed on 2026-11-26 on an NTAG215
+    lookalike; 7.63, a genuine NXP NTAG213, 215 and 216, is still open (no spare tags yet).
   - [x] Correct the README's claim that locking protects the tag. Recommend a metal box or shielding
     sleeve, and not carrying the tag around.
   - [ ] Proper lock (settings frozen too) or a write password, on a separate branch, tested with spare
     tags. The write password is B17's Protect from writes; the proper lock (CFGLCK with AUTH0 FF, the owner's
-    choice on 2026-11-26) is on `lock-readback`.
+    choice on 2026-11-26) is in the same commit, `864c78d`, with the same rows.
   - [ ] Rescue for Ultralight C tags already locked with `FF 0F` (none known: the tested tag turned out to be an
     NTAG213).
 
@@ -29,8 +30,8 @@
 
 - [ ] **#1 (Medium): the Lock text promises more than the lock does.** Same issue as #11 above.
   - [x] Corrected wording in the app and README.
-  - [ ] Lock read-back (#11's first step): after the `tag-write-password` branch, which already detects the
-    chip type.
+  - [ ] Lock read-back (#11's first step): done with it, in `864c78d` on `develop`; only row 7.63 (NXP chips) is
+    still open.
 - [x] **#2 (Medium): check that the signed APK was built from this source.** Build again in an
   independent environment (CI or the signing machine), compare, and make `sign-release.sh` refuse an
   unsigned APK whose SHA-256 doesn't match the expected one.
@@ -174,10 +175,15 @@ report's tests N1–N12, A1–A3, H1).
 
 - [ ] **B2: Lock probably leaves NTAG215/216 data pages writable** *(device: N1)*. Read the lock bytes back after
   every Lock and say "data locked" or "only marked read-only"; stop recommending 215/216 in the too-small hint and
-  correct README:434-436 until then. Write the real dynamic lock bytes on 215/216 on a branch, with spare tags.
+  correct README:434-436 until then. Write the real dynamic lock bytes on 215/216 on a branch, with spare tags. Done
+  in `864c78d` (on `develop`): each chip's own dynamic lock bytes (`NtagChip.dynamicLock`), read back, so the hint
+  can keep naming the 215 and 216; README *Choosing a tag* says it was tried on a lookalike only. Passed on an
+  NTAG215 lookalike (rows 7.59-7.60); a genuine NXP 215 and 216: row 7.63.
 - [ ] **B3: an interrupted Lock leaves the tag half-locked and both messages are false** *(device: N3)*. Same
   read-back; finish the lock with raw WRITEs; reword "unchanged" and "SeedTag didn't change it". Do the read-back
-  now, not after `tag-write-password` (it needs only READs).
+  now, not after `tag-write-password` (it needs only READs). Done in `864c78d` (on `develop`): `NtagLock.missing`
+  says what's left and the next tap writes only that; the messages were reworded. Interrupted and then finished on
+  an NTAG215 lookalike (rows 7.59-7.60 passed); NXP chips: row 7.63.
 - [ ] **B5: salt and nonce are a 28-byte covert channel `verify` can't detect.**
   - [x] Reword README step 5 (it rules out a weak key, not a hidden channel).
   - [ ] Derive salt and nonce from the secrets so `seedtag.py verify` can check them: options, trade-offs and what
@@ -194,8 +200,8 @@ report's tests N1–N12, A1–A3, H1).
   step 4 *Check your words* (*They match* only with the words shown, *Fix a word*), and a Restore-and-compare item
   in Done's next steps; device rows 7.65-7.68 passed.
 - [ ] **B7: no path to a second tag; retyping the generated passphrase scores "Weak".** "Write the same backup to
-  another tag" after Done and Verify (ciphertext only); README: identical copies are fine. On branch
-  `b7-copy-tag` (2026-11-26): *Write a copy to another tag* (`TagFlow.copyTo`, `Purpose.Copy`); device rows 7.80-7.83.
+  another tag" after Done and Verify (ciphertext only); README: identical copies are fine. On `develop`
+  (`08bb1e3`, 2026-11-26; the `b7-copy-tag` branch is merged and gone): *Write a copy to another tag* (`TagFlow.copyTo`, `Purpose.Copy`); device rows 7.80-7.83.
 - [ ] **B8: one Base64 typo in `seedtag.py` looks like a wrong password.**
   - [x] Plain error messages; re-pad and accept `-_` (and an `en` prefix); accept a file; `py` on Windows; shared
     `blob-text.tsv`.
