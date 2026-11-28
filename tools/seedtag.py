@@ -36,7 +36,8 @@ Run it on an offline machine.
     python3 seedtag.py encrypt          # words + password -> Base64 blob
     python3 seedtag.py decrypt [BLOB]   # Base64 blob + password -> words
     python3 seedtag.py verify  [BLOB]   # like decrypt, but only prints OK / FAIL
-                                        # plus a short fingerprint, not the words
+                                        # plus a short fingerprint, not the words, and
+                                        # whether salt and nonce are the derived ones
     python3 seedtag.py check   DUMP     # is anything on the tag besides the backup?
     python3 seedtag.py tag-key [BLOB]   # the tag's write password, for other NFC
                                         # tools, if the app isn't there to remove it
@@ -381,8 +382,12 @@ _broken = set()  # packages that failed unexpectedly in this run: not tried agai
 
 
 def derive_key(password: str, salt: bytes) -> bytes:
+    return _argon2(unicodedata.normalize("NFKD", password).encode("utf-8"), salt)
+
+
+def _argon2(pw: bytes, salt: bytes) -> bytes:
+    """Argon2id at the v1 parameters (32 bytes), from the first backend that works."""
     global kdf_used
-    pw = unicodedata.normalize("NFKD", password).encode("utf-8")
     why = []
     for name, kdf in KDF_BACKENDS:
         if name != "built-in" and (builtin_only or name in _broken):
@@ -428,16 +433,47 @@ def _aesgcm(decrypt_only: bool = False):
     return AESGCM, InvalidTag
 
 
+# Board B5 (FORMAT.md section 2, "Salt and nonce"): a new backup's salt and nonce are worked out from the seed
+# and the password, not drawn at random, so that verify can check that nothing is hidden in them. Opening reads
+# them from the blob as always, so older tags, with random ones, open as before. Same as SeedBox in the app.
+SALT_LABEL = b"seedtag-v1-salt"
+NONCE_LABEL = b"seedtag-v1-nonce"
+
+
+def derived_salt(entropy: bytes) -> bytes:
+    """The salt of a new backup: Argon2id of the entropy (slow on purpose: a fast hash would let someone holding
+    the tag test guesses of a partly seen seed quickly), first 16 bytes."""
+    return _argon2(entropy, SALT_LABEL)[:SALT_LEN]
+
+
+def derived_nonce(key: bytes) -> bytes:
+    """The nonce of a new backup: from its AES key, so one key always encrypts the same seed with the same nonce."""
+    return hmac.new(key, NONCE_LABEL, hashlib.sha256).digest()[:NONCE_LEN]
+
+
 def seal(entropy: bytes, password: str, salt: "bytes | None" = None,
          nonce: "bytes | None" = None) -> bytes:
+    """A backup's blob. Without salt and nonce, the derived ones; fixed ones are for test vectors only."""
     if len(entropy) not in (16, 20, 24, 28, 32):
         raise ValueError("bad entropy length")
-    salt = salt if salt is not None else os.urandom(SALT_LEN)
-    nonce = nonce if nonce is not None else os.urandom(NONCE_LEN)
     header = bytes([VERSION])
     aesgcm, _ = _aesgcm()
-    ct = aesgcm(derive_key(password, salt)).encrypt(nonce, entropy, header)
+    salt = salt if salt is not None else derived_salt(entropy)
+    key = derive_key(password, salt)
+    nonce = nonce if nonce is not None else derived_nonce(key)
+    ct = aesgcm(key).encrypt(nonce, entropy, header)
     return header + salt + nonce + ct
+
+
+def salt_and_nonce(blob: bytes, entropy: bytes, key: bytes) -> str:
+    """How an opened blob's salt and nonce were made: "derived" (as since board B5: nothing can be hidden in
+    them), "random" (an older SeedTag or seedtag.py, or another tool), or "mismatch": the nonce is the derived one
+    but the salt isn't, which no honest writer produces, so the salt may hide something. The salt is only checked
+    (one more Argon2id run) when the nonce says the tag was written the new way."""
+    nonce = blob[1 + SALT_LEN:1 + SALT_LEN + NONCE_LEN]
+    if not hmac.compare_digest(nonce, derived_nonce(key)):
+        return "random"
+    return "derived" if hmac.compare_digest(blob[1:1 + SALT_LEN], derived_salt(entropy)) else "mismatch"
 
 
 class WrongPassword(ValueError):
@@ -1282,7 +1318,7 @@ def main(argv):
                 print(f"check code: {check_code(blob)} (SeedTag shows the same for this tag; if it doesn't match, "
                       "the text has a typo and no password will open it)", file=sys.stderr)
             password = getpass.getpass("Password: ")
-            if cmd == "tag-key":
+            if cmd in ("tag-key", "verify"):
                 entropy, fix, key = _open_forgiving_key(blob, password)
             else:
                 entropy, fix = open_forgiving(blob, password)
@@ -1306,8 +1342,22 @@ def main(argv):
                 print(f"  as stored in pages 2Ch-2Fh: {pages}")
                 print("  to remove it: authenticate with the key, then write 30 00 00 00 to page 2Ah")
             else:
+                how = salt_and_nonce(blob, entropy, key)
+                if how == "mismatch":
+                    print("FAIL: the backup decrypts, but its salt isn't the one worked out from the seed, although its "
+                          "nonce is. No honest SeedTag writes that: the salt may hide data, the seed for instance, for "
+                          "someone with a key to it. Don't trust this tag or the build that wrote it: make a new backup "
+                          "with a SeedTag you've checked, and move the funds to a new seed if you can.", file=sys.stderr)
+                    return 1
                 print(f"OK  {len(entropy) * 3 // 4} words  fingerprint: {fingerprint(entropy)}")
                 print("(SeedTag's own fingerprint, not the one a wallet shows)", file=sys.stderr)
+                if how == "derived":
+                    print("salt and nonce: worked out from the seed and password, as SeedTag writes them, so "
+                          "nothing can be hidden in them", file=sys.stderr)
+                else:
+                    print("salt and nonce: random. That's how SeedTag 0.4.2 and earlier, and seedtag.py from then, "
+                          "wrote them; newer versions work them out from the seed and password. If a newer version "
+                          "wrote this tag, don't trust it: random bytes there could hide the seed.", file=sys.stderr)
     except ValueError as e:
         print(f"FAIL: {e}", file=sys.stderr)
         if isinstance(e, WrongPassword):

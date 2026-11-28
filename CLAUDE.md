@@ -192,6 +192,11 @@ AAD   = 0x01
 tag   = one NDEF Text record, lang "en", standard Base64 of blob
 ```
 
+New blobs get a salt and nonce worked out from the secrets, not random ones (board B5, FORMAT.md section
+2): `salt = Argon2id(entropy, "seedtag-v1-salt", same parameters)[:16]`,
+`nonce = HMAC-SHA256(key, "seedtag-v1-nonce")[:12]`. A rule for writing v1, no new version byte; `open` reads
+them from the blob as before, and `seedtag.py verify` checks them (`derived-vectors.tsv`).
+
 `FORMAT.md` (0BSD) is the full description: the record, what readers forgive,
 the vector files, and the envelope v0.4.2 and later use to recognise a backup
 without decrypting it (first Text record, standard Base64, 61–200 bytes, first

@@ -48,10 +48,13 @@ def main(argv) -> int:
     failed = 0
     rows = [line.split("\t") for line in path.read_text(encoding="utf-8").splitlines() if line]
     for pw, entropy, text in rows:
-        got = seedtag.open_blob(seedtag.blob_from_text(text), bytes.fromhex(pw).decode())
-        if got.hex() != entropy:
+        typed = bytes.fromhex(pw).decode()
+        got = seedtag.open_blob(seedtag.blob_from_text(text), typed)
+        # Board B5: salt and nonce are derived, so seedtag.py seals the very same text.
+        same = base64.b64encode(seedtag.seal(bytes.fromhex(entropy), typed)).decode() == text
+        if got.hex() != entropy or not same:
             failed += 1
-    print(f"seedtag.py opened {len(rows) - failed} of {len(rows)} backups the app's core sealed")
+    print(f"seedtag.py opened, and sealed the same, {len(rows) - failed} of {len(rows)} backups the app's core sealed")
     return 1 if failed or len(rows) < CASES else 0
 
 

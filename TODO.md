@@ -181,7 +181,10 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B5: salt and nonce are a 28-byte covert channel `verify` can't detect.**
   - [x] Reword README step 5 (it rules out a weak key, not a hidden channel).
   - [ ] Derive salt and nonce from the secrets so `seedtag.py verify` can check them: options, trade-offs and what
-    the fix needs in [the salt and nonce report](reports/2026-11-18-salt-nonce-channel.md). A format decision for
+    the fix needs in [the salt and nonce report](reports/2026-11-18-salt-nonce-channel.md). Owner, 2026-11-28:
+    option C. On `develop`: `SeedBox.derivedSalt`/`derivedNonce`/`saltAndNonce`, the same in `seedtag.py`, `verify`
+    reports it, FORMAT.md section 2, `derived-vectors.tsv`, `make test-cross` compares texts byte for byte; device
+    row 7.96, tools 5.24. Not reviewed from outside (the report asked for that). A format decision for
     the owner (the report recommends option C, after a review); own branch. The generated passphrase stays a way
     out for a malicious app even then (the report, "What it doesn't close").
   - The other places to hide data, around the blob and elsewhere on the tag, are under

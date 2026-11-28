@@ -41,8 +41,24 @@ entropy = the BIP39 entropy, 16/20/24/28/32 bytes for 12/15/18/21/24 words
 - Every parameter is fixed by the version byte; none is stored in the blob.
 - The words are the entropy's BIP39 English words. Their checksum isn't stored: a decoder recomputes it from the
   entropy.
-- `salt` and `nonce` come from a secure random generator (see the README, *Using it safely*, point 5, for what
-  that means for checking a tag).
+- **Salt and nonce.** Decoders read them from the blob and must not depend on how they were made. SeedTag
+  0.4.2 and earlier, and `seedtag.py` from then, drew them from a secure random generator. Later versions work
+  them out from the secrets, so that `seedtag.py verify` can check that nothing is hidden in them (README,
+  *Using it safely*, point 5):
+
+  ```
+  salt  = first 16 bytes of Argon2id(password = entropy, salt = ASCII "seedtag-v1-salt",
+                                     t = 3, m = 65536 KiB, p = 1, version 0x13, output 32 bytes)
+  key   = as above, from the password and this salt
+  nonce = first 12 bytes of HMAC-SHA256(key = key, message = ASCII "seedtag-v1-nonce")
+  ```
+
+  The salt uses Argon2id rather than a fast hash so that it's no quicker a test of guessed seed words than
+  deriving the wallet's addresses. A key comes only from one seed and one password, so a key never meets one
+  nonce with two different messages. Both are a rule for writing v1, not a new format: the version byte stays
+  `01`, and every v1 reader opens such a blob. Two backups of one seed with one password are byte-identical.
+  `verify` reports *derived* (both match), *random* (the nonce doesn't: an older writer) or fails when the nonce
+  matches and the salt doesn't, which no honest writer makes.
 - Sizes: the blob is 61 to 77 bytes; the text 84 to 104 characters; the NDEF message 91 to 111 bytes.
 
 The **fingerprint** shown by Verify and `seedtag.py verify` is the first 4 bytes of
@@ -110,8 +126,8 @@ Points raised by the expert review (board finding B22), to settle when a v2 is d
 - Pad the entropy to 32 bytes, with its length inside the ciphertext, so that every blob has one size and the
   word count doesn't show. 78 bytes, 104 characters: it still fits an NTAG213.
 - Derive salt and nonce from the secrets instead of drawing them at random, so that a checker can tell they
-  hide nothing (board finding B5, `reports/2026-11-18-salt-nonce-channel.md`). That one may also stay a rule
-  for writing v1.
+  hide nothing (board finding B5, `reports/2026-11-18-salt-nonce-channel.md`). Done as a rule for writing v1
+  (section 2); a v2 keeps it.
 
 ## 5. Test vectors
 
@@ -128,6 +144,9 @@ them.
 - **`password-variants.tsv`**: the typed password (hex), then the variants tried, in order, as pairs of the
   variant's name and the password (hex). A row with only a password has no variants.
 - **`check-codes.tsv`**: the tag's text, its check code (section 3).
+- **`derived-vectors.tsv`**: password (hex), entropy (hex), the tag's text, with the salt and nonce worked out
+  (section 2): sealing the entropy with that password, and no fixed salt or nonce, gives exactly the text. One
+  row per word count, non-ASCII and non-BMP passwords included.
 - **`tag-key-vectors.tsv`**: password (hex), the tag's text, then the write password derived from them
   (section 6): the Ultralight C 3DES key, the same as stored in its pages 2Ch-2Fh, the NTAG PWD and PACK, all hex.
 - `bip39-vectors.tsv` (entropy, words) is Trezor's BIP39 reference set, from python-mnemonic (MIT), not part of

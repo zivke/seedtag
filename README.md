@@ -279,20 +279,23 @@ seed. From safest down:
 5. **Check a new tag on another computer.** Any library inside SeedTag could, if it were poisoned, weaken the
    encryption so that the tag looks fine but opens for anyone. To rule that out, verify the tag with `seedtag.py`'s
    own code on another, offline computer: `python3 -I -S seedtag.py verify <BASE64>` (`-I -S` keeps installed
-   packages out; about a minute). It must print the fingerprint the app shows. Read the tag with another NFC app
-   too: it should hold one Text record and nothing else. [The dependency report](reports/2026-11-14-dependency-risk.md)
+   packages out; about two minutes). It must print the fingerprint the app shows, and say the salt and nonce are
+   *worked out from the seed and password*. Read the tag with another NFC app too: it should hold one Text record
+   and nothing else. [The dependency report](reports/2026-11-14-dependency-risk.md)
    lists what else a poisoned library could do.
-   This rules out a weak key and extra records on the tag, but not everything. A poisoned app could still hide a
-   secret, such as the seed encrypted for an attacker who later reads the tag, in two places these checks don't
-   see:
-   - **The salt and nonce** (28 bytes of the blob). They're random by design, so nothing can tell them apart from
-     a hidden secret.
+   This rules out a weak key, extra records on the tag and anything hidden in the blob: every byte of it is fixed
+   by the seed and the password. A tag written by SeedTag 0.4.2 or earlier has a random salt and nonce (28 bytes),
+   which nothing can tell apart from a hidden secret, and `verify` says *random* for it; one written by a later
+   version must say *worked out*, and if it says *random*, don't trust it. A poisoned app could still hide a
+   secret, such as the seed encrypted for an attacker who later reads the tag, in places this check doesn't see:
+   - **The generated passphrase.** It comes from the app's random generator, and a poisoned app could make it one
+     its maker can work out. A password you made yourself (dice and the BIP39 list, say) closes this.
    - **The rest of the tag's memory.** An NFC app shows the message that holds the backup, not the memory after it
      or the tag's lock and settings bytes. `seedtag.py check` checks all of it on an NTAG213, 215 or 216, from a
      memory dump ([Recovering on a computer](#recovering-on-a-computer)); on other tags, a message that looks right
      doesn't prove the rest of the tag is clean.
 
-   Against the salt and nonce, only the build itself helps: an APK whose source and build you can check
+   Against the passphrase, only the build itself helps: an APK whose source and build you can check
    ([Signing a release](#signing-a-release)), and a tag kept out of strangers' reach.
 
 The Back up, Verify and Restore screens remind you of this (*Safest on a spare phone*, in their checklist,
@@ -469,8 +472,8 @@ worked, a "rejected" buzz when something went wrong (it follows the phone's touc
      A tag with a write password has to have it removed first.
    - **Write a copy to another tag** (also on Back up's last screen): the same backup on a second tag, to keep
      somewhere else. It writes the tag's text as it is, so no words or password are needed and the same password
-     opens both. Identical copies are fine: they give away nothing more than one tag does (the salt and nonce
-     only have to differ between different backups, and a copy is the same backup). The copy is read back and
+     opens both. Identical copies are fine: they give away nothing more than one tag does. (Two backups of the
+     same seed with the same password come out identical anyway: the salt and nonce are worked out from them.) The copy is read back and
      cleared after the backup like any backup; Verify it once on its own. A tag that already holds this backup
      is recognised and left alone.
 6. **Erase**, the fourth tab, to retire a tag or reuse it. Scan it first (nothing is written): the app

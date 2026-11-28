@@ -128,7 +128,52 @@ class SeedBoxV1(unittest.TestCase):
         self.assertEqual(77, len(blob))
         self.assertEqual(104, len(base64.b64encode(blob)))
         self.assertEqual(ent, seedtag.open_blob(blob, "pw"))
-        self.assertNotEqual(blob, seedtag.seal(ent, "pw"))  # fresh salt + nonce
+        # Board B5: derived salt and nonce, so the same backup comes out the same; another password changes the
+        # nonce (and the key), not the salt.
+        self.assertEqual(blob, seedtag.seal(ent, "pw"))
+        other = seedtag.seal(ent, "pw2")
+        self.assertEqual(blob[1:17], other[1:17])
+        self.assertNotEqual(blob[17:29], other[17:29])
+
+    def test_derived_salt_and_nonce_match_app(self):
+        derived = rows("derived-vectors.tsv")
+        self.assertEqual(5, len(derived))
+        for pw_hex, ent_hex, text in derived:
+            pw, ent = bytes.fromhex(pw_hex).decode(), bytes.fromhex(ent_hex)
+            self.assertEqual(text, base64.b64encode(seedtag.seal(ent, pw)).decode())
+            got, key = seedtag._open_with_key(base64.b64decode(text), pw)
+            self.assertEqual(ent, got)
+            self.assertEqual("derived", seedtag.salt_and_nonce(base64.b64decode(text), ent, key))
+        # An older tag: random salt and nonce.
+        pw, ent, _, _, b64, _ = self.vecs[0]
+        blob = base64.b64decode(b64)
+        self.assertEqual("random", seedtag.salt_and_nonce(blob, ent, seedtag._open_with_key(blob, pw)[1]))
+        # The derived nonce with another salt: what no honest writer makes.
+        pw, ent = bytes.fromhex(derived[1][0]).decode(), bytes.fromhex(derived[1][1])
+        salt = bytes([0x5A]) * 16
+        odd = seedtag.seal(ent, pw, salt, seedtag.derived_nonce(seedtag.derive_key(pw, salt)))
+        self.assertEqual("mismatch", seedtag.salt_and_nonce(odd, ent, seedtag._open_with_key(odd, pw)[1]))
+
+    def test_verify_reports_salt_and_nonce(self):
+        def verify(text, pw):
+            err = io.StringIO()
+            with mock.patch.object(seedtag.getpass, "getpass", return_value=pw), \
+                    contextlib.redirect_stderr(err), contextlib.redirect_stdout(io.StringIO()):
+                code = seedtag.main(["verify", text])
+            return code, err.getvalue()
+        pw_hex, ent_hex, text = rows("derived-vectors.tsv")[1]
+        pw = bytes.fromhex(pw_hex).decode()
+        code, err = verify(text, pw)
+        self.assertEqual(0, code)
+        self.assertIn("salt and nonce: worked out from the seed and password", err)
+        code, err = verify(self.vecs[0][4], self.vecs[0][0])
+        self.assertEqual(0, code)
+        self.assertIn("salt and nonce: random", err)
+        salt = bytes([0x5A]) * 16
+        odd = seedtag.seal(bytes.fromhex(ent_hex), pw, salt, seedtag.derived_nonce(seedtag.derive_key(pw, salt)))
+        code, err = verify(base64.b64encode(odd).decode(), pw)
+        self.assertEqual(1, code)
+        self.assertIn("its salt isn't the one worked out from the seed", err)
 
 
 # Backends that must be installed (comma-separated), e.g. in CI: a skip is then a failure.
@@ -440,7 +485,7 @@ class BlobText(unittest.TestCase):
         pw, _, _, _, _, _ = rows("seedtag-v1-vectors.tsv")[0]
         stderr = io.StringIO()
         with mock.patch.object(seedtag.getpass, "getpass", return_value=pw), \
-                mock.patch.object(seedtag, "open_forgiving", return_value=(bytes(32), None)), \
+                mock.patch.object(seedtag, "_open_forgiving_key", return_value=(bytes(32), None, bytes(32))), \
                 contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(0, seedtag.main(["verify", text]))
         return stderr.getvalue()
@@ -465,7 +510,7 @@ class BlobText(unittest.TestCase):
     def test_wrong_password_mentions_the_text(self):
         pw, _, _, _, b64, _ = rows("seedtag-v1-vectors.tsv")[0]
         stderr = io.StringIO()
-        with mock.patch.object(seedtag, "open_forgiving", side_effect=seedtag.WrongPassword("wrong password")), \
+        with mock.patch.object(seedtag, "_open_forgiving_key", side_effect=seedtag.WrongPassword("wrong password")), \
                 mock.patch.object(seedtag.getpass, "getpass", return_value="pw"), \
                 contextlib.redirect_stderr(stderr):
             self.assertEqual(1, seedtag.main(["verify", b64]))

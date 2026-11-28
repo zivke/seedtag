@@ -78,7 +78,7 @@ class SeedBoxTest {
     }
 
     @Test
-    fun randomRoundTripAndFits137ByteTag() {
+    fun roundTripAndFits137ByteTag() {
         val e = ByteArray(32) { it.toByte() }
         val blob = SeedBox.seal(e, "pw".toCharArray())
         assertEquals(77, blob.size)
@@ -87,8 +87,12 @@ class SeedBoxTest {
         // NDEF TLV (2) + record + terminator (1) must fit the 137 bytes of an NTAG213 or Ultralight C
         assertTrue(2 + NdefText.messageSize(text) + 1 <= 137)
         assertArrayEquals(e, SeedBox.open(blob, "pw".toCharArray()))
-        // fresh salt/nonce every time
-        assertTrue(SeedBox.toBase64(SeedBox.seal(e, "pw".toCharArray())) != text)
+        // Board B5: salt and nonce come from the seed and password, so the same backup comes out the same, and
+        // another password changes the nonce (and the key), not the salt.
+        assertEquals(text, SeedBox.toBase64(SeedBox.seal(e, "pw".toCharArray())))
+        val other = SeedBox.seal(e, "pw2".toCharArray())
+        assertArrayEquals(blob.copyOfRange(1, 17), other.copyOfRange(1, 17))
+        assertTrue(!blob.copyOfRange(17, 29).contentEquals(other.copyOfRange(17, 29)))
     }
 
     @Test
@@ -182,5 +186,30 @@ class SeedBoxTest {
         assertEquals(row[4], f("KAT_TEXT"))
         assertTrue(SeedBox.selfTest())
         assertTrue(SeedBox.selfTest()) // once per process: the second call is free
+    }
+
+    @Test
+    fun derivedSaltAndNonceMatchPython() {
+        // derived-vectors.tsv, made by seedtag.py: sealing without a fixed salt and nonce gives exactly the text.
+        val rows = javaClass.getResource("/derived-vectors.tsv")!!.readText().lines().filter { it.isNotBlank() }.map { it.split("\t") }
+        assertEquals(5, rows.size)
+        for ((pwHex, entHex, text) in rows) {
+            val pw = String(hex(pwHex), Charsets.UTF_8).toCharArray()
+            val entropy = hex(entHex)
+            assertEquals(text, SeedBox.toBase64(SeedBox.seal(entropy, pw)))
+            val blob = SeedBox.fromBase64(text)
+            assertArrayEquals(entropy, SeedBox.open(blob, pw))
+            assertEquals(SeedBox.Derivation.Derived, SeedBox.saltAndNonce(blob, entropy, pw))
+        }
+        // An older tag, random salt and nonce: the first v1 vector.
+        val v = vectors.first()
+        assertEquals(SeedBox.Derivation.Random, SeedBox.saltAndNonce(SeedBox.seal(v.entropy, v.password.toCharArray(), v.salt, v.nonce), v.entropy, v.password.toCharArray()))
+        // The derived nonce with another salt: what no honest writer makes.
+        val (pwHex, entHex) = rows[1]
+        val pw = String(hex(pwHex), Charsets.UTF_8).toCharArray()
+        val salt = ByteArray(16) { 0x5a }
+        val key = SeedBox.deriveKey(pw, salt)
+        val odd = SeedBox.seal(hex(entHex), pw, salt, SeedBox.derivedNonce(key))
+        assertEquals(SeedBox.Derivation.Mismatch, SeedBox.saltAndNonce(odd, hex(entHex), pw))
     }
 }

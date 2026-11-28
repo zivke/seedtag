@@ -4,6 +4,7 @@
 package rs.zivke.seedtag.core
 
 import org.junit.Assert.assertArrayEquals
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Test
@@ -28,6 +29,8 @@ class CrossTest {
         for ((pw, entropy, text) in fromPython) {
             val password = String(hex(pw), Charsets.UTF_8).toCharArray()
             assertArrayEquals(hex(entropy), SeedBox.open(SeedBox.fromBase64(text), password))
+            // Board B5: salt and nonce are derived, so the core seals the very same text.
+            assertEquals(text, SeedBox.toBase64(SeedBox.seal(hex(entropy), password)))
         }
         val random = SecureRandom()
         val lines = (0 until 12).map { i ->

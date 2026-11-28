@@ -9,11 +9,12 @@ import java.nio.ByteBuffer
 import java.nio.CharBuffer
 import java.nio.charset.CharacterCodingException
 import java.security.GeneralSecurityException
-import java.security.SecureRandom
+import java.security.MessageDigest
 import java.text.Normalizer
 import java.util.Base64
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
+import javax.crypto.Mac
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
@@ -45,11 +46,68 @@ object SeedBox {
     const val KEY_LEN = 32
     const val OVERHEAD = 1 + SALT_LEN + NONCE_LEN + TAG_LEN
 
-    /** Encrypts raw BIP39 entropy. The caller keeps ownership of [entropy] and [password]. */
-    fun seal(entropy: ByteArray, password: CharArray, random: SecureRandom = SecureRandom()): ByteArray {
-        val salt = ByteArray(SALT_LEN).also(random::nextBytes)
-        val nonce = ByteArray(NONCE_LEN).also(random::nextBytes)
-        return seal(entropy, password, salt, nonce)
+    /**
+     * Encrypts raw BIP39 entropy. The caller keeps ownership of [entropy] and [password].
+     *
+     * Board B5 (FORMAT.md section 2, "Salt and nonce"): the salt and nonce aren't drawn at random but worked out from
+     * the seed and the password ([derivedSalt], [derivedNonce]), so that seedtag.py verify, outside this app, can
+     * check that nothing is hidden in them. [open] reads them from the blob as always: older tags, with random
+     * ones, open as before, and so do these in every older version. Two Argon2id runs.
+     */
+    fun seal(entropy: ByteArray, password: CharArray): ByteArray {
+        require(entropy.size in Bip39.validEntropyLengths) { "bad entropy length ${entropy.size}" }
+        return sealWith(entropy, password, derivedSalt(entropy), null)
+    }
+
+    const val SALT_LABEL = "seedtag-v1-salt"
+    const val NONCE_LABEL = "seedtag-v1-nonce"
+
+    /**
+     * A new backup's salt: Argon2id of the entropy, at the v1 parameters, with [SALT_LABEL] as its salt, first 16
+     * bytes. Slow on purpose: from a fast hash, someone holding the tag could test guesses of a partly seen seed
+     * quickly, with no password needed.
+     */
+    fun derivedSalt(entropy: ByteArray): ByteArray {
+        val out = argon2(entropy, SALT_LABEL.toByteArray(Charsets.US_ASCII))
+        try {
+            return out.copyOf(SALT_LEN)
+        } finally {
+            out.fill(0)
+        }
+    }
+
+    /**
+     * A new backup's nonce: HMAC-SHA256 of [NONCE_LABEL] under its AES key, first 12 bytes. The same key only ever
+     * comes from the same seed and password, so a key never meets one nonce with two different messages.
+     */
+    fun derivedNonce(key: ByteArray): ByteArray = try {
+        Mac.getInstance("HmacSHA256").run {
+            init(SecretKeySpec(key, "HmacSHA256"))
+            doFinal(NONCE_LABEL.toByteArray(Charsets.US_ASCII)).copyOf(NONCE_LEN)
+        }
+    } catch (e: GeneralSecurityException) {
+        throw SeedTagException.CryptoFailure(e.javaClass.simpleName)
+    }
+
+    /** How a blob's salt and nonce were made; see [saltAndNonce]. */
+    enum class Derivation { Derived, Random, Mismatch }
+
+    /**
+     * Whether [blob], which [password] opens to [entropy], has the derived salt and nonce ([Derivation.Derived]),
+     * random ones (an older SeedTag or seedtag.py: [Derivation.Random]), or the derived nonce with another salt,
+     * which no honest writer makes ([Derivation.Mismatch]). seedtag.py's salt_and_nonce does the same; the app
+     * doesn't show it (a check made by the app that wrote the tag proves nothing). Up to two Argon2id runs.
+     */
+    fun saltAndNonce(blob: ByteArray, entropy: ByteArray, password: CharArray): Derivation {
+        val salt = blob.copyOfRange(1, 1 + SALT_LEN)
+        val nonce = blob.copyOfRange(1 + SALT_LEN, 1 + SALT_LEN + NONCE_LEN)
+        val key = deriveKey(password, salt)
+        try {
+            if (!MessageDigest.isEqual(nonce, derivedNonce(key))) return Derivation.Random
+        } finally {
+            key.fill(0)
+        }
+        return if (MessageDigest.isEqual(salt, derivedSalt(entropy))) Derivation.Derived else Derivation.Mismatch
     }
 
     /**
@@ -91,18 +149,24 @@ object SeedBox {
 
     private fun hexBytes(s: String) = ByteArray(s.length / 2) { s.substring(2 * it, 2 * it + 2).toInt(16).toByte() }
 
-    /** Deterministic variant – tests only. Never reuse a salt/nonce pair for real data. */
+    /** With a fixed salt and nonce: test vectors only (and the self-test). */
     fun seal(entropy: ByteArray, password: CharArray, salt: ByteArray, nonce: ByteArray): ByteArray {
         require(entropy.size in Bip39.validEntropyLengths) { "bad entropy length ${entropy.size}" }
         require(salt.size == SALT_LEN && nonce.size == NONCE_LEN)
+        return sealWith(entropy, password, salt, nonce)
+    }
+
+    /** [nonce] null: the derived one, from the key. */
+    private fun sealWith(entropy: ByteArray, password: CharArray, salt: ByteArray, nonce: ByteArray?): ByteArray {
         val key = deriveKey(password, salt)
         try {
+            val n = nonce ?: derivedNonce(key)
             val header = byteArrayOf(VERSION.toByte())
             val cipher = Cipher.getInstance("AES/GCM/NoPadding")
-            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(TAG_LEN * 8, nonce))
+            cipher.init(Cipher.ENCRYPT_MODE, SecretKeySpec(key, "AES"), GCMParameterSpec(TAG_LEN * 8, n))
             cipher.updateAAD(header)
             val ct = cipher.doFinal(entropy)
-            return header + salt + nonce + ct
+            return header + salt + n + ct
         } catch (e: GeneralSecurityException) {
             throw SeedTagException.CryptoFailure(e.javaClass.simpleName)
         } finally {
@@ -233,19 +297,24 @@ object SeedBox {
     fun deriveKey(password: CharArray, salt: ByteArray): ByteArray {
         val pw = passwordBytes(password)
         try {
-            val params = Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
-                .withVersion(Argon2Parameters.ARGON2_VERSION_13)
-                .withIterations(ARGON_ITERATIONS)
-                .withMemoryAsKB(ARGON_MEMORY_KIB)
-                .withParallelism(ARGON_PARALLELISM)
-                .withSalt(salt)
-                .build()
-            val out = ByteArray(KEY_LEN)
-            Argon2BytesGenerator().apply { init(params) }.generateBytes(pw, out)
-            return out
+            return argon2(pw, salt)
         } finally {
             pw.fill(0)
         }
+    }
+
+    /** Argon2id at the v1 parameters, 32 bytes. The caller zeroes the result. */
+    private fun argon2(pw: ByteArray, salt: ByteArray): ByteArray {
+        val params = Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
+            .withVersion(Argon2Parameters.ARGON2_VERSION_13)
+            .withIterations(ARGON_ITERATIONS)
+            .withMemoryAsKB(ARGON_MEMORY_KIB)
+            .withParallelism(ARGON_PARALLELISM)
+            .withSalt(salt)
+            .build()
+        val out = ByteArray(KEY_LEN)
+        Argon2BytesGenerator().apply { init(params) }.generateBytes(pw, out)
+        return out
     }
 
     /**

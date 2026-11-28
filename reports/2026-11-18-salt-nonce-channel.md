@@ -1,8 +1,8 @@
 # Salt and nonce as a hidden channel (board finding B5)
 
 - **Date:** 2026-11-18
-- **Status:** proposal, not implemented. Needs the owner's decision (it changes how new tags are written) and a
-  review of the cryptography before any code.
+- **Status:** option C chosen by the owner and implemented on `develop` (2026-11-28; FORMAT.md section 2,
+  `derived-vectors.tsv`). The outside review of the construction asked for below hasn't happened.
 - **Source:** finding B5 of the [expert board review](2026-11-16-expert-board-review.md), and the discussion
   after it. The README wording (`b1d666e`) is done; the fix in the code is open (`TODO.md`, B5).
 

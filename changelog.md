@@ -7,6 +7,9 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- `seedtag.py verify` says whether a tag's salt and nonce are the ones worked out from the seed and password
+  (*worked out*: nothing can be hidden in them) or random (a tag from 0.4.2 or earlier), and fails if only the
+  nonce is, which no honest writer makes. `derived-vectors.tsv` has the vectors.
 - README, *What the tag is for*: what losing a tag, the password, the seed's copy or a whole place means and what
   to do (two copies of the password, never with a tag), and that nothing helps against coercion. A printable
   `HEIR-SHEET.md` to fill in by hand: what the tag is, where the pieces are, the fingerprint and check codes, the
@@ -103,6 +106,10 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- New backups' salt and nonce are worked out from the seed and the password (FORMAT.md section 2) instead of
+  drawn at random, in the app and in `seedtag.py encrypt`, so that no poisoned build can hide anything in those 28
+  bytes unseen. Every older version still opens these tags, and older tags open as before (same format, version
+  byte `01`). Two backups of one seed with one password are now identical. Writing takes one more Argon2id run.
 - Every file's licence is recorded (REUSE layout: SPDX headers, `REUSE.toml`), checked by `make check`. The BIP39
   wordlist embedded in `seedtag.py` carries BIP-0039's MIT notice; the rest of `seedtag.py` stays 0BSD.
 - The *Before you start* checklist is red only for what's wrong right now (not offline, debugging on); advice
