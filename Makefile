@@ -81,6 +81,7 @@ test-cross: wrapper-check
 
 ## check: tests, the workflow check, plus lint on the app
 check: test check-workflows
+	python3 tools/check-licenses.py
 	$(GRADLE) :app:lintDebug
 
 ## check-workflows: the GitHub Actions files parse, declare permissions and pin every action by SHA

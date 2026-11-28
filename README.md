@@ -881,7 +881,10 @@ SeedTag is free and has no ads. If you've found it useful, you can support its d
 
 - The app and everything else in this repository: [GNU GPL v3 or later](LICENSE) (`GPL-3.0-or-later`). You may use,
   share and change it, but anything you distribute that's based on it must be released under the same license, with
-  its source.
+  its source. The exceptions are below and in [THIRD-PARTY.md](THIRD-PARTY.md), which lists what SeedTag includes by
+  others: AndroidX, Compose, Kotlin and the icons under `Apache-2.0`, Bouncy Castle and the BIP39 wordlist under
+  `MIT`. The app shows all of these licences in full under *About › Open-source licences*; the texts are in
+  [LICENSES/](LICENSES).
 - The five icons in `app/src/main/res/drawable/ic_*.xml` (all but the launcher icon): Google's
   [Material Symbols](https://github.com/google/material-design-icons), `Apache-2.0`. Each file names its source
   commit and what was changed.

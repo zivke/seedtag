@@ -25,12 +25,15 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
@@ -228,6 +231,7 @@ internal fun AboutPage() {
                     "together with its source code. seedtag.py is under the BSD Zero Clause license, so anyone can always use it to " +
                     "recover a tag. © 2026 zivke.",
             )
+            OpenSourceLicenses()
             AboutSection(
                 "Support SeedTag",
                 "SeedTag is free and has no ads. If you've found it useful, you can support its development with a donation.",
@@ -240,6 +244,55 @@ internal fun AboutPage() {
             )
         }
         Notice(Tone.Caution, "Use at your own risk", DISCLAIMER)
+    }
+}
+
+/**
+ * Board B19: what SeedTag includes from others, with each licence's full text, since Apache-2.0 and MIT ask for it
+ * with every copy (and GPL §0 for the GPL's own "Appropriate Legal Notices"). The texts are in res/raw, the same
+ * files as LICENSE and LICENSES/ (`make check` compares them), and read only when shown.
+ */
+@Composable
+private fun OpenSourceLicenses() {
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+    Column(Modifier.padding(vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Open-source licences", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "SeedTag includes software and data by others, each under its own licence:\n\n" +
+                "• AndroidX and Jetpack Compose, and five Material Symbols icons (Google); Kotlin, kotlinx.coroutines " +
+                "and kotlinx.serialization (JetBrains); JetBrains annotations; JSpecify: Apache License 2.0.\n" +
+                "• Bouncy Castle, for Argon2id: MIT License, © 2000-2026 The Legion of the Bouncy Castle Inc.\n" +
+                "• The BIP39 English wordlist, from BIP-0039: MIT License.\n\n" +
+                "SeedTag itself is under the GNU GPL, version 3 or later.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        LicenseText("GNU General Public License, version 3", R.raw.license_gpl_3_0)
+        LicenseText("Apache License 2.0", R.raw.license_apache_2_0)
+        LicenseText("MIT License: Bouncy Castle", R.raw.license_mit_bouncycastle)
+        LicenseText("MIT License: the BIP39 wordlist", R.raw.license_mit_bip39)
+    }
+}
+
+/** A licence's full text, folded away; read from [res] only once it's opened. */
+@Composable
+private fun LicenseText(title: String, res: Int) {
+    var open by remember { mutableStateOf(false) }
+    val resources = LocalResources.current
+    Link(if (open) "Hide: $title" else "Show: $title") { open = !open }
+    if (open) {
+        // Hard-wrapped plain text: one Text per paragraph, its lines joined, so it fits any width.
+        val paragraphs = remember(res) {
+            resources.openRawResource(res).bufferedReader(Charsets.UTF_8).use { it.readText() }
+                .split(Regex("\n\\s*\n"))
+                .map { para -> para.lines().joinToString(" ") { it.trim() }.trim() }
+                .filter { it.isNotEmpty() }
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            paragraphs.forEach {
+                Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
     }
 }
 

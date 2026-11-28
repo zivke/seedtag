@@ -7,6 +7,9 @@ All notable user-visible changes to SeedTag. The format follows
 ## [Unreleased]
 
 ### Added
+- *About › Open-source licences*: what SeedTag includes by others (AndroidX, Compose, Kotlin, Material Symbols
+  icons under Apache-2.0; Bouncy Castle and the BIP39 wordlist under MIT), and the full text of each licence and of
+  the GPL, as those licences ask. In the repository: `LICENSES/` and `THIRD-PARTY.md`.
 - A tests-only GitHub Actions workflow (`test.yml`) on every branch push: `make test`, `make test-cross`, and
   `seedtag.py` with the `cryptography` package on the runner's Python and the newest one it has, with `-W error`.
 - A neutral *Accessibility is on* notice while seed words are on screen (Back up's words and *Check your words*,

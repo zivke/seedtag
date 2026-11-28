@@ -272,7 +272,9 @@ report's tests N1–N12, A1–A3, H1).
 - [ ] **B18: no key-loss, rotation or succession plan.** Write it (backups, spare certificate, `apksigner rotate`
   and minSdk); explicit signature-scheme flags; "If SeedTag is abandoned"; SECURITY.md, CONTRIBUTING.md.
 - [ ] **B19: third-party licence texts not shipped.** `LICENSES/` (REUSE), an "Open-source licences" section in
-  About, `THIRD-PARTY.md`, the GPL text reachable from About.
+  About, `THIRD-PARTY.md`, the GPL text reachable from About. On `develop` (2026-11-28): all of it; the texts
+  are in `res/raw` (Apache-2.0 from apache.org, Bouncy Castle's from its verified jar, BIP-0039's MIT from the BIP),
+  `tools/check-licenses.py` (in `make check`) keeps them equal to `LICENSE` and `LICENSES/`; device row 7.95.
 
 ### Medium-Low and Low
 
