@@ -3,7 +3,9 @@
 # Copyright (C) 2026 zivke
 #
 # This file alone is under the BSD Zero Clause license, unlike the rest of SeedTag
-# (GPL-3.0-or-later), so anyone can always use it to recover a tag, for any purpose:
+# (GPL-3.0-or-later), so anyone can always use it to recover a tag, for any purpose
+# (the BIP39 wordlist embedded below is BIP-0039's, under the MIT License, also free
+# for any purpose; its notice is next to it):
 #
 # Permission to use, copy, modify, and/or distribute this software for any
 # purpose with or without fee is hereby granted.
@@ -86,6 +88,31 @@ SALT_LEN, NONCE_LEN, TAG_LEN = 16, 12, 16
 _OVERHEAD = 1 + SALT_LEN + NONCE_LEN + TAG_LEN
 ARGON_T, ARGON_M_KIB, ARGON_P, KEY_LEN = 3, 65536, 1, 32
 
+# SPDX-SnippetBegin
+# SPDX-SnippetCopyrightText: BIP-0039 authors: Marek Palatinus, Pavol Rusnak, Aaron Voisine, Sean Bowe
+# SPDX-License-Identifier: MIT
+#
+# The BIP39 English wordlist, word for word bitcoin/bips bip-0039/english.txt (the test
+# suite checks it against SeedTag's copy, SHA-256 2f5eed53...dbda). BIP-0039 falls under
+# the MIT License:
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 WORDLIST = """
 abandon ability able about above absent absorb abstract absurd abuse access
 accident account accuse achieve acid acoustic acquire across act action actor
@@ -258,6 +285,7 @@ winter wire wisdom wise wish witness wolf woman wonder wood wool word work
 world worry worth wrap wreck wrestle wrist write wrong yard year yellow you
 young youth zebra zero zone zoo
 """.split()
+# SPDX-SnippetEnd
 assert len(WORDLIST) == 2048
 _INDEX = {w: i for i, w in enumerate(WORDLIST)}
 

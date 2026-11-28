@@ -234,7 +234,9 @@ is a **new version byte**, with `open` still accepting v1, matching changes in
 - Licenses: the app and everything else are `GPL-3.0-or-later` (`LICENSE`); `tools/seedtag.py`,
   `FORMAT.md` and SeedTag's own vector files (`.license` next to each) are `0BSD`, so recovery and
   independent decoders are never in legal doubt: keep it that way. Every source file starts
-  with an `SPDX-License-Identifier` line and `Copyright (C) 2026 zivke`; add them to new files.
+  with an `SPDX-License-Identifier` line and `Copyright (C) 2026 zivke`; add them to new files. Files that
+  can't carry one go in `REUSE.toml`; `tools/check-licenses.py` (in `make check`) fails on any tracked file
+  that's in neither. Third-party works and their licences: `THIRD-PARTY.md`, `LICENSES/`, About.
 - No new dependencies without asking. Bouncy Castle is the only crypto library.
 - Every download is pinned: the wrapper jar (`gradle-wrapper.jar.sha256`, checked by `make`), the
   Gradle distribution (`distributionSha256Sum`), every dependency (`gradle/verification-metadata.xml`),

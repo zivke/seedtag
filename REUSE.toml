@@ -1,0 +1,46 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# Copyright (C) 2026 zivke
+#
+# Licence and copyright of the files that can't carry a header of their own (board B39), in the REUSE layout
+# (https://reuse.software). Every other file starts with an SPDX-License-Identifier line or has a .license file
+# next to it; LICENSE and LICENSES/ hold the texts. `make check` runs tools/check-licenses.py, which checks that
+# every tracked file is covered one of these ways (the `reuse` tool itself isn't used: it would be a new
+# dependency). Licence texts copied for the app (app/src/main/res/raw/license_*.txt) are verbatim copies of
+# LICENSE and LICENSES/ and are checked against them instead.
+version = 1
+
+# SeedTag's own docs, reports, settings and data that have no room for a comment.
+[[annotations]]
+path = [
+    "*.md",
+    ".devcontainer/*.md",
+    "reports/**",
+    ".claude/**",
+    ".vscode/**",
+    "art/**",
+    "gradle/verification-metadata.xml",
+    "gradle/wrapper/gradle-wrapper.properties",
+    "gradle/wrapper/gradle-wrapper.jar.sha256",
+    "tools/release-cert.sha256",
+]
+SPDX-FileCopyrightText = "2026 zivke"
+SPDX-License-Identifier = "GPL-3.0-or-later"
+
+# The BIP39 English wordlist, byte for byte bitcoin/bips bip-0039/english.txt. BIP-0039: "This BIP falls under
+# the MIT License." It has no copyright line; its authors are named instead.
+[[annotations]]
+path = "core/src/main/resources/rs/zivke/seedtag/core/bip39-english.txt"
+SPDX-FileCopyrightText = "BIP-0039 authors: Marek Palatinus, Pavol Rusnak, Aaron Voisine, Sean Bowe"
+SPDX-License-Identifier = "MIT"
+
+# Trezor's reference vectors (python-mnemonic, vectors.json), as a TSV.
+[[annotations]]
+path = "core/src/test/resources/bip39-vectors.tsv"
+SPDX-FileCopyrightText = "2013-2016 Pavol Rusnak"
+SPDX-License-Identifier = "MIT"
+
+# The Gradle wrapper (gradlew and gradlew.bat carry their own Apache-2.0 header).
+[[annotations]]
+path = "gradle/wrapper/gradle-wrapper.jar"
+SPDX-FileCopyrightText = "2015-2021 the original authors (Gradle)"
+SPDX-License-Identifier = "Apache-2.0"

@@ -99,6 +99,8 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- Every file's licence is recorded (REUSE layout: SPDX headers, `REUSE.toml`), checked by `make check`. The BIP39
+  wordlist embedded in `seedtag.py` carries BIP-0039's MIT notice; the rest of `seedtag.py` stays 0BSD.
 - The *Before you start* checklist is red only for what's wrong right now (not offline, debugging on); advice
   that's always true (read every screen, a spare phone, privacy on Restore, at your own risk) is amber. Verify's
   list drops *Read every screen carefully* and *Nothing is kept*.

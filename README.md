@@ -670,6 +670,7 @@ was built without Argon2id, it uses `argon2-cffi` for the key derivation instead
 argon2-cffi`), and it says which one it used.
 
 Without either package, `decrypt` and `verify` still work with a built-in Argon2id and AES-GCM in plain Python,
+written from their specifications (RFC 9106; FIPS 197 and NIST SP 800-38D), not copied from another library, and
 tested against the same vectors: about a minute per password tried (a password that needs the spaces or capitals
 retry takes two or three), and around 90 MB of memory. `encrypt` needs `cryptography`. To make sure only
 `seedtag.py`'s own code runs, even where packages are installed, start it with `python3 -I -S seedtag.py …`: a
@@ -889,9 +890,12 @@ SeedTag is free and has no ads. If you've found it useful, you can support its d
   [Material Symbols](https://github.com/google/material-design-icons), `Apache-2.0`. Each file names its source
   commit and what was changed.
 - `tools/seedtag.py`: [BSD Zero Clause](tools/seedtag.py) (`0BSD`, the full text is in the file's header), so
-  anyone can always use it to recover a tag, for any purpose.
+  anyone can always use it to recover a tag, for any purpose. The BIP39 wordlist embedded in it is BIP-0039's,
+  under the MIT License (also free for any purpose), with its notice next to it.
 - [FORMAT.md](FORMAT.md) and the vector files it describes (`seedtag-v1-vectors.tsv`, `blob-text.tsv`,
   `password-variants.tsv`; each has a `.license` file): `0BSD` too, so anyone can write a decoder, under any
   license. `bip39-vectors.tsv` is Trezor's reference set (python-mnemonic, MIT).
 
-Each source file names its license in an `SPDX-License-Identifier` line. See [changelog.md](changelog.md) for changes.
+Each source file names its license in an `SPDX-License-Identifier` line; files that can't (docs, data, images)
+are listed in [REUSE.toml](REUSE.toml), in the [REUSE](https://reuse.software) layout, and `make check` checks that
+every file is covered. See [changelog.md](changelog.md) for changes.

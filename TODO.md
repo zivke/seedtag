@@ -343,13 +343,15 @@ report's tests N1–N12, A1–A3, H1).
   - [ ] Per release (needs the host and a decision on what's published): the unsigned SHA-256 and the commit in
     the release notes, `seedtag.py` with its SHA-256 as a release asset, a README section on verifying a
     download, the tag-signing public key in the repository.
-- [ ] **B39: licence headers and provenance** (`REUSE.toml`, missing headers, wordlist source and licence).
+- [x] **B39: licence headers and provenance** (`REUSE.toml`, missing headers, wordlist source and licence).
   - [x] SPDX headers on SeedTag's own files that had none (2026-11-26): `Makefile`, the Gradle build files,
     `gradle.properties`, `libs.versions.toml`, ProGuard rules, the manifest and resource XML, the icon SVG,
     `.devcontainer/*`, `.editorconfig`, `.gitignore`; GPL-3.0-or-later, as the README says.
-  - [ ] Needs a decision: the wordlist's source and licence (embedded in the 0BSD `seedtag.py`), the Trezor vectors'
-    licence, what the reports and Markdown docs are under, `gradlew*` and the wrapper jar (Apache-2.0),
-    `.claude/` and `.vscode/`; then `REUSE.toml`, and `reuse lint` in `make check` (a new tool, so ask).
+  - [x] Owner, 2026-11-28: as proposed. The wordlist is BIP-0039's, MIT (checked in the BIP, 2026-11-28; the list
+    there is byte for byte SeedTag's), with its notice in `seedtag.py` (an SPDX snippet); the Trezor vectors MIT;
+    docs, reports, `.claude/`, `.vscode/` and art GPL; the wrapper Apache-2.0. `REUSE.toml`, and
+    `tools/check-licenses.py` in `make check` instead of the `reuse` tool. README: the built-in crypto is written
+    from RFC 9106, FIPS 197 and SP 800-38D.
 - [x] **B40: storage advice** (heat, wireless chargers, bending, refresh every ~5 years).
 - [x] **B41: wording and numbers** (111/91 vs ~114/~94, step order in "Using it", one name for Lock, "Verified"
   for a different seed).
