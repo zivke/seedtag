@@ -96,6 +96,9 @@ All notable user-visible changes to SeedTag. The format follows
   a clean NTAG213 looks like, page by page.
 
 ### Changed
+- The *Before you start* checklist is red only for what's wrong right now (not offline, debugging on); advice
+  that's always true (read every screen, a spare phone, privacy on Restore, at your own risk) is amber. Verify's
+  list drops *Read every screen carefully* and *Nothing is kept*.
 - While the Erase tab checks a backup's password, the tab row is hidden, as on Back up's typing steps: on a small
   phone the keyboard and buttons left the explanation almost no room. **Don't check the password** brings it back.
 - The password meter's "fair" colour in the light theme is darker, for readable contrast (5.1:1, was 4.0:1).

@@ -295,9 +295,11 @@ seed. From safest down:
    Against the salt and nonce, only the build itself helps: an APK whose source and build you can check
    ([Signing a release](#signing-a-release)), and a tag kept out of strangers' reach.
 
-The Back up, Verify and Restore screens remind you of this (*Safest on a spare phone*, second in their checklist,
+The Back up, Verify and Restore screens remind you of this (*Safest on a spare phone*, in their checklist,
 explains it under *Learn more*, and so does the About page), say whether airplane mode is on, and warn when USB or
-wireless debugging is on. Android lets the app see those settings without any permission, but not Wi-Fi or Bluetooth,
+wireless debugging is on. In that checklist, red means something is wrong right now (not offline, debugging on)
+and amber is advice that's always true, so the red keeps standing out; Verify, which never shows the words, has a
+shorter list. Android lets the app see those settings without any permission, but not Wi-Fi or Bluetooth,
 so those you have to check yourself. The accessibility banner also updates while SeedTag is open, not only when you
 come back to it.
 

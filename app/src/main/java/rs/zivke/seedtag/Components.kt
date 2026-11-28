@@ -60,7 +60,11 @@ import kotlinx.coroutines.launch
 
 // ========================================================= components ===
 
-internal enum class Tone { Info, Caution, Success }
+/**
+ * [Caution] (red) is for what's wrong or dangerous right now, or can't be undone; [Advice] (amber) for advice that's
+ * always true, so the red keeps meaning something (board B31).
+ */
+internal enum class Tone { Info, Advice, Caution, Success }
 
 internal class ToneColors(val container: Color, val accent: Color, val content: Color)
 
@@ -70,6 +74,7 @@ internal fun colorsOf(tone: Tone): ToneColors {
     val x = LocalExtra.current
     return when (tone) {
         Tone.Info -> ToneColors(c.surfaceContainer, c.onSurfaceVariant, c.onSurface)
+        Tone.Advice -> ToneColors(x.adviceContainer, x.fair, x.onAdviceContainer)
         Tone.Caution -> ToneColors(c.errorContainer, c.error, c.onErrorContainer)
         Tone.Success -> ToneColors(x.successContainer, x.success, x.onSuccessContainer)
     }
@@ -79,7 +84,7 @@ internal fun colorsOf(tone: Tone): ToneColors {
 @Composable
 internal fun iconOf(tone: Tone): ImageVector = ImageVector.vectorResource(
     when (tone) {
-        Tone.Info -> R.drawable.ic_info
+        Tone.Info, Tone.Advice -> R.drawable.ic_info
         Tone.Caution -> R.drawable.ic_warning
         Tone.Success -> R.drawable.ic_check_circle
     },
@@ -452,20 +457,21 @@ internal fun Preflight(vm: SeedTagViewModel, flow: Flow) {
         )
     }
     val items = buildList {
-        add(
+        // Verify shows no words and asks before anything that can't be undone: a shorter list (board B31).
+        if (flow != Flow.Verify) add(
             Item(
-                Tone.Caution,
+                Tone.Advice,
                 "Read every screen carefully",
                 "Each one says exactly what to do. Read all of it, including every Learn more, before you actually " +
                     "do anything – the details matter. Some steps, such as overwriting a tag or making it read-only, can't be " +
                     "undone.",
             ),
         )
-        add(Item(Tone.Caution, SPARE_PHONE_TITLE, SPARE_PHONE_SUMMARY, SPARE_PHONE_DETAILS))
+        add(Item(Tone.Advice, SPARE_PHONE_TITLE, SPARE_PHONE_SUMMARY, SPARE_PHONE_DETAILS))
         if (flow == Flow.Restore) {
             add(
                 Item(
-                    Tone.Caution,
+                    Tone.Advice,
                     "Only do this in private",
                     "The words will be shown on screen. Make sure no one – and no camera – can see it.",
                     "They're hidden again as soon as you leave the app.",
@@ -503,7 +509,7 @@ internal fun Preflight(vm: SeedTagViewModel, flow: Flow) {
                 "Find where to hold it" to { vm.page = Page.Antenna },
             ),
         )
-        add(
+        if (flow != Flow.Verify) add(
             Item(
                 Tone.Info,
                 "Nothing is kept",
@@ -527,7 +533,7 @@ internal fun Preflight(vm: SeedTagViewModel, flow: Flow) {
             )
         }
         if (flow == Flow.Backup) {
-            add(Item(Tone.Caution, "Use at your own risk", "There's no warranty, and it's up to you to make sure this phone is free of malware.", DISCLAIMER))
+            add(Item(Tone.Advice, "Use at your own risk", "There's no warranty, and it's up to you to make sure this phone is free of malware.", DISCLAIMER))
         }
     }
     Checklist("Before you start", items)

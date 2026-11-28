@@ -316,7 +316,9 @@ report's tests N1–N12, A1–A3, H1).
   again"). Done 2026-11-26: no Show and no editing on a generated passphrase (the view model ignores keys for
   it), *Show it again* clears Repeat, *Type my own password instead* behind a question; device rows 7.69-7.72
   passed.
-- [ ] **B31: warning fatigue; idle timeout short for Restore.**
+- [ ] **B31: warning fatigue; idle timeout short for Restore.** Owner, 2026-11-28: colour as proposed, timeout
+  unchanged. On `develop`: `Tone.Advice` (amber) for the checklist's fixed advice, red only for live conditions,
+  a shorter Verify list; device row 7.94.
 - [ ] **B32: a refused write reads as "moved away"; one bad read-back calls the tag faulty** *(device: N10)*. On `develop`
   (2026-11-26): after a failed write the tag is read again (`AfterWrite`): unchanged gives "didn't take", twice in a
   row "refuses writes"; a write that went through carries on. A bad read-back is read again before "faulty". Device
